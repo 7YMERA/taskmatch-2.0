@@ -34,8 +34,8 @@
   --tm-sky: #38bdf8;
 
   /* Brand gradient — used for the wordmark and primary flourishes */
-  --tm-gradient: linear-gradient(90deg, #818cf8 0%, #a78bfa 50%, #34d399 100%);
-  --tm-gradient-btn: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+  --tm-gradient: linear-gradient(90deg, #818cf8 0%, #a78bfa 28%, #38bdf8 55%, #34d399 78%, #fbbf24 100%);
+  --tm-gradient-btn: linear-gradient(90deg, #4f46e5 0%, #7c3aed 55%, #0ea5e9 100%);
 
   /* Radii */
   --tm-r-sm: 8px;

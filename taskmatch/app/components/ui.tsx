@@ -58,10 +58,12 @@ export function AmbientBackground({ animate = true }: { animate?: boolean }) {
     <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
       <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
         style={{ background: 'rgba(99,102,241,0.22)', animation: anim }} />
-      <div className="absolute top-1/3 -right-24 w-[28rem] h-[28rem] rounded-full blur-3xl"
-        style={{ background: 'rgba(139,92,246,0.20)', animation: animate ? 'tm-drift 18s ease-in-out infinite reverse' : undefined }} />
-      <div className="absolute bottom-0 left-1/3 w-80 h-80 rounded-full blur-3xl"
-        style={{ background: 'rgba(52,211,153,0.12)', animation: animate ? 'tm-float 10s ease-in-out infinite' : undefined }} />
+      <div className="absolute top-1/4 -right-24 w-[28rem] h-[28rem] rounded-full blur-3xl"
+        style={{ background: 'rgba(56,189,248,0.18)', animation: animate ? 'tm-drift 18s ease-in-out infinite reverse' : undefined }} />
+      <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full blur-3xl"
+        style={{ background: 'rgba(52,211,153,0.16)', animation: animate ? 'tm-float 10s ease-in-out infinite' : undefined }} />
+      <div className="absolute top-1/2 left-1/2 w-72 h-72 rounded-full blur-3xl"
+        style={{ background: 'rgba(251,191,36,0.10)', animation: animate ? 'tm-drift 22s ease-in-out infinite' : undefined }} />
       <div className="absolute inset-0 opacity-[0.04]"
         style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
     </div>

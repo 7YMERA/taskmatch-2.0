@@ -85,9 +85,9 @@ function Section({ id, children, className = '' }: { id?: string; children: Reac
   )
 }
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
+function Eyebrow({ children, color = 'var(--tm-violet)' }: { children: React.ReactNode; color?: string }) {
   return (
-    <p className="text-xs uppercase tracking-[0.2em] mb-3 font-medium" style={{ color: 'var(--tm-violet)' }}>{children}</p>
+    <p className="text-xs uppercase tracking-[0.2em] mb-3 font-medium" style={{ color }}>{children}</p>
   )
 }
 
@@ -151,10 +151,10 @@ export default function Landing() {
   ]
 
   const steps = [
-    { n: '01', t: 'Add your people & skills', d: 'Build a roster with each person’s skills and programme.' },
-    { n: '02', t: 'Create tasks with requirements', d: 'Describe a task, set the skills it needs and the hours you expect.' },
-    { n: '03', t: 'Let TaskMatch rank the fit', d: 'See who fits best by skill and workload, with a pairing suggested.' },
-    { n: '04', t: 'Track, score & learn', d: 'Completed work scores efficiency and feeds the next match.' },
+    { n: '01', t: 'Add your people & skills', d: 'Build a roster with each person’s skills and programme.', c: 'var(--tm-indigo)' },
+    { n: '02', t: 'Create tasks with requirements', d: 'Describe a task, set the skills it needs and the hours you expect.', c: 'var(--tm-sky)' },
+    { n: '03', t: 'Let TaskMatch rank the fit', d: 'See who fits best by skill and workload, with a pairing suggested.', c: 'var(--tm-emerald)' },
+    { n: '04', t: 'Track, score & learn', d: 'Completed work scores efficiency and feeds the next match.', c: 'var(--tm-amber)' },
   ]
 
   const team = [
@@ -231,13 +231,14 @@ export default function Landing() {
       <div style={{ background: 'var(--tm-surface-1)', borderTop: '1px solid var(--tm-border)', borderBottom: '1px solid var(--tm-border)' }}>
         <Section id="how">
           <div className="text-center mb-14">
-            <Eyebrow>How it works</Eyebrow>
+            <Eyebrow color="var(--tm-sky)">How it works</Eyebrow>
             <h2 className="text-3xl sm:text-4xl font-bold">Four steps, from roster to results</h2>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {steps.map(s => (
-              <Card key={s.n} hover className="p-6">
-                <div className="text-2xl font-bold tm-wordmark mb-3">{s.n}</div>
+              <Card key={s.n} hover className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1" style={{ background: s.c }} />
+                <div className="text-3xl font-bold mb-3" style={{ color: s.c }}>{s.n}</div>
                 <h3 className="font-semibold mb-1.5" style={{ color: 'var(--tm-text)' }}>{s.t}</h3>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--tm-text-muted)' }}>{s.d}</p>
               </Card>
@@ -248,7 +249,7 @@ export default function Landing() {
 
       {/* ─── MISSION ─── */}
       <Section id="mission" className="text-center">
-        <Eyebrow>Our mission</Eyebrow>
+        <Eyebrow color="var(--tm-emerald)">Our mission</Eyebrow>
         <h2 className="text-3xl sm:text-5xl font-bold max-w-4xl mx-auto leading-tight mb-6">
           Teams do their best work when the <span className="tm-wordmark">right person</span> picks up the <span className="tm-wordmark">right task</span>.
         </h2>
@@ -257,9 +258,9 @@ export default function Landing() {
           deadlines slip. TaskMatch makes skills and capacity visible, so allocation is fair, balanced, and based on evidence.
         </p>
         <div className="grid sm:grid-cols-3 gap-6 mt-14 max-w-3xl mx-auto">
-          {[['Fair', 'Work spread by capacity, not by who says yes first.'], ['Visible', 'Every skill and score is on the record.'], ['Evidence-led', 'Past results shape the next match.']].map(([t, d]) => (
+          {[['Fair', 'Work spread by capacity, not by who says yes first.', 'var(--tm-sky)'], ['Visible', 'Every skill and score is on the record.', 'var(--tm-emerald)'], ['Evidence-led', 'Past results shape the next match.', 'var(--tm-amber)']].map(([t, d, c]) => (
             <div key={t}>
-              <p className="text-xl font-semibold mb-1" style={{ color: 'var(--tm-emerald)' }}>{t}</p>
+              <p className="text-xl font-semibold mb-1" style={{ color: c }}>{t}</p>
               <p className="text-sm" style={{ color: 'var(--tm-text-muted)' }}>{d}</p>
             </div>
           ))}
@@ -270,7 +271,7 @@ export default function Landing() {
       <div style={{ background: 'var(--tm-surface-1)', borderTop: '1px solid var(--tm-border)', borderBottom: '1px solid var(--tm-border)' }}>
         <Section id="team">
           <div className="text-center mb-14">
-            <Eyebrow>The team</Eyebrow>
+            <Eyebrow color="var(--tm-amber)">The team</Eyebrow>
             <h2 className="text-3xl sm:text-4xl font-bold">The people behind TaskMatch</h2>
             <p className="text-sm mt-3" style={{ color: 'var(--tm-text-faint)' }}>(edit these in <code>app/page.tsx</code>)</p>
           </div>
@@ -289,7 +290,7 @@ export default function Landing() {
       {/* ─── ROADMAP / WHAT'S NEW ─── */}
       <Section id="roadmap">
         <div className="text-center mb-14">
-          <Eyebrow>What&apos;s new</Eyebrow>
+          <Eyebrow color="var(--tm-rose)">What&apos;s new</Eyebrow>
           <h2 className="text-3xl sm:text-4xl font-bold">Shipped recently & what&apos;s next</h2>
         </div>
         <div className="max-w-3xl mx-auto space-y-4">
@@ -340,3 +341,4 @@ export default function Landing() {
     </div>
   )
 }
+
