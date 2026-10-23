@@ -1,20 +1,145 @@
 @import "tailwindcss";
 
+/* ───────────────────────────────────────────────────────────
+   TaskMatch Design System — tokens
+   One source of truth for colour, surface, radius and motion.
+   Change a value here and it updates everywhere.
+   ─────────────────────────────────────────────────────────── */
+:root {
+  /* Base canvas */
+  --tm-bg: #0f0f13;
+  --tm-bg-elev: #16161c;
+  --tm-bg-sidebar: #131318;
+
+  /* Surfaces (cards, inputs) — layered translucency on the dark canvas */
+  --tm-surface-1: rgba(255, 255, 255, 0.035);
+  --tm-surface-2: rgba(255, 255, 255, 0.06);
+  --tm-surface-3: rgba(255, 255, 255, 0.10);
+
+  /* Borders */
+  --tm-border: rgba(255, 255, 255, 0.10);
+  --tm-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --tm-text: rgba(255, 255, 255, 0.92);
+  --tm-text-muted: rgba(255, 255, 255, 0.55);
+  --tm-text-faint: rgba(255, 255, 255, 0.35);
+
+  /* Brand accents */
+  --tm-indigo: #6366f1;
+  --tm-violet: #8b5cf6;
+  --tm-emerald: #34d399;
+  --tm-amber: #fbbf24;
+  --tm-rose: #fb7185;
+  --tm-sky: #38bdf8;
+
+  /* Brand gradient — used for the wordmark and primary flourishes */
+  --tm-gradient: linear-gradient(90deg, #818cf8 0%, #a78bfa 50%, #34d399 100%);
+  --tm-gradient-btn: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+
+  /* Radii */
+  --tm-r-sm: 8px;
+  --tm-r-md: 12px;
+  --tm-r-lg: 16px;
+  --tm-r-xl: 20px;
+
+  /* Elevation */
+  --tm-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --tm-shadow-glow: 0 10px 40px rgba(99, 102, 241, 0.25);
+}
+
+html { background: var(--tm-bg); }
+
 body {
-  background: #111111 !important;
-  color: white;
+  background: var(--tm-bg);
+  color: var(--tm-text);
   min-height: 100vh;
-  /* Render native form controls (incl. the <select> popup) in dark mode,
-     so dropdown backdrops stay dark even when the control bg is light. */
   color-scheme: dark;
 }
 
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+
+option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
+
+/* ─── Reusable component classes (the design system) ─── */
+
+/* Card surface */
+.tm-card {
+  background: var(--tm-surface-1);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-r-lg);
+  backdrop-filter: blur(6px);
+}
+.tm-card-hover { transition: border-color .2s, background .2s, transform .2s; }
+.tm-card-hover:hover {
+  border-color: var(--tm-border-strong);
+  background: var(--tm-surface-2);
 }
 
-/* Keep native dropdown menus dark instead of the default white */
-option {
-  background-color: #1a1a1a;
-  color: white;
+/* Brand wordmark */
+.tm-wordmark {
+  background: var(--tm-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+/* Buttons */
+.tm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 500; line-height: 1;
+  padding: 10px 18px; border-radius: var(--tm-r-md);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background .18s, border-color .18s, opacity .18s, transform .08s;
+}
+.tm-btn:active { transform: translateY(1px); }
+.tm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.tm-btn-primary { background: var(--tm-gradient-btn); color: #fff; box-shadow: var(--tm-shadow-glow); }
+.tm-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.tm-btn-ghost { background: transparent; border-color: var(--tm-border-strong); color: var(--tm-text-muted); }
+.tm-btn-ghost:hover:not(:disabled) { background: var(--tm-surface-2); color: var(--tm-text); }
+.tm-btn-danger { background: #dc2626; color: #fff; }
+.tm-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+
+/* Inputs */
+.tm-input {
+  width: 100%;
+  background: var(--tm-surface-1);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-r-md);
+  padding: 10px 14px; font-size: 14px; color: var(--tm-text);
+  outline: none; transition: border-color .18s, background .18s;
+}
+.tm-input::placeholder { color: var(--tm-text-faint); }
+.tm-input:focus { border-color: var(--tm-indigo); background: var(--tm-surface-2); }
+.tm-label { font-size: 12px; color: var(--tm-text-faint); margin-bottom: 4px; display: block; }
+
+/* Badges */
+.tm-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+/* ─── Motion ─── */
+@keyframes tm-toast-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes tm-modal-in { from { opacity: 0; transform: scale(.97) } to { opacity: 1; transform: scale(1) } }
+@keyframes tm-fade-up { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes tm-float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+@keyframes tm-drift { 0% { transform: translate(0,0) } 50% { transform: translate(24px,-16px) } 100% { transform: translate(0,0) } }
+@keyframes tm-shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+
+.tm-fade-up { animation: tm-fade-up .5s ease-out both; }
+
+/* Skeleton loading shimmer */
+.tm-skeleton {
+  background: linear-gradient(90deg, var(--tm-surface-1) 25%, var(--tm-surface-2) 50%, var(--tm-surface-1) 75%);
+  background-size: 800px 100%;
+  animation: tm-shimmer 1.4s infinite linear;
+  border-radius: var(--tm-r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-fade-up, .tm-skeleton, [class*="animate-"] { animation: none !important; }
 }
