@@ -96,9 +96,7 @@ export default function Profile() {
       const res = await axios.post(`${API}/complete`, {
         assignment_id: assignmentId,
         actual_hours,
-        actor_email: userEmail,
-        actor_role: userRole,
-      })
+      }, { headers: await authHeader() })
       toast(res.data.score != null && res.data.committed_hours != null
         ? `Completed! Score ${res.data.score} (${res.data.committed_hours}h committed vs ${res.data.elapsed_hours}h actual)`
         : `Completed! Your score: ${res.data.score ?? 'n/a'}`, 'success')

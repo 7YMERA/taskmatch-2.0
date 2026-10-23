@@ -68,6 +68,12 @@ export default function MyTasks() {
     setLoading(false)
   }
 
+  // Send the caller's Supabase token so the API verifies identity server-side.
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
   // Teammates' active tasks + due dates, so a student can schedule around the group.
   const loadTeam = async (grp: string | null, selfId: string) => {
     if (!grp) { setTeamTasks([]); return }
@@ -100,7 +106,7 @@ export default function MyTasks() {
   const startTask = async (assignmentId: string) => {
     setBusy(assignmentId)
     try {
-      await axios.post(`${API}/start`, { assignment_id: assignmentId, actor_email: userEmail, actor_role: userRole })
+      await axios.post(`${API}/start`, { assignment_id: assignmentId }, { headers: await authHeaders() })
       if (student) await load(student.id)
     } catch (err: any) { toast(errMsg(err, 'Could not start'), 'error') }
     finally { setBusy(null) }
@@ -116,7 +122,7 @@ export default function MyTasks() {
     if (actual_hours !== undefined && (isNaN(actual_hours) || actual_hours < 0)) { toast('Enter a valid number of hours.', 'error'); return }
     setBusy(assignmentId)
     try {
-      const res = await axios.post(`${API}/complete`, { assignment_id: assignmentId, actual_hours, actor_email: userEmail, actor_role: userRole })
+      const res = await axios.post(`${API}/complete`, { assignment_id: assignmentId, actual_hours }, { headers: await authHeaders() })
       const d = res.data
       const basis = d.score != null && d.committed_hours != null ? ` — score ${d.score} (${d.committed_hours}h committed vs ${d.elapsed_hours}h actual)` : (d.score != null ? ` — score ${d.score}` : '')
       toast(`Completed!${userRole === 'leader' ? basis : ''}`, 'success')

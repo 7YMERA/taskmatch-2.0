@@ -41,6 +41,14 @@ export default function TaskDetail() {
     loadAll()
   }, [id])
 
+  // Attach the caller's Supabase access token so the API can verify who is acting.
+  // The server derives actor identity + permissions from this token — never from
+  // request-body fields, which a client could forge.
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
   const loadAll = async () => {
     const { data: t } = await supabase
       .from('tasks')
@@ -94,7 +102,7 @@ export default function TaskDetail() {
     if (assigning) return
     setAssigning(student_id)
     try {
-      await axios.post(`${API}/assign`, { task_id: id, student_id, actor_email: userEmail, actor_role: userRole })
+      await axios.post(`${API}/assign`, { task_id: id, student_id }, { headers: await authHeaders() })
       await refresh()
       toast(`${name} assigned!`, 'success')
     } catch (err: any) { toast(errMsg(err, 'Could not assign'), 'error') } finally { setAssigning(null) }
@@ -104,14 +112,14 @@ export default function TaskDetail() {
     if (status === 'Completed') { toast("This assignment is completed — it's kept as the student's performance record and can't be removed.", 'info'); return }
     if (!(await confirmDialog({ title: `Remove ${name} from this task?`, message: `They keep their profile and history; only this assignment is removed.${status === 'In Progress' ? ' Their running timer for this task will be discarded.' : ''}`, danger: true, confirmLabel: 'Remove' }))) return
     try {
-      await axios.post(`${API}/unassign`, { assignment_id: assignmentId, actor_email: userEmail, actor_role: userRole })
+      await axios.post(`${API}/unassign`, { assignment_id: assignmentId }, { headers: await authHeaders() })
       await refresh()
     } catch (err: any) { toast(errMsg(err, 'Could not remove'), 'error') }
   }
 
   const startAssignment = async (assignmentId: string) => {
     try {
-      await axios.post(`${API}/start`, { assignment_id: assignmentId, actor_email: userEmail, actor_role: userRole })
+      await axios.post(`${API}/start`, { assignment_id: assignmentId }, { headers: await authHeaders() })
       await refresh()
     } catch (err: any) { toast(errMsg(err, 'Could not start'), 'error') }
   }
@@ -123,7 +131,7 @@ export default function TaskDetail() {
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
     if (actual_hours !== undefined && (isNaN(actual_hours) || actual_hours < 0)) { toast('Enter a valid number.', 'error'); return }
     try {
-      const res = await axios.post(`${API}/complete`, { assignment_id: assignmentId, actual_hours, actor_email: userEmail, actor_role: userRole })
+      const res = await axios.post(`${API}/complete`, { assignment_id: assignmentId, actual_hours }, { headers: await authHeaders() })
       toast(res.data.score != null && res.data.committed_hours != null
         ? `Completed! Score ${res.data.score} (${res.data.committed_hours}h committed vs ${res.data.elapsed_hours}h actual)`
         : `Completed! Score: ${res.data.score ?? 'n/a'}`, 'success')

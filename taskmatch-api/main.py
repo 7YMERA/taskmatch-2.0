@@ -83,6 +83,17 @@ def require_admin_client():
     return admin
 
 
+def actor_from_token(authorization):
+    """Resolve the acting user's (email, role) from their verified Supabase token.
+
+    This is the trusted source of identity for audit logging and permission
+    checks — never read actor_email / actor_role from the request body, since a
+    client can forge those. Returns (email, role)."""
+    user = require_user(authorization)
+    role = (user.user_metadata or {}).get("role", "student")
+    return user.email, role
+
+
 WIP_LIMIT = 3
 
 
@@ -391,10 +402,13 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
 
 
 @app.post("/assign")
-def assign(body: dict):
-    """Leader assigns a student to a task."""
+def assign(body: dict, authorization: str = Header(None)):
+    """Leader assigns a student to a task. Caller must be an authenticated leader;
+    the actor recorded in the audit log is taken from the verified token, not the body."""
+    require_leader(authorization)
+    actor_email, actor_role = actor_from_token(authorization)
     return _create_assignment(body.get("task_id"), body.get("student_id"),
-                              body.get("actor_email"), body.get("actor_role"))
+                              actor_email, actor_role)
 
 
 @app.post("/self-assign")
@@ -416,11 +430,10 @@ def self_assign(body: dict, authorization: str = Header(None)):
 
 
 @app.post("/start")
-def start(body: dict):
+def start(body: dict, authorization: str = Header(None)):
     """Assignee starts their assigned task — the timer begins now (in_progress_at)."""
+    actor_email, actor_role = actor_from_token(authorization)
     assignment_id = body.get("assignment_id")
-    actor_email = body.get("actor_email")
-    actor_role = body.get("actor_role")
     if not assignment_id:
         raise HTTPException(status_code=400, detail="assignment_id required")
 
@@ -458,13 +471,12 @@ def start(body: dict):
 
 
 @app.post("/unassign")
-def unassign(body: dict):
+def unassign(body: dict, authorization: str = Header(None)):
     """Remove a student from a task (undo an assignment). Completed assignments are kept —
     they hold the student's performance record. If removing the last active assignee leaves
     the task with no one working it, roll the task back to 'New'."""
+    actor_email, actor_role = actor_from_token(authorization)
     assignment_id = body.get("assignment_id")
-    actor_email = body.get("actor_email")
-    actor_role = body.get("actor_role")
     if not assignment_id:
         raise HTTPException(status_code=400, detail="assignment_id required")
 
@@ -505,7 +517,7 @@ def unassign(body: dict):
 
 
 @app.post("/complete")
-def complete(body: dict):
+def complete(body: dict, authorization: str = Header(None)):
     """Mark a student's assignment complete, compute their performance score,
     and flip the task to Completed once every assignee is done.
 
@@ -513,10 +525,9 @@ def complete(body: dict):
     Elapsed defaults to wall-clock (in_progress_at -> now), but a manually
     entered actual_hours overrides it.
     """
+    actor_email, actor_role = actor_from_token(authorization)
     assignment_id = body.get("assignment_id")
     actual_hours = body.get("actual_hours")  # optional manual override
-    actor_email = body.get("actor_email")
-    actor_role = body.get("actor_role")
 
     if not assignment_id:
         raise HTTPException(status_code=400, detail="assignment_id required")

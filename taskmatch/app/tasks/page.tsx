@@ -59,6 +59,12 @@ export default function Tasks() {
     fetchGroups()
   }, [])
 
+  // Send the caller's Supabase token so the API verifies identity server-side.
+  const authHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }
+
   const fetchTasks = async () => {
     const { data } = await supabase
       .from('tasks')
@@ -163,7 +169,7 @@ export default function Tasks() {
     if (assigning) return           // ignore rapid double-clicks while a request is in flight
     setAssigning(student_id)
     try {
-      await axios.post(`${API}/assign`, { task_id, student_id, actor_email: userEmail, actor_role: userRole })
+      await axios.post(`${API}/assign`, { task_id, student_id }, { headers: await authHeaders() })
       const res = await axios.get(`${API}/recommend/${task_id}`)
       setRecommendations(prev => ({ ...prev, [task_id]: res.data.recommendations }))
       setRecMeta(prev => ({ ...prev, [task_id]: { suggested_pair: res.data.suggested_pair, assigned_count: res.data.assigned_count } }))
