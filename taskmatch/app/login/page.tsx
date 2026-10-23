@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AmbientBackground, Button, Input, Field } from '../components/ui'
+import { AmbientBackground, Button, Icon } from '../components/ui'
 import { ThemeToggle } from '../lib/theme'
 
 const supabase = createClient(
@@ -45,9 +45,12 @@ export default function Login() {
     }
   }
 
+  const fillDemo = () => { setEmail('demo@taskmatch.app'); setPassword('taskmatch123') }
+
+  /* ── Post-login buffer ── */
   if (signingIn) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--tm-bg)' }}>
+      <main className="relative min-h-screen grid place-items-center px-6" style={{ background: 'var(--tm-bg)' }}>
         <AmbientBackground />
         <div className="relative z-10 text-center tm-fade-up">
           <div className="mx-auto mb-8 w-20 h-20 relative">
@@ -55,7 +58,7 @@ export default function Login() {
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-400 border-r-emerald-400 animate-spin" />
           </div>
           <h1 className="text-2xl mb-2">
-            <span className="tm-wordmark">Welcome back{welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}!</span>
+            <span className="tm-wordmark">Welcome back{welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}</span>
           </h1>
           <p className="text-sm transition-opacity duration-300" style={{ color: 'var(--tm-text-muted)' }}>{SIGNIN_MSGS[step]}</p>
           <div className="w-60 h-1.5 rounded-full overflow-hidden mx-auto mt-6" style={{ background: 'var(--tm-surface-2)' }}>
@@ -63,58 +66,63 @@ export default function Login() {
               style={{ width: `${((step + 1) / SIGNIN_MSGS.length) * 100}%`, background: 'var(--tm-gradient-btn)' }} />
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
+  /* ── Single centered sign-in card ── */
   return (
-    <div className="relative min-h-screen grid lg:grid-cols-2" style={{ background: 'var(--tm-bg)' }}>
+    <main className="relative min-h-screen grid place-items-center px-4 py-10" style={{ background: 'var(--tm-bg)' }}>
       <AmbientBackground />
 
       <div className="absolute top-5 right-5 z-20"><ThemeToggle /></div>
+      <Link href="/" className="absolute top-5 left-5 z-20 inline-flex items-center gap-1.5 text-sm transition hover:opacity-80"
+        style={{ color: 'var(--tm-text-faint)' }}>
+        <Icon name="arrowRight" size={15} className="rotate-180" /> Home
+      </Link>
 
-      {/* LEFT — brand panel (hidden on mobile) */}
-      <div className="relative z-10 hidden lg:flex flex-col justify-between p-12">
-        <Link href="/" className="text-sm transition hover:opacity-80" style={{ color: 'var(--tm-text-faint)' }}>← Home</Link>
-        <div className="tm-fade-up">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs"
-            style={{ border: '1px solid var(--tm-border)', background: 'var(--tm-surface-1)', color: 'var(--tm-text-muted)' }}>
-            <span className="w-2 h-2 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Skill-based task allocation
-          </div>
-          <h1 className="text-5xl font-bold leading-tight mb-4">
-            <span className="tm-wordmark">TaskMatch</span>
-          </h1>
-          <p className="text-lg max-w-sm" style={{ color: 'var(--tm-text-muted)' }}>
-            The right people on the right tasks — matched by skill, balanced by workload.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-2">
-            {['Smart matching', 'Performance scoring', 'Audit log', 'Team groups'].map(t => (
-              <span key={t} className="text-xs px-3 py-1.5 rounded-full"
-                style={{ border: '1px solid var(--tm-border)', background: 'var(--tm-surface-1)', color: 'var(--tm-text-muted)' }}>{t}</span>
-            ))}
-          </div>
+      <div className="relative z-10 w-full max-w-[400px] tm-fade-up">
+        {/* Logo + wordmark, centered above the card */}
+        <div className="flex flex-col items-center mb-6">
+          <svg width="52" height="52" viewBox="0 0 42 42" fill="none" aria-label="TaskMatch"
+            className="drop-shadow-[0_4px_16px_rgba(99,102,241,0.45)] mb-3">
+            <defs><linearGradient id="lg" x1="4" y1="4" x2="38" y2="38" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#6366f1" /><stop offset="0.5" stopColor="#8b5cf6" /><stop offset="1" stopColor="#34d399" />
+            </linearGradient></defs>
+            <rect x="3" y="3" width="36" height="36" rx="11" fill="url(#lg)" />
+            <line x1="15.5" y1="15.5" x2="26.5" y2="26.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
+            <circle cx="15" cy="15" r="3.6" fill="#fff" /><rect x="22.5" y="22.5" width="7" height="7" rx="2.2" fill="#fff" />
+          </svg>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--tm-text)' }}>Welcome back</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--tm-text-faint)' }}>Sign in to your TaskMatch workspace</p>
         </div>
-        <p className="text-xs" style={{ color: 'var(--tm-text-faint)' }}>Match people to work by skill, not by guesswork.</p>
-      </div>
 
-      {/* RIGHT — sign-in card */}
-      <div className="relative z-10 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm tm-card p-8 tm-fade-up">
-          <Link href="/" className="text-xs lg:hidden transition hover:opacity-80" style={{ color: 'var(--tm-text-faint)' }}>← Home</Link>
-          <div className="mt-2 mb-7">
-            <h2 className="text-2xl font-bold" style={{ color: 'var(--tm-text)' }}>Welcome back</h2>
-            <p className="text-sm mt-1" style={{ color: 'var(--tm-text-faint)' }}>Sign in to continue to your workspace.</p>
-          </div>
+        {/* The card */}
+        <div className="tm-card p-7 sm:p-8">
+          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            <div>
+              <label className="tm-label" htmlFor="email">Email</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--tm-text-faint)' }}>
+                  <Icon name="user" size={17} />
+                </span>
+                <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com" autoFocus
+                  className="tm-input" style={{ paddingLeft: 40 }} />
+              </div>
+            </div>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <Field label="Email">
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" autoFocus />
-            </Field>
-            <Field label="Password">
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" />
-            </Field>
+            <div>
+              <label className="tm-label" htmlFor="pw">Password</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--tm-text-faint)' }}>
+                  <Icon name="lock" size={17} />
+                </span>
+                <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="tm-input" style={{ paddingLeft: 40 }} />
+              </div>
+            </div>
 
             {error && (
               <p className="text-xs px-3 py-2 rounded-lg" style={{ color: 'var(--tm-rose)', background: 'rgba(251,113,133,0.1)', border: '1px solid rgba(251,113,133,0.25)' }}>
@@ -122,17 +130,24 @@ export default function Login() {
               </p>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full mt-1">
+            <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
 
-          <p className="text-xs mt-6 text-center" style={{ color: 'var(--tm-text-faint)' }}>
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" style={{ color: 'var(--tm-indigo)' }} className="hover:opacity-80">Sign up</Link>
-          </p>
+          {/* Demo credentials — one click to fill */}
+          <button onClick={fillDemo} type="button"
+            className="w-full mt-4 text-xs rounded-lg py-2.5 transition hover:opacity-100"
+            style={{ border: '1px dashed var(--tm-border-strong)', color: 'var(--tm-text-muted)', background: 'var(--tm-surface-1)' }}>
+            Use demo account&nbsp;·&nbsp;<span style={{ color: 'var(--tm-indigo)' }}>demo@taskmatch.app</span>
+          </button>
         </div>
+
+        <p className="text-sm mt-6 text-center" style={{ color: 'var(--tm-text-faint)' }}>
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" style={{ color: 'var(--tm-indigo)' }} className="hover:opacity-80 font-medium">Sign up</Link>
+        </p>
       </div>
-    </div>
+    </main>
   )
 }
