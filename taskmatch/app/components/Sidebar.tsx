@@ -7,6 +7,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { effectiveRole, setRoleOverride } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
+import { Icon } from './ui'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,11 +44,11 @@ export default function Sidebar() {
   const initials = (n: string) => (n || '?').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
 
   const nav = [
-    { label: 'Dashboard', href: '/dashboard', icon: '▣' },
-    { label: 'Students', href: '/students', icon: '◉' },
-    { label: 'Tasks', href: '/tasks', icon: '✓' },
-    { label: 'My Tasks', href: '/my-tasks', icon: '★' },
-    ...(role === 'leader' ? [{ label: 'Logs', href: '/logs', icon: '≣' }] : []),
+    { label: 'Dashboard', href: '/dashboard', icon: 'grid' as const },
+    { label: 'Students', href: '/students', icon: 'users' as const },
+    { label: 'Tasks', href: '/tasks', icon: 'check' as const },
+    { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
+    ...(role === 'leader' ? [{ label: 'Logs', href: '/logs', icon: 'list' as const }] : []),
   ]
 
   const panel = (
@@ -78,7 +79,7 @@ export default function Sidebar() {
               background: activeItem ? 'var(--tm-surface-2)' : 'transparent',
               borderLeft: activeItem ? '2px solid var(--tm-indigo)' : '2px solid transparent',
             }}>
-            <span className="text-xs opacity-70 w-4 text-center">{item.icon}</span>{item.label}
+            <span className="shrink-0 opacity-70" style={{ width: 16 }}><Icon name={item.icon} size={16} /></span>{item.label}
           </Link>
         )
       })}
@@ -131,7 +132,7 @@ export default function Sidebar() {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-14"
         style={{ background: 'var(--tm-bg-sidebar)', borderBottom: '1px solid var(--tm-border)' }}>
-        <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-xl" style={{ color: 'var(--tm-text)' }}>☰</button>
+        <button onClick={() => setOpen(true)} aria-label="Open menu" style={{ color: 'var(--tm-text)' }}><Icon name="menu" /></button>
         <span className="tm-wordmark font-bold">TaskMatch</span>
         <div className="ml-auto"><ThemeToggle /></div>
       </div>

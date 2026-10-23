@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { AmbientBackground, Button, Card } from './components/ui'
+import { AmbientBackground, Button, Card, Icon } from './components/ui'
 import { ThemeToggle } from './lib/theme'
 
 const supabase = createClient(
@@ -59,8 +59,8 @@ function NavBar() {
           <ThemeToggle />
           <Link href="/login" className="hidden sm:block"><Button variant="ghost" className="!py-2 !px-4">Log in</Button></Link>
           <Link href="/signup"><Button className="!py-2 !px-4">Get started</Button></Link>
-          <button className="md:hidden text-xl ml-1" style={{ color: 'var(--tm-text)' }}
-            aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
+          <button className="md:hidden ml-1" style={{ color: 'var(--tm-text)' }}
+            aria-label="Menu" onClick={() => setMenuOpen(o => !o)}><Icon name="menu" /></button>
         </div>
       </nav>
 
@@ -145,9 +145,9 @@ export default function Landing() {
   }
 
   const features = [
-    { icon: '⚡', title: 'Smart matching', desc: 'Rank people against a task’s required skills and current workload, then suggest a balanced strong + learner pairing — automatically.', accent: 'var(--tm-violet)', mock: MatchMock },
-    { icon: '📊', title: 'Performance scoring', desc: 'Every completed task scores efficiency from committed vs actual hours, and rolls up into each person’s track record.', accent: 'var(--tm-emerald)', mock: ScoreMock },
-    { icon: '🛡', title: 'Immutable audit log', desc: 'Every assignment, start and completion is recorded, attributed and time-stamped — and can never be edited or deleted.', accent: 'var(--tm-rose)', mock: AuditMock },
+    { icon: 'bolt' as const, title: 'Smart matching', desc: 'Rank people against a task’s required skills and current workload, then suggest a balanced strong + learner pairing — automatically.', accent: 'var(--tm-violet)', mock: MatchMock },
+    { icon: 'chart' as const, title: 'Performance scoring', desc: 'Every completed task scores efficiency from committed vs actual hours, and rolls up into each person’s track record.', accent: 'var(--tm-emerald)', mock: ScoreMock },
+    { icon: 'shield' as const, title: 'Immutable audit log', desc: 'Every assignment, start and completion is recorded, attributed and time-stamped — and can never be edited or deleted.', accent: 'var(--tm-rose)', mock: AuditMock },
   ]
 
   const steps = [
@@ -196,7 +196,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-xs flex flex-col items-center gap-1 animate-bounce" style={{ color: 'var(--tm-text-faint)' }}>
-            <span>Scroll</span><span>↓</span>
+            <span>Scroll</span><Icon name="arrowDown" size={16} />
           </div>
         </Section>
       </div>
@@ -211,7 +211,10 @@ export default function Landing() {
           {features.map((f, i) => (
             <div key={f.title} className={`grid lg:grid-cols-2 gap-10 items-center ${i % 2 ? 'lg:[direction:rtl]' : ''}`}>
               <div className="lg:[direction:ltr]">
-                <div className="text-3xl mb-4">{f.icon}</div>
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4"
+                  style={{ background: `color-mix(in srgb, ${f.accent} 15%, transparent)`, color: f.accent }}>
+                  <Icon name={f.icon} size={24} />
+                </div>
                 <h3 className="text-2xl font-semibold mb-3" style={{ color: f.accent }}>{f.title}</h3>
                 <p className="text-base leading-relaxed max-w-md" style={{ color: 'var(--tm-text-muted)' }}>{f.desc}</p>
               </div>

@@ -538,7 +538,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                   </div>
                   {isLate(task) && <span className="text-[11px] text-amber-400 shrink-0" title={`Delivered after due ${task.due_date}`}>late</span>}
                   {isDelayed(task) && <span className="text-[11px] text-red-400 shrink-0" title={`Past due ${task.due_date}`}>delayed</span>}
-                  {isClosed(task) && <span className="text-[11px] text-white/40 shrink-0" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed 🔒</span>}
+                  {isClosed(task) && <span className="text-[11px] text-white/40 shrink-0" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed </span>}
 
                   {userRole === 'leader' && (
                     <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
@@ -608,13 +608,13 @@ const updateTaskStatus = async (id: string, status: string) => {
                         <>
                           {meta?.suggested_pair && (
                             <div className="mb-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
-                              <p className="text-xs font-medium text-indigo-300 mb-1">⚖️ Suggested balanced pair</p>
+                              <p className="text-xs font-medium text-indigo-300 mb-1">️ Suggested balanced pair</p>
                               <p className="text-xs text-white/60">{meta.suggested_pair.reason}</p>
                             </div>
                           )}
                           {meta && meta.assigned_count < 2 && (
                             <div className="mb-3 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                              ⚠ This task has {meta.assigned_count} assignee{meta.assigned_count === 1 ? '' : 's'} — assign at least 2 people.
+                              This task has {meta.assigned_count} assignee{meta.assigned_count === 1 ? '' : 's'} — assign at least 2 people.
                             </div>
                           )}
                           <div className="flex flex-col gap-2">

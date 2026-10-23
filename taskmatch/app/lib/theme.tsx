@@ -4,6 +4,7 @@
    <html data-theme="..."> so every CSS token flips at once. */
 
 import { useEffect, useState } from 'react'
+import { Icon } from '../components/ui'
 
 type Theme = 'dark' | 'light'
 
@@ -35,8 +36,8 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     <button onClick={flip} aria-label="Toggle light / dark theme"
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       className={`tm-btn tm-btn-ghost ${className}`}
-      style={{ padding: '8px 12px', fontSize: 16, lineHeight: 1 }}>
-      {theme === 'dark' ? '☀️' : '🌙'}
+      style={{ padding: '8px 10px', lineHeight: 1 }}>
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
     </button>
   )
 }

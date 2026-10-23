@@ -53,7 +53,6 @@ export default function Login() {
           <div className="mx-auto mb-8 w-20 h-20 relative">
             <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: 'var(--tm-border)' }} />
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-400 border-r-emerald-400 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-2xl">👋</div>
           </div>
           <h1 className="text-2xl mb-2">
             <span className="tm-wordmark">Welcome back{welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}!</span>
@@ -89,7 +88,7 @@ export default function Login() {
             The right people on the right tasks — matched by skill, balanced by workload.
           </p>
           <div className="mt-8 flex flex-wrap gap-2">
-            {['⚡ Smart matching', '📊 Performance scoring', '🛡 Audit log', '👥 Team groups'].map(t => (
+            {['Smart matching', 'Performance scoring', 'Audit log', 'Team groups'].map(t => (
               <span key={t} className="text-xs px-3 py-1.5 rounded-full"
                 style={{ border: '1px solid var(--tm-border)', background: 'var(--tm-surface-1)', color: 'var(--tm-text-muted)' }}>{t}</span>
             ))}

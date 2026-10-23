@@ -320,7 +320,7 @@ export default function Dashboard() {
               </div>
             )}
           {!loading && wipData.at_limit > 0 && (
-            <p className="text-[11px] text-red-400/70 mt-3">⚠ {wipData.at_limit} student{wipData.at_limit === 1 ? '' : 's'} at the WIP limit — they can&apos;t take new tasks until they finish something.</p>
+            <p className="text-[11px] text-red-400/70 mt-3">{wipData.at_limit} student{wipData.at_limit === 1 ? '' : 's'} at the WIP limit — they can&apos;t take new tasks until they finish something.</p>
           )}
         </div>
         </>)}
@@ -329,11 +329,11 @@ export default function Dashboard() {
         {/* Fastest / slowest task */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {[
-            { title: 'Fastest task', icon: '⚡', t: fastest },
-            { title: 'Slowest task', icon: '🐢', t: slowest },
+            { title: 'Fastest task', icon: '', t: fastest },
+            { title: 'Slowest task', icon: '', t: slowest },
           ].map(card => (
             <div key={card.title} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-              <p className="text-sm font-medium text-white mb-1">{card.icon} {card.title}</p>
+              <p className="text-sm font-medium text-white mb-1">{card.title}</p>
               <p className="text-xs text-white/40 mb-3">By efficiency score (committed vs actual hours)</p>
               {loading ? <p className="text-white/40 text-sm">Loading…</p>
                 : !card.t ? <p className="text-white/40 text-sm">Not enough completed tasks yet.</p>

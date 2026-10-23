@@ -5,6 +5,45 @@
 
 import React from 'react'
 
+/* ─── Outline icons (stroke-based line icons — professional, no emoji) ───
+   Usage: <Icon name="bolt" />  ·  size + color inherit via currentColor. */
+type IconName =
+  | 'bolt' | 'chart' | 'shield' | 'users' | 'scale' | 'lock'
+  | 'sun' | 'moon' | 'arrowRight' | 'arrowDown' | 'check' | 'menu'
+  | 'grid' | 'list' | 'star' | 'user' | 'pause'
+
+const PATHS: Record<IconName, React.ReactNode> = {
+  bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
+  chart: <><path d="M3 3v18h18" /><rect x="7" y="12" width="3" height="5" /><rect x="12" y="8" width="3" height="9" /><rect x="17" y="5" width="3" height="12" /></>,
+  shield: <path d="M12 3 5 6v5c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z" />,
+  users: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0" /><path d="M16 5.5a3 3 0 0 1 0 5.8" /><path d="M17 20a5 5 0 0 0-3-4.6" /></>,
+  scale: <><path d="M12 3v18" /><path d="M7 7h10" /><path d="M5 7 3 13h4L5 7Z" /><path d="M19 7l-2 6h4l-2-6Z" /><path d="M8 21h8" /></>,
+  lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2" /><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" /></>,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></>,
+  moon: <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />,
+  arrowRight: <path d="M4 12h16M14 6l6 6-6 6" />,
+  arrowDown: <path d="M12 4v16M6 14l6 6 6-6" />,
+  check: <path d="M4 12l5 5L20 6" />,
+  menu: <path d="M3 6h18M3 12h18M3 18h18" />,
+  grid: <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></>,
+  list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  star: <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z" />,
+  user: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
+  pause: <><rect x="7" y="5" width="3.5" height="14" rx="1" /><rect x="13.5" y="5" width="3.5" height="14" rx="1" /></>,
+}
+
+export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style }:
+  { name: IconName; size?: number; strokeWidth?: number; className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+      className={className} style={style} aria-hidden>
+      {PATHS[name]}
+    </svg>
+  )
+}
+
+
 type Accent = 'indigo' | 'violet' | 'emerald' | 'amber' | 'rose' | 'sky'
 
 const ACCENT: Record<Accent, string> = {
@@ -94,11 +133,11 @@ export function SectionTitle({ children, hint }: { children: React.ReactNode; hi
 }
 
 /* ─── Empty state ─── */
-export function EmptyState({ icon = '📭', title, hint, action }:
-  { icon?: string; title: string; hint?: string; action?: React.ReactNode }) {
+export function EmptyState({ icon, title, hint, action }:
+  { icon?: React.ReactNode; title: string; hint?: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <div className="text-4xl mb-3 opacity-80">{icon}</div>
+      {icon && <div className="mb-3 opacity-60" style={{ color: 'var(--tm-text-faint)' }}>{icon}</div>}
       <p className="text-sm font-medium" style={{ color: 'var(--tm-text)' }}>{title}</p>
       {hint && <p className="text-xs mt-1.5 max-w-xs" style={{ color: 'var(--tm-text-faint)' }}>{hint}</p>}
       {action && <div className="mt-5">{action}</div>}

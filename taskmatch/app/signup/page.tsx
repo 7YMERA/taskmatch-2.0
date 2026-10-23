@@ -70,7 +70,6 @@ export default function SignUp() {
           <div className="mx-auto mb-8 w-20 h-20 relative">
             <div className="absolute inset-0 rounded-full border-4 border-white/10" />
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-400 border-r-violet-400 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-2xl">🚀</div>
           </div>
           <h1 className="text-2xl font-bold mb-2">
             <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400 bg-clip-text text-transparent">

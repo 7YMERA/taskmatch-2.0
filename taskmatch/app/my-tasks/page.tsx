@@ -180,7 +180,7 @@ export default function MyTasks() {
 
             {tab === 'active' ? (
               active.length === 0 ? (
-                <p className="text-white/40 text-sm">Nothing assigned to you right now. 🎉</p>
+                <p className="text-white/40 text-sm">Nothing assigned to you right now.</p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {active.map(a => (

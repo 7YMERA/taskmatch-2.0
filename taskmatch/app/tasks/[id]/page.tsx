@@ -218,7 +218,7 @@ export default function TaskDetail() {
                       <span className="text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400" title={`SLA breached — past due ${task.due_date}`}>Delayed</span>
                     )}
                     {isClosed(task) && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/50" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>Closed 🔒</span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/50" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>Closed </span>
                     )}
                     {task.task_skills?.map((ts: any) => (
                       <span key={ts.skill_id} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
@@ -239,7 +239,7 @@ export default function TaskDetail() {
               <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
                 <p className="text-sm font-medium text-white mb-1">Team ({assignees.length})</p>
                 {assignees.length < 2 && (
-                  <p className="text-xs text-amber-400 mb-3">⚠ Tasks should have at least 2 people.</p>
+                  <p className="text-xs text-amber-400 mb-3">Tasks should have at least 2 people.</p>
                 )}
                 {assignees.length === 0 ? (
                   <p className="text-xs text-white/40">No one assigned yet.</p>
@@ -284,12 +284,12 @@ export default function TaskDetail() {
                 <p className="text-[11px] text-white/35 mb-2">Ranked by: meets all required skills first → best skill match → least busy (WIP). The performance band is shown for context, but it doesn&apos;t set the order — a strong skill-match can rank above a higher performer.</p>
                 {isClosed(task) && (
                   <div className="my-2 rounded-lg border border-white/15 bg-white/5 p-2.5">
-                    <p className="text-xs text-white/70">🔒 This task is closed (SLA window expired), so assignments are disabled. This is about the task&apos;s deadline — not any student&apos;s skill level.</p>
+                    <p className="text-xs text-white/70">This task is closed (SLA window expired), so assignments are disabled. This is about the task&apos;s deadline — not any student&apos;s skill level.</p>
                   </div>
                 )}
                 {meta?.suggested_pair && (
                   <div className="my-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-2.5">
-                    <p className="text-xs font-medium text-indigo-300 mb-1">⚖️ Suggested balanced pair</p>
+                    <p className="text-xs font-medium text-indigo-300 mb-1">️ Suggested balanced pair</p>
                     <p className="text-xs text-white/60">{meta.suggested_pair.reason}</p>
                   </div>
                 )}
