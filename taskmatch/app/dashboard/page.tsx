@@ -8,6 +8,7 @@ import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import Donut from '../components/Donut'
 import { effectiveRole } from '../lib/role'
+import { Card, StatTile, Badge, Icon, bandAccent, Skeleton } from '../components/ui'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -194,14 +195,19 @@ export default function Dashboard() {
         <h1 className="text-2xl font-semibold mb-6" style={{ color: 'var(--tm-text)' }}>{isLeader ? 'Dashboard' : 'My Dashboard'}</h1>
 
         {!roleReady ? (
-          <p className="text-white/40 text-sm">Loading…</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <Card key={i} className="p-5"><Skeleton style={{ height: 48 }} /></Card>)}
+          </div>
         ) : isLeader ? (
         <>
-        {/* Section tabs — click to page between sections instead of scrolling */}
-        <div className="flex gap-2 mb-6">
+        {/* Section tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {([['overview', 'Overview'], ['workload', 'Workload'], ['performance', 'Performance']] as const).map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)}
-              className={`text-sm px-4 py-2 rounded-lg border transition ${tab === k ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/50 hover:text-white hover:border-white/25'}`}>
+              className="text-sm px-4 py-2 rounded-lg border transition whitespace-nowrap"
+              style={tab === k
+                ? { borderColor: 'var(--tm-indigo)', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }
+                : { borderColor: 'var(--tm-border)', color: 'var(--tm-text-muted)' }}>
               {label}
             </button>
           ))}
@@ -211,19 +217,13 @@ export default function Dashboard() {
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
-            { label: 'Total students', value: loading ? '…' : `${totalStudents}`, sub: 'across all programmes', href: '/students' },
-            { label: 'Avg performance score', value: loading ? '…' : `${avgScore}`, sub: `${scored.length} completed task${scored.length === 1 ? '' : 's'} scored`, href: '/students' },
-            { label: 'Avg completion time', value: loading ? '…' : (avgTime === '—' ? '—' : `${avgTime}h`), sub: 'per completed task', href: '/tasks?status=Completed' },
-            { label: 'Tasks completed', value: loading ? '…' : `${completedCount}`, sub: `of ${tasks.length} total`, href: '/tasks?status=Completed' },
+            { label: 'Total students', value: loading ? '…' : `${totalStudents}`, sub: 'across all programmes', href: '/students', accent: 'indigo' as const },
+            { label: 'Avg performance score', value: loading ? '…' : `${avgScore}`, sub: `${scored.length} completed task${scored.length === 1 ? '' : 's'} scored`, href: '/students', accent: 'emerald' as const },
+            { label: 'Avg completion time', value: loading ? '…' : (avgTime === '—' ? '—' : `${avgTime}h`), sub: 'per completed task', href: '/tasks?status=Completed', accent: 'sky' as const },
+            { label: 'Tasks completed', value: loading ? '…' : `${completedCount}`, sub: `of ${tasks.length} total`, href: '/tasks?status=Completed', accent: 'violet' as const },
           ].map(m => (
-            <Link key={m.label} href={m.href}
-              className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 hover:border-white/25 hover:bg-white/[0.03] transition group">
-              <p className="text-xs text-white/40 mb-1 flex items-center justify-between">
-                {m.label}
-                <span className="opacity-0 group-hover:opacity-100 transition text-white/30">→</span>
-              </p>
-              <p className="text-2xl font-semibold text-white">{m.value}</p>
-              <p className="text-xs text-white/30 mt-1">{m.sub}</p>
+            <Link key={m.label} href={m.href} className="block">
+              <StatTile label={m.label} value={m.value} accent={m.accent} sub={m.sub} />
             </Link>
           ))}
         </div>
@@ -231,20 +231,14 @@ export default function Dashboard() {
         {/* Lifecycle status breakdown — each card opens the Tasks page pre-filtered */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {[
-            { label: 'New', value: newCount, color: 'text-yellow-400', sub: 'awaiting assignment', filter: 'New' },
-            { label: 'Ongoing', value: ongoingCount, color: 'text-green-400', sub: 'in progress', filter: 'In Progress' },
-            { label: 'Completed', value: completedCount, color: 'text-blue-400', sub: `done${lateCount ? ` · ${lateCount} late` : ''}`, filter: 'Completed' },
-            { label: 'Delayed', value: delayedCount, color: 'text-red-400', sub: 'SLA breached, not done', filter: 'Delayed' },
-            { label: 'Closed', value: closedCount, color: 'text-white/60', sub: `auto-locked > ${GRACE_DAYS}d overdue`, filter: 'Closed' },
+            { label: 'New', value: newCount, accent: 'amber' as const, sub: 'awaiting assignment', filter: 'New' },
+            { label: 'Ongoing', value: ongoingCount, accent: 'emerald' as const, sub: 'in progress', filter: 'In Progress' },
+            { label: 'Completed', value: completedCount, accent: 'sky' as const, sub: `done${lateCount ? ` · ${lateCount} late` : ''}`, filter: 'Completed' },
+            { label: 'Delayed', value: delayedCount, accent: 'rose' as const, sub: 'SLA breached, not done', filter: 'Delayed' },
+            { label: 'Closed', value: closedCount, accent: 'indigo' as const, sub: `auto-locked > ${GRACE_DAYS}d overdue`, filter: 'Closed' },
           ].map(m => (
-            <Link key={m.label} href={`/tasks?status=${encodeURIComponent(m.filter)}`}
-              className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 hover:border-white/25 hover:bg-white/[0.03] transition group">
-              <p className="text-xs text-white/40 mb-1 flex items-center justify-between">
-                {m.label}
-                <span className="opacity-0 group-hover:opacity-100 transition text-white/30">→</span>
-              </p>
-              <p className={`text-2xl font-semibold ${m.color}`}>{loading ? '…' : m.value}</p>
-              <p className="text-xs text-white/30 mt-1">{m.sub}</p>
+            <Link key={m.label} href={`/tasks?status=${encodeURIComponent(m.filter)}`} className="block">
+              <StatTile label={m.label} value={loading ? '…' : m.value} accent={m.accent} sub={m.sub} />
             </Link>
           ))}
         </div>
@@ -403,18 +397,14 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Student personal snapshot — no other students' scores */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {[
-                { label: 'My active tasks', value: `${myActive}`, sub: `of ${wipLimit} WIP limit`, color: myActive >= wipLimit ? 'text-red-400' : 'text-white' },
-                { label: 'Completed', value: `${myDone.length}`, sub: 'tasks done', color: 'text-blue-400' },
-                { label: 'My avg score', value: `${myAvgScore}`, sub: myScored.length ? `${myScored.length} scored` : 'none yet', color: 'text-white' },
-                { label: 'On time', value: myOnTimeRate == null ? '—' : `${myOnTimeRate}%`, sub: `${myOnTime}/${myDone.length} completed`, color: (myOnTimeRate ?? 100) >= 80 ? 'text-emerald-400' : 'text-amber-400' },
+                { label: 'My active tasks', value: `${myActive}`, sub: `of ${wipLimit} WIP limit`, accent: (myActive >= wipLimit ? 'rose' as const : 'indigo' as const) },
+                { label: 'Completed', value: `${myDone.length}`, sub: 'tasks done', accent: 'sky' as const },
+                { label: 'My avg score', value: `${myAvgScore}`, sub: myScored.length ? `${myScored.length} scored` : 'none yet', accent: 'violet' as const },
+                { label: 'On time', value: myOnTimeRate == null ? '—' : `${myOnTimeRate}%`, sub: `${myOnTime}/${myDone.length} completed`, accent: ((myOnTimeRate ?? 100) >= 80 ? 'emerald' as const : 'amber' as const) },
               ].map(m => (
-                <div key={m.label} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-                  <p className="text-xs text-white/40 mb-1">{m.label}</p>
-                  <p className={`text-2xl font-semibold ${m.color}`}>{loading ? '…' : m.value}</p>
-                  <p className="text-xs text-white/30 mt-1">{m.sub}</p>
-                </div>
+                <StatTile key={m.label} label={m.label} value={loading ? '…' : m.value} accent={m.accent} sub={m.sub} />
               ))}
             </div>
 
