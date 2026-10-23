@@ -1,9 +1,15 @@
 import os
-from fastapi import FastAPI, HTTPException, Header
+import logging
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from supabase import create_client
 from collections import defaultdict
 from datetime import date, datetime, timezone
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("taskmatch")
 
 try:
     from dotenv import load_dotenv  # local dev: read taskmatch-api/.env (Render injects env vars directly)
@@ -13,16 +19,61 @@ except Exception:
 
 app = FastAPI()
 
-# CORS_ORIGINS = comma-separated allowed origins (set to your deployed frontend URL).
-# Defaults to "*" so the deployed frontend can reach the API during testing.
-_origins = os.environ.get("CORS_ORIGINS", "*")
-allow_origins = ["*"] if _origins.strip() == "*" else [o.strip() for o in _origins.split(",") if o.strip()]
+# CORS_ORIGINS = comma-separated allowed origins (your deployed frontend URL,
+# e.g. "https://taskmatch.vercel.app,http://localhost:3000").
+# Locked down by default: if unset, NO cross-origin requests are allowed.
+# Set it to "*" explicitly only if you truly want an open API (not recommended).
+_origins = os.environ.get("CORS_ORIGINS", "").strip()
+if _origins == "*":
+    allow_origins = ["*"]
+else:
+    allow_origins = [o.strip() for o in _origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ─── Request schemas — typed bodies so bad input is rejected at the door ───
+# (actor identity is NEVER taken from the body — it comes from the verified token)
+
+class AssignBody(BaseModel):
+    task_id: str = Field(..., min_length=1)
+    student_id: str = Field(..., min_length=1)
+
+class SelfAssignBody(BaseModel):
+    task_id: str = Field(..., min_length=1)
+
+class StartBody(BaseModel):
+    assignment_id: str = Field(..., min_length=1)
+
+class UnassignBody(BaseModel):
+    assignment_id: str = Field(..., min_length=1)
+
+class CompleteBody(BaseModel):
+    assignment_id: str = Field(..., min_length=1)
+    actual_hours: float | None = Field(default=None, ge=0)
+
+class SetRoleBody(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    role: str = Field(..., pattern="^(student|leader)$")
+
+
+# ─── Global error handling — no raw stack-trace 500s leak to clients ───
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(request: Request, exc: Exception):
+    """Any unexpected error (e.g. a Supabase hiccup) becomes a clean 500 with a
+    generic message. The real error is logged server-side for debugging."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong on the server. Please try again."},
+    )
+
 
 # Supabase creds are loaded from the environment only — never hard-coded.
 # Set SUPABASE_URL and SUPABASE_KEY in taskmatch-api/.env (local) or in your
@@ -402,25 +453,23 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
 
 
 @app.post("/assign")
-def assign(body: dict, authorization: str = Header(None)):
+def assign(body: AssignBody, authorization: str = Header(None)):
     """Leader assigns a student to a task. Caller must be an authenticated leader;
     the actor recorded in the audit log is taken from the verified token, not the body."""
     require_leader(authorization)
     actor_email, actor_role = actor_from_token(authorization)
-    return _create_assignment(body.get("task_id"), body.get("student_id"),
+    return _create_assignment(body.task_id, body.student_id,
                               actor_email, actor_role)
 
 
 @app.post("/self-assign")
-def self_assign(body: dict, authorization: str = Header(None)):
+def self_assign(body: SelfAssignBody, authorization: str = Header(None)):
     """A student picks up a task for themselves. The student is resolved from the caller's
     own verified login token — never from the request body — so this can only ever assign
     the caller to their own account, never anyone else."""
     user = require_user(authorization)
     role = (user.user_metadata or {}).get("role", "student")
-    task_id = body.get("task_id")
-    if not task_id:
-        raise HTTPException(status_code=400, detail="task_id required")
+    task_id = body.task_id
 
     srows = supabase.table("students").select("id, name").eq("email", user.email).execute().data
     if not srows:
@@ -430,12 +479,10 @@ def self_assign(body: dict, authorization: str = Header(None)):
 
 
 @app.post("/start")
-def start(body: dict, authorization: str = Header(None)):
+def start(body: StartBody, authorization: str = Header(None)):
     """Assignee starts their assigned task — the timer begins now (in_progress_at)."""
     actor_email, actor_role = actor_from_token(authorization)
-    assignment_id = body.get("assignment_id")
-    if not assignment_id:
-        raise HTTPException(status_code=400, detail="assignment_id required")
+    assignment_id = body.assignment_id
 
     rows = (
         supabase.table("assignments")
@@ -471,14 +518,12 @@ def start(body: dict, authorization: str = Header(None)):
 
 
 @app.post("/unassign")
-def unassign(body: dict, authorization: str = Header(None)):
+def unassign(body: UnassignBody, authorization: str = Header(None)):
     """Remove a student from a task (undo an assignment). Completed assignments are kept —
     they hold the student's performance record. If removing the last active assignee leaves
     the task with no one working it, roll the task back to 'New'."""
     actor_email, actor_role = actor_from_token(authorization)
-    assignment_id = body.get("assignment_id")
-    if not assignment_id:
-        raise HTTPException(status_code=400, detail="assignment_id required")
+    assignment_id = body.assignment_id
 
     rows = (
         supabase.table("assignments")
@@ -517,7 +562,7 @@ def unassign(body: dict, authorization: str = Header(None)):
 
 
 @app.post("/complete")
-def complete(body: dict, authorization: str = Header(None)):
+def complete(body: CompleteBody, authorization: str = Header(None)):
     """Mark a student's assignment complete, compute their performance score,
     and flip the task to Completed once every assignee is done.
 
@@ -526,11 +571,8 @@ def complete(body: dict, authorization: str = Header(None)):
     entered actual_hours overrides it.
     """
     actor_email, actor_role = actor_from_token(authorization)
-    assignment_id = body.get("assignment_id")
-    actual_hours = body.get("actual_hours")  # optional manual override
-
-    if not assignment_id:
-        raise HTTPException(status_code=400, detail="assignment_id required")
+    assignment_id = body.assignment_id
+    actual_hours = body.actual_hours  # optional manual override
 
     rows = (
         supabase.table("assignments")
@@ -842,19 +884,15 @@ def list_accounts(authorization: str = Header(None)):
 
 
 @app.post("/set-role")
-def set_role(body: dict, authorization: str = Header(None)):
+def set_role(body: SetRoleBody, authorization: str = Header(None)):
     """Promote/demote an account between 'student' and 'leader'. Leader-only, with a guard
     against demoting the last remaining leader (which would lock everyone out), and every
     change written to the audit log."""
     actor = require_leader(authorization)
     admin_client = require_admin_client()
 
-    user_id = body.get("user_id")
-    new_role = body.get("role")
-    if new_role not in ("student", "leader"):
-        raise HTTPException(status_code=400, detail="role must be 'student' or 'leader'")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="user_id required")
+    user_id = body.user_id
+    new_role = body.role
 
     target = admin_client.auth.admin.get_user_by_id(user_id)
     tuser = target.user if target else None
