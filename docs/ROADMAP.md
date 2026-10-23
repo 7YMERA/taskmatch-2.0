@@ -64,3 +64,6 @@ Biggest scope. "Startup", not "FYP".
   but it should not reach production unchanged.
 - Supabase client is created separately in ~8 frontend files — one shared helper.
 - `taskmatch-api/main.py` is a single large file; split into modules as it grows.
+- Frontend lint has legacy `any` types (`dashboard/page.tsx`, `SkillPicker.tsx`)
+  and unused imports. CI runs lint as **advisory** until these are cleaned; make
+  it blocking once fixed. Type-check and tests ARE blocking gates.
