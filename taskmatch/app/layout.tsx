@@ -1,20 +1,20 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { UiHost } from './lib/ui'
+import { noFlashScript } from './lib/theme'
 
 export const metadata: Metadata = {
   title: 'TaskMatch',
-  description: 'Task-Skill Matching & WIP Allocation System',
+  description: 'Skill-based task allocation for teams',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ background: '#111111' }}>
-      <body style={{ background: '#111111', color: 'white', minHeight: '100vh', margin: 0 }}>
+    <html lang="en">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
+      </head>
+      <body style={{ minHeight: '100vh', margin: 0 }}>
         {children}
         <UiHost />
       </body>

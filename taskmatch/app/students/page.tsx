@@ -17,7 +17,7 @@ const supabase = createClient(
 )
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const PROGRAMMES = ['CS', 'IT', 'IS']  // UTP programmes: Computer Science, Information Technology, Information Systems
+const PROGRAMMES = ['CS', 'IT', 'IS']  // programmes: Computer Science, Information Technology, Information Systems
 // Bright palette that stays readable on the dark background
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
 

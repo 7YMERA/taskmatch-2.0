@@ -190,8 +190,8 @@ export default function Dashboard() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-2xl font-semibold text-white mb-6">{isLeader ? 'Dashboard' : 'My Dashboard'}</h1>
+      <main className="flex-1 p-5 sm:p-8 pt-20 md:pt-8 overflow-y-auto">
+        <h1 className="text-2xl font-semibold mb-6" style={{ color: 'var(--tm-text)' }}>{isLeader ? 'Dashboard' : 'My Dashboard'}</h1>
 
         {!roleReady ? (
           <p className="text-white/40 text-sm">Loading…</p>
@@ -209,9 +209,9 @@ export default function Dashboard() {
 
         {tab === 'overview' && (<>
         {/* KPI cards */}
-        <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
-            { label: 'Total students', value: loading ? '…' : `${totalStudents}`, sub: 'CS, IT & IS cohort', href: '/students' },
+            { label: 'Total students', value: loading ? '…' : `${totalStudents}`, sub: 'across all programmes', href: '/students' },
             { label: 'Avg performance score', value: loading ? '…' : `${avgScore}`, sub: `${scored.length} completed task${scored.length === 1 ? '' : 's'} scored`, href: '/students' },
             { label: 'Avg completion time', value: loading ? '…' : (avgTime === '—' ? '—' : `${avgTime}h`), sub: 'per completed task', href: '/tasks?status=Completed' },
             { label: 'Tasks completed', value: loading ? '…' : `${completedCount}`, sub: `of ${tasks.length} total`, href: '/tasks?status=Completed' },
@@ -229,7 +229,7 @@ export default function Dashboard() {
         </div>
 
         {/* Lifecycle status breakdown — each card opens the Tasks page pre-filtered */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {[
             { label: 'New', value: newCount, color: 'text-yellow-400', sub: 'awaiting assignment', filter: 'New' },
             { label: 'Ongoing', value: ongoingCount, color: 'text-green-400', sub: 'in progress', filter: 'In Progress' },
@@ -250,7 +250,7 @@ export default function Dashboard() {
         </div>
 
         {/* Visualizations — task lifecycle donut + team performance bars */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
             <p className="text-sm font-medium text-white mb-1">Task lifecycle</p>
             <p className="text-xs text-white/40 mb-3">Where the {tasks.length} task{tasks.length === 1 ? '' : 's'} stand right now</p>
@@ -327,7 +327,7 @@ export default function Dashboard() {
 
         {tab === 'performance' && (<>
         {/* Fastest / slowest task */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {[
             { title: 'Fastest task', icon: '⚡', t: fastest },
             { title: 'Slowest task', icon: '🐢', t: slowest },
@@ -424,7 +424,7 @@ export default function Dashboard() {
                 <p className="text-xs text-white/40">Ask your leader to add you on the Students page using {userEmail}, then refresh.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
                   <p className="text-sm font-medium text-white mb-1">My tasks</p>
                   <p className="text-xs text-white/40 mb-3">Your work across all states</p>

@@ -48,14 +48,42 @@
   --tm-shadow-glow: 0 10px 40px rgba(99, 102, 241, 0.25);
 }
 
+/* ─── Light theme overrides ─── applied when <html data-theme="light"> */
+[data-theme="light"] {
+  --tm-bg: #f6f7fb;
+  --tm-bg-elev: #ffffff;
+  --tm-bg-sidebar: #ffffff;
+
+  --tm-surface-1: rgba(17, 24, 39, 0.03);
+  --tm-surface-2: rgba(17, 24, 39, 0.06);
+  --tm-surface-3: rgba(17, 24, 39, 0.10);
+
+  --tm-border: rgba(17, 24, 39, 0.10);
+  --tm-border-strong: rgba(17, 24, 39, 0.18);
+
+  --tm-text: rgba(17, 24, 39, 0.92);
+  --tm-text-muted: rgba(17, 24, 39, 0.62);
+  --tm-text-faint: rgba(17, 24, 39, 0.42);
+
+  --tm-shadow: 0 8px 30px rgba(17, 24, 39, 0.10);
+  --tm-shadow-glow: 0 10px 40px rgba(99, 102, 241, 0.18);
+  color-scheme: light;
+}
+
+/* Smooth the flip between themes */
+html, body, .tm-card, .tm-input, .tm-btn, aside {
+  transition: background-color .25s ease, border-color .25s ease, color .25s ease;
+}
+
 html { background: var(--tm-bg); }
 
 body {
   background: var(--tm-bg);
   color: var(--tm-text);
   min-height: 100vh;
-  color-scheme: dark;
 }
+
+html { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 

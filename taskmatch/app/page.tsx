@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { AmbientBackground, Button, Badge } from './components/ui'
+import { AmbientBackground, Button } from './components/ui'
+import { ThemeToggle } from './lib/theme'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -104,12 +105,14 @@ export default function Landing() {
     <div className="relative min-h-screen overflow-hidden flex items-center" style={{ background: 'var(--tm-bg)' }}>
       <AmbientBackground />
 
+      <div className="absolute top-5 right-5 z-20"><ThemeToggle /></div>
+
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-8 py-12 grid lg:grid-cols-5 gap-10 items-center">
         {/* LEFT — branding + actions */}
         <div className="lg:col-span-2 tm-fade-up">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs"
             style={{ border: '1px solid var(--tm-border)', background: 'var(--tm-surface-1)', color: 'var(--tm-text-muted)' }}>
-            <span className="w-2 h-2 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Final Year Project · TaskMatch
+            <span className="w-2 h-2 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Skill-based task allocation
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold mb-4"><span className="tm-wordmark">TaskMatch</span></h1>
           <p className="text-lg mb-2" style={{ color: 'var(--tm-text-muted)' }}>Skill-based task allocation for student teams.</p>

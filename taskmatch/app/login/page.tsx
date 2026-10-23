@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AmbientBackground, Button, Input, Field } from '../components/ui'
+import { ThemeToggle } from '../lib/theme'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,6 +72,8 @@ export default function Login() {
     <div className="relative min-h-screen grid lg:grid-cols-2" style={{ background: 'var(--tm-bg)' }}>
       <AmbientBackground />
 
+      <div className="absolute top-5 right-5 z-20"><ThemeToggle /></div>
+
       {/* LEFT — brand panel (hidden on mobile) */}
       <div className="relative z-10 hidden lg:flex flex-col justify-between p-12">
         <Link href="/" className="text-sm transition hover:opacity-80" style={{ color: 'var(--tm-text-faint)' }}>← Home</Link>
@@ -92,7 +95,7 @@ export default function Login() {
             ))}
           </div>
         </div>
-        <p className="text-xs" style={{ color: 'var(--tm-text-faint)' }}>Final Year Project · UTP</p>
+        <p className="text-xs" style={{ color: 'var(--tm-text-faint)' }}>Match people to work by skill, not by guesswork.</p>
       </div>
 
       {/* RIGHT — sign-in card */}
@@ -107,7 +110,7 @@ export default function Login() {
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <Field label="Email">
               <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@utp.edu.my" autoFocus />
+                placeholder="you@example.com" autoFocus />
             </Field>
             <Field label="Password">
               <Input type="password" value={password} onChange={e => setPassword(e.target.value)}

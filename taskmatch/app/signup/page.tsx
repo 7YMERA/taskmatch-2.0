@@ -138,7 +138,7 @@ export default function SignUp() {
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="you@utp.edu.my"
+                  placeholder="you@example.com"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
                 />
               </div>
