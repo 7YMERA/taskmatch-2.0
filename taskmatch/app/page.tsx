@@ -151,10 +151,10 @@ export default function Landing() {
   ]
 
   const steps = [
-    { n: '01', t: 'Add your people & skills', d: 'Build a roster with each person’s skills and programme.', c: 'var(--tm-indigo)' },
-    { n: '02', t: 'Create tasks with requirements', d: 'Describe a task, set the skills it needs and the hours you expect.', c: 'var(--tm-sky)' },
-    { n: '03', t: 'Let TaskMatch rank the fit', d: 'See who fits best by skill and workload, with a pairing suggested.', c: 'var(--tm-emerald)' },
-    { n: '04', t: 'Track, score & learn', d: 'Completed work scores efficiency and feeds the next match.', c: 'var(--tm-amber)' },
+    { n: '01', t: 'Add your people & skills', d: 'Build a roster with each person’s skills and programme.', c: 'var(--tm-indigo)', a: 'indigo' as const },
+    { n: '02', t: 'Create tasks with requirements', d: 'Describe a task, set the skills it needs and the hours you expect.', c: 'var(--tm-sky)', a: 'sky' as const },
+    { n: '03', t: 'Let TaskMatch rank the fit', d: 'See who fits best by skill and workload, with a pairing suggested.', c: 'var(--tm-emerald)', a: 'emerald' as const },
+    { n: '04', t: 'Track, score & learn', d: 'Completed work scores efficiency and feeds the next match.', c: 'var(--tm-amber)', a: 'amber' as const },
   ]
 
   const team = [
@@ -236,7 +236,7 @@ export default function Landing() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {steps.map(s => (
-              <Card key={s.n} hover className="p-6 relative overflow-hidden">
+              <Card key={s.n} hover tint={s.a} className="p-6 relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-1" style={{ background: s.c }} />
                 <div className="text-3xl font-bold mb-3" style={{ color: s.c }}>{s.n}</div>
                 <h3 className="font-semibold mb-1.5" style={{ color: 'var(--tm-text)' }}>{s.t}</h3>

@@ -91,18 +91,36 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 
 /* ─── Reusable component classes (the design system) ─── */
 
-/* Card surface */
+/* Card surface — a faint cool tint + hairline highlight so boxes read as
+   raised panels, not flat dark rectangles. */
 .tm-card {
-  background: var(--tm-surface-1);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)) ,
+    var(--tm-surface-1);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-r-lg);
   backdrop-filter: blur(6px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 20px rgba(0,0,0,0.18);
 }
-.tm-card-hover { transition: border-color .2s, background .2s, transform .2s; }
+[data-theme="light"] .tm-card {
+  background: linear-gradient(180deg, #ffffff, #fbfbfe);
+  box-shadow: 0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.06);
+}
+.tm-card-hover { transition: border-color .2s, background .2s, transform .2s, box-shadow .2s; }
 .tm-card-hover:hover {
   border-color: var(--tm-border-strong);
-  background: var(--tm-surface-2);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
 }
+
+/* Accent-tinted cards — give a box a coloured wash + coloured border for
+   contrast against the dark/light canvas. Use .tm-tint-<accent>. */
+.tm-tint-indigo  { background: color-mix(in srgb, #6366f1 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #6366f1 35%, transparent) !important; }
+.tm-tint-violet  { background: color-mix(in srgb, #8b5cf6 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #8b5cf6 35%, transparent) !important; }
+.tm-tint-emerald { background: color-mix(in srgb, #34d399 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #34d399 35%, transparent) !important; }
+.tm-tint-amber   { background: color-mix(in srgb, #fbbf24 12%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #fbbf24 38%, transparent) !important; }
+.tm-tint-rose    { background: color-mix(in srgb, #fb7185 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #fb7185 35%, transparent) !important; }
+.tm-tint-sky     { background: color-mix(in srgb, #38bdf8 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #38bdf8 35%, transparent) !important; }
 
 /* Brand wordmark */
 .tm-wordmark {
@@ -170,4 +188,32 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 
 @media (prefers-reduced-motion: reduce) {
   .tm-fade-up, .tm-skeleton, [class*="animate-"] { animation: none !important; }
+}
+
+/* ───────────────────────────────────────────────────────────
+   Legacy bridge — map the hard-coded Tailwind classes the inner
+   pages still use onto theme tokens, so they flip in light mode
+   without rewriting every file. Full migration replaces these.
+   ─────────────────────────────────────────────────────────── */
+.bg-\[\#1a1a1a\] { background-color: var(--tm-bg-elev) !important; }
+.bg-\[\#111111\], .bg-\[\#111\] { background-color: var(--tm-bg) !important; }
+.border-white\/10 { border-color: var(--tm-border) !important; }
+.border-white\/5 { border-color: var(--tm-border) !important; }
+.bg-white\/5 { background-color: var(--tm-surface-1) !important; }
+.bg-white\/10 { background-color: var(--tm-surface-2) !important; }
+.bg-white\/\[0\.03\] { background-color: var(--tm-surface-1) !important; }
+
+/* NOTE: text-white is intentionally NOT globally remapped in dark mode — it is
+   used on coloured buttons/badges where white must stay. */
+
+/* In LIGHT mode, plain white body text would vanish on light cards, so flip it
+   to the dark text token — but keep white where it sits on a saturated colour. */
+[data-theme="light"] .text-white { color: var(--tm-text) !important; }
+[data-theme="light"] .bg-indigo-600,
+[data-theme="light"] .bg-indigo-600 *,
+[data-theme="light"] .bg-emerald-600, [data-theme="light"] .bg-emerald-600 *,
+[data-theme="light"] .bg-red-600, [data-theme="light"] .bg-red-600 *,
+[data-theme="light"] .tm-btn-primary, [data-theme="light"] .tm-btn-danger,
+[data-theme="light"] [class*="bg-indigo-5"], [data-theme="light"] [class*="bg-indigo-5"] * {
+  color: #fff !important;
 }

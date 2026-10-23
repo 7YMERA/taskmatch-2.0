@@ -79,10 +79,10 @@ export function Button({ variant = 'primary', className = '', ...rest }: BtnProp
 }
 
 /* ─── Card ─── */
-export function Card({ hover = false, className = '', style, children }:
-  { hover?: boolean; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+export function Card({ hover = false, tint, className = '', style, children }:
+  { hover?: boolean; tint?: Accent; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
   return (
-    <div className={`tm-card ${hover ? 'tm-card-hover' : ''} ${className}`} style={style}>
+    <div className={`tm-card ${hover ? 'tm-card-hover' : ''} ${tint ? 'tm-tint-' + tint : ''} ${className}`} style={style}>
       {children}
     </div>
   )
