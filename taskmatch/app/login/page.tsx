@@ -84,22 +84,27 @@ export default function Login() {
       <div className="relative z-10 w-full max-w-[400px] tm-fade-up">
         {/* Logo + wordmark, centered above the card */}
         <div className="flex flex-col items-center mb-6">
-          <svg width="52" height="52" viewBox="0 0 42 42" fill="none" aria-label="TaskMatch"
-            className="drop-shadow-[0_4px_16px_rgba(99,102,241,0.45)] mb-3">
-            <defs><linearGradient id="lg" x1="4" y1="4" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#6366f1" /><stop offset="0.5" stopColor="#8b5cf6" /><stop offset="1" stopColor="#34d399" />
-            </linearGradient></defs>
-            <rect x="3" y="3" width="36" height="36" rx="11" fill="url(#lg)" />
-            <line x1="15.5" y1="15.5" x2="26.5" y2="26.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
-            <circle cx="15" cy="15" r="3.6" fill="#fff" /><rect x="22.5" y="22.5" width="7" height="7" rx="2.2" fill="#fff" />
-          </svg>
+          <div className="relative mb-3">
+            <div className="absolute inset-0 rounded-2xl blur-2xl opacity-60" style={{ background: 'var(--tm-gradient)' }} />
+            <svg width="52" height="52" viewBox="0 0 42 42" fill="none" aria-label="TaskMatch"
+              className="relative drop-shadow-[0_4px_16px_rgba(99,102,241,0.45)]">
+              <defs><linearGradient id="lg" x1="4" y1="4" x2="38" y2="38" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#6366f1" /><stop offset="0.5" stopColor="#8b5cf6" /><stop offset="1" stopColor="#34d399" />
+              </linearGradient></defs>
+              <rect x="3" y="3" width="36" height="36" rx="11" fill="url(#lg)" />
+              <line x1="15.5" y1="15.5" x2="26.5" y2="26.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
+              <circle cx="15" cy="15" r="3.6" fill="#fff" /><rect x="22.5" y="22.5" width="7" height="7" rx="2.2" fill="#fff" />
+            </svg>
+          </div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--tm-text)' }}>Welcome back</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--tm-text-faint)' }}>Sign in to your TaskMatch workspace</p>
         </div>
 
-        {/* The card */}
-        <div className="tm-card p-7 sm:p-8">
-          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+        {/* The card — with a colored top accent bar */}
+        <div className="tm-card p-7 sm:p-8 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'var(--tm-gradient)' }} />
+          <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: 'rgba(139,92,246,0.18)' }} />
+          <form onSubmit={handleLogin} className="relative z-10 flex flex-col gap-5">
             <div>
               <label className="tm-label" htmlFor="email">Email</label>
               <div className="relative">
@@ -137,7 +142,7 @@ export default function Login() {
 
           {/* Demo credentials — one click to fill */}
           <button onClick={fillDemo} type="button"
-            className="w-full mt-4 text-xs rounded-lg py-2.5 transition hover:opacity-100"
+            className="relative z-10 w-full mt-4 text-xs rounded-lg py-2.5 transition hover:opacity-100"
             style={{ border: '1px dashed var(--tm-border-strong)', color: 'var(--tm-text-muted)', background: 'var(--tm-surface-1)' }}>
             Use demo account&nbsp;·&nbsp;<span style={{ color: 'var(--tm-indigo)' }}>demo@taskmatch.app</span>
           </button>
