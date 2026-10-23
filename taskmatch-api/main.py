@@ -24,12 +24,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Supabase creds come from env when deployed, with a local fallback so it still runs as-is.
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://mcbmgpiaqprrgssuwwys.supabase.co")
-supabase = create_client(
-    SUPABASE_URL,
-    os.environ.get("SUPABASE_KEY", "sb_publishable_7HmS0w3Iy1sP5iViaO2NIg_lTCw2DjZ"),
-)
+# Supabase creds are loaded from the environment only — never hard-coded.
+# Set SUPABASE_URL and SUPABASE_KEY in taskmatch-api/.env (local) or in your
+# host's env vars (Render/AWS). See .env.example for the template.
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError(
+        "SUPABASE_URL and SUPABASE_KEY must be set in the environment "
+        "(copy taskmatch-api/.env.example to .env and fill it in)."
+    )
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Admin client uses the secret/service-role key for privileged auth operations
 # (listing accounts, changing roles). It is None until the key is configured, so those
