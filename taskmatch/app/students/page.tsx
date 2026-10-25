@@ -10,6 +10,7 @@ import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
+import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, bandAccent } from '../components/ui'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +21,12 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PROGRAMMES = ['CS', 'IT', 'IS']  // programmes: Computer Science, Information Technology, Information Systems
 // Bright palette that stays readable on the dark background
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const MUTED = { color: 'var(--tm-text-muted)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
 
 export default function Students() {
   const router = useRouter()
@@ -278,15 +285,15 @@ export default function Students() {
     const w = wip[sid]
     if (!w) return <div className="w-14 shrink-0" />
     const atLimit = w.wip >= wipLimit
-    const fill = atLimit ? '#ef4444' : w.wip >= wipLimit - 1 ? '#f59e0b' : 'rgba(255,255,255,0.5)'
+    const fill = atLimit ? 'var(--tm-rose)' : w.wip >= wipLimit - 1 ? 'var(--tm-amber)' : 'var(--tm-text-muted)'
     return (
       <div className="flex items-center gap-1.5 shrink-0 w-14" title={`${w.wip} of ${wipLimit} active tasks`}>
         <span className="flex gap-0.5">
           {Array.from({ length: wipLimit }).map((_, i) => (
-            <span key={i} className="w-1 h-3.5 rounded-sm" style={{ backgroundColor: i < w.wip ? fill : 'rgba(255,255,255,0.1)' }} />
+            <span key={i} className="w-1 h-3.5 rounded-sm" style={{ backgroundColor: i < w.wip ? fill : 'var(--tm-surface-3)' }} />
           ))}
         </span>
-        <span className="text-xs tabular-nums" style={{ color: atLimit ? '#f87171' : 'rgba(255,255,255,0.4)' }}>{w.wip}/{wipLimit}</span>
+        <span className="text-xs tabular-nums" style={{ color: atLimit ? 'var(--tm-rose)' : 'var(--tm-text-faint)' }}>{w.wip}/{wipLimit}</span>
       </div>
     )
   }
@@ -324,99 +331,88 @@ export default function Students() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8">
-        <div className="flex items-center justify-between mb-6">
+      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Students</h1>
+            <h1 className="text-2xl font-semibold" style={TEXT}>Students</h1>
+            <p className="text-xs mt-1" style={FAINT}>Your team roster, skills and current workload</p>
           </div>
           {userRole === 'leader' && (
             <div className="flex gap-2">
-              <button onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}
-                className="flex items-center gap-2 text-sm px-4 py-2 border border-violet-500/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 rounded-lg transition">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Create group
-              </button>
-              <button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}
-                className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                + Add student
-              </button>
+              <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
+                <Icon name="users" size={16} /> Create group
+              </Button>
+              <Button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}>
+                <Icon name="plus" size={16} /> Add student
+              </Button>
             </div>
           )}
         </div>
 
         {/* Create group form — leader only */}
         {showGroupForm && userRole === 'leader' && (
-          <div className="bg-gradient-to-br from-violet-500/10 to-transparent border border-violet-500/30 rounded-xl p-5 mb-6">
+          <Card tint="violet" className="p-5 mb-6 tm-fade-up">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-lg bg-violet-500/20 text-violet-300 flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(139,92,246,0.18)', color: 'var(--tm-violet)' }}>
+                <Icon name="users" size={18} />
               </div>
               {(() => {
                 const isExisting = groups.some(g => g.name === groupForm.name.trim())
                 return (
                   <div>
-                    <p className="text-sm font-medium text-white">{isExisting ? `Add students to “${groupForm.name.trim()}”` : 'Create a group'}</p>
-                    <p className="text-xs text-white/40">{isExisting ? 'Pick students below — anyone in another group will be moved here' : 'Name it, pick a colour, and add students (typing an existing name adds to that group)'}</p>
+                    <p className="text-sm font-medium" style={TEXT}>{isExisting ? `Add students to “${groupForm.name.trim()}”` : 'Create a group'}</p>
+                    <p className="text-xs" style={FAINT}>{isExisting ? 'Pick students below — anyone in another group will be moved here' : 'Name it, pick a colour, and add students (typing an existing name adds to that group)'}</p>
                   </div>
                 )
               })()}
             </div>
-            <input
+            <Input
               list="existing-group-names"
               placeholder="Group name — type new, or pick an existing one to add members"
               value={groupForm.name}
               onChange={e => setGroupForm({ ...groupForm, name: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition mb-4"
+              className="mb-4"
             />
             <datalist id="existing-group-names">
               {existingGroups.map(g => <option key={g} value={g} />)}
             </datalist>
 
-            <p className="text-xs text-white/40 mb-2">Colour <span className="text-white/25">(only used when creating a new group)</span></p>
+            <p className="text-xs mb-2" style={MUTED}>Colour <span style={FAINT}>(only used when creating a new group)</span></p>
             <div className="flex gap-2 mb-4">
               {GROUP_COLORS.map(c => (
                 <button key={c} type="button" onClick={() => setGroupForm({ ...groupForm, color: c })}
-                  style={{ backgroundColor: c }}
-                  className={`w-7 h-7 rounded-full border-2 transition ${groupForm.color === c ? 'border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c, outline: groupForm.color === c ? '2px solid var(--tm-text)' : 'none', outlineOffset: 2 }}
+                  className={`w-7 h-7 rounded-full transition ${groupForm.color === c ? 'scale-110' : ''}`}
                   aria-label={c} />
               ))}
             </div>
 
-            <p className="text-xs text-white/40 mb-2">Select students ({groupForm.members.length} selected)</p>
-            <p className="text-xs text-white/30 mb-2">Anyone already in another group will be moved here.</p>
+            <p className="text-xs mb-1" style={MUTED}>Select students ({groupForm.members.length} selected)</p>
+            <p className="text-xs mb-2" style={FAINT}>Anyone already in another group will be moved here.</p>
             <div className="flex flex-col gap-1 mb-4 max-h-56 overflow-y-auto">
               {(() => {
                 const target = groupForm.name.trim()
                 // Show everyone except those already in the target group; note their current group.
                 const list = students.filter(s => !(target && s.group_label === target))
                 return list.length === 0 ? (
-                  <p className="text-xs text-white/30">
+                  <p className="text-xs" style={FAINT}>
                     {students.length === 0 ? 'No students yet — add students first.' : 'Everyone is already in this group.'}
                   </p>
                 ) : list.map(s => {
                   const checked = groupForm.members.includes(s.id)
                   return (
-                    <button key={s.id} type="button"
+                    <button key={s.id} type="button" aria-pressed={checked}
                       onClick={() => setGroupForm(prev => ({
                         ...prev,
                         members: checked ? prev.members.filter(id => id !== s.id) : [...prev.members, s.id],
                       }))}
-                      className={`flex items-center gap-2 text-left text-xs px-3 py-2 rounded-lg border transition ${checked
-                        ? 'border-indigo-500 bg-indigo-500/20 text-white'
-                        : 'border-white/10 text-white/50 hover:text-white'}`}>
-                      <span className={`w-3.5 h-3.5 rounded-sm border shrink-0 ${checked ? 'bg-indigo-400 border-indigo-400' : 'border-white/30'}`} />
-                      {s.name} <span className="text-white/30">· {s.matric}</span>
-                      {s.group_label && s.group_label !== target && <span className="ml-auto text-white/30">in {s.group_label}</span>}
+                      className="tm-pick">
+                      <span className="w-4 h-4 rounded border shrink-0 flex items-center justify-center"
+                        style={checked ? { background: 'var(--tm-indigo)', borderColor: 'var(--tm-indigo)', color: '#fff' } : { borderColor: 'var(--tm-border-strong)' }}>
+                        {checked && <Icon name="check" size={11} strokeWidth={3} />}
+                      </span>
+                      {s.name} <span style={FAINT}>· {s.matric}</span>
+                      {s.group_label && s.group_label !== target && <span className="ml-auto" style={FAINT}>in {s.group_label}</span>}
                     </button>
                   )
                 })
@@ -424,54 +420,45 @@ export default function Students() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={createGroup}
-                className="flex items-center gap-2 text-sm px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Save group
-              </button>
-              <button onClick={() => { setShowGroupForm(false); setGroupForm({ name: '', color: GROUP_COLORS[0], members: [] }) }}
-                className="text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
+              <Button onClick={createGroup}>
+                <Icon name="check" size={16} /> Save group
+              </Button>
+              <Button variant="ghost" onClick={() => { setShowGroupForm(false); setGroupForm({ name: '', color: GROUP_COLORS[0], members: [] }) }}>
                 Cancel
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Add student form — leader only */}
         {showForm && userRole === 'leader' && (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mb-6">
-            <p className="text-sm font-medium text-white mb-4">New student</p>
+          <Card className="p-5 mb-6 tm-fade-up">
+            <p className="text-sm font-medium mb-4" style={TEXT}>New student</p>
 
             {/* Source: attach a roster row to someone who already signed up, or type in someone new. */}
             <div className="flex gap-2 mb-4">
-              <button type="button"
-                onClick={() => setAddMode('existing')}
-                className={`text-xs px-3 py-1.5 rounded-lg border transition ${addMode === 'existing'
-                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                  : 'border-white/10 text-white/40 hover:text-white'}`}>
-                Assign existing account
-              </button>
-              <button type="button"
-                onClick={() => { setAddMode('blank'); setPickedAccountId(''); setForm({ ...form, name: '', email: '' }) }}
-                className={`text-xs px-3 py-1.5 rounded-lg border transition ${addMode === 'blank'
-                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                  : 'border-white/10 text-white/40 hover:text-white'}`}>
-                Enter manually
-              </button>
+              {([['existing', 'Assign existing account'], ['blank', 'Enter manually']] as const).map(([mode, label]) => (
+                <button key={mode} type="button"
+                  onClick={() => {
+                    setAddMode(mode)
+                    if (mode === 'blank') { setPickedAccountId(''); setForm({ ...form, name: '', email: '' }) }
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg border transition"
+                  style={addMode === mode
+                    ? { borderColor: 'var(--tm-indigo)', background: 'rgba(99,102,241,0.15)', color: 'var(--tm-indigo)' }
+                    : { borderColor: 'var(--tm-border)', color: 'var(--tm-text-muted)' }}>
+                  {label}
+                </button>
+              ))}
             </div>
 
             {addMode === 'existing' && (
               <div className="mb-4">
-                <p className="text-xs text-white/40 mb-2">
+                <label className="tm-label">
                   Signed-up accounts not yet on the roster ({unassignedAccounts.length})
-                </p>
+                </label>
                 {unassignedAccounts.length === 0 ? (
-                  <p className="text-xs text-white/30">
+                  <p className="text-xs" style={FAINT}>
                     Everyone who has signed up is already on the roster. Switch to “Enter manually” to add
                     someone who hasn’t created an account yet.
                   </p>
@@ -483,78 +470,77 @@ export default function Students() {
                       setPickedAccountId(e.target.value)
                       if (a) setForm(f => ({ ...f, name: a.name || f.name, email: a.email || '' }))
                     }}
-                    className={`w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition ${pickedAccountId ? 'text-white' : 'text-white/40'}`}>
+                    className="tm-input"
+                    style={pickedAccountId ? undefined : FAINT}>
                     <option value="">Select an account…</option>
                     {unassignedAccounts.map(a => (
-                      <option key={a.id} value={a.id} className="text-white">
+                      <option key={a.id} value={a.id}>
                         {a.email}{a.name ? ` — ${a.name}` : ''}{a.role === 'leader' ? ' (leader)' : ''}
                       </option>
                     ))}
                   </select>
                 )}
-                <p className="text-xs text-white/30 mt-2">
+                <p className="text-xs mt-2" style={FAINT}>
                   Email is taken from the account and locked so the roster row stays linked to their login. Fill in the rest below.
                 </p>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               {[
-                { key: 'name', placeholder: 'Full name' },
-                { key: 'matric', placeholder: 'Matric no. e.g. 22001874' },
-                { key: 'email', placeholder: 'Email' },
-                { key: 'year', placeholder: 'Year e.g. 3' },
+                { key: 'name', label: 'Full name', placeholder: 'e.g. Aisyah Rahman' },
+                { key: 'matric', label: 'Matric no.', placeholder: 'e.g. 22001874' },
+                { key: 'email', label: 'Email', placeholder: 'name@utp.edu.my' },
+                { key: 'year', label: 'Year', placeholder: 'e.g. 3' },
               ].map(f => (
-                <input key={f.key}
-                  placeholder={f.placeholder}
-                  value={(form as any)[f.key]}
-                  onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                  readOnly={addMode === 'existing' && f.key === 'email'}
-                  className={`bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition ${addMode === 'existing' && f.key === 'email' ? 'opacity-60 cursor-not-allowed' : ''}`}
-                />
+                <Field key={f.key} label={f.label}>
+                  <Input
+                    placeholder={f.placeholder}
+                    value={(form as any)[f.key]}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                    readOnly={addMode === 'existing' && f.key === 'email'}
+                    className={addMode === 'existing' && f.key === 'email' ? 'opacity-60 cursor-not-allowed' : ''}
+                  />
+                </Field>
               ))}
-              <select
-                value={form.programme}
-                onChange={e => setForm({ ...form, programme: e.target.value })}
-                className={`bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition ${form.programme ? 'text-white' : 'text-white/20'}`}>
-                <option value="" disabled hidden>Programme</option>
-                {PROGRAMMES.map(p => (
-                  <option key={p} value={p} className="text-white">{p}</option>
-                ))}
-              </select>
+              <Field label="Programme">
+                <select
+                  value={form.programme}
+                  onChange={e => setForm({ ...form, programme: e.target.value })}
+                  className="tm-input"
+                  style={form.programme ? undefined : FAINT}>
+                  <option value="" disabled hidden>Programme</option>
+                  {PROGRAMMES.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </Field>
             </div>
-            <p className="text-[11px] text-white/30 mb-4 -mt-1">Tip: add the student first, then put them in a group from the group filter → “+ Add students”.</p>
+            <p className="text-[11px] mb-4 -mt-1" style={FAINT}>Tip: add the student first, then put them in a group from the group filter → “Add students”.</p>
 
-            <p className="text-xs text-white/40 mb-2">Assign skills <span className="text-white/25">— click a skill, then set B / I / A</span></p>
+            <p className="text-xs mb-2" style={MUTED}>Assign skills <span style={FAINT}>— click a skill, then set B / I / A</span></p>
             <div className="mb-4">
               <SkillPicker skills={skills} value={selectedSkills} onChange={setSelectedSkills} />
             </div>
 
             <div className="flex gap-3">
-              <button onClick={addStudent}
-                className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                Save student
-              </button>
-              <button onClick={() => { setShowForm(false); setSelectedSkills([]) }}
-                className="text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
-                Cancel
-              </button>
-              <button onClick={() => { setForm({ name: '', matric: '', programme: '', year: '', email: '', group_label: '' }); setSelectedSkills([]) }}
-                className="ml-auto text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
+              <Button onClick={addStudent}>Save student</Button>
+              <Button variant="ghost" onClick={() => { setShowForm(false); setSelectedSkills([]) }}>Cancel</Button>
+              <Button variant="ghost" className="ml-auto"
+                onClick={() => { setForm({ name: '', matric: '', programme: '', year: '', email: '', group_label: '' }); setSelectedSkills([]) }}>
                 Clear all
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Group filter — a compact dropdown so a long group list stays tidy */}
         <div className="flex gap-2 mb-4 items-center">
-          <span className="text-xs text-white/40">Group:</span>
+          <span className="text-xs" style={FAINT}>Group</span>
           {groupFilter !== 'all' && groupFilter !== '__none__' && (
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: groupColor(groupFilter) }} />
           )}
-          <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
-            className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none max-w-[16rem]">
+          <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="tm-select-sm max-w-[16rem]">
             <option value="all">All groups ({students.length})</option>
             {existingGroups.map(g => (
               <option key={g} value={g}>{g} ({students.filter(s => s.group_label === g).length})</option>
@@ -564,106 +550,115 @@ export default function Students() {
         </div>
 
         {/* Students list */}
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-white">
-              Team roster ({shownStudents.length}{groupFilter !== 'all' ? ` of ${students.length}` : ''})
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <p className="text-sm font-medium" style={TEXT}>
+              Team roster <span style={FAINT}>({shownStudents.length}{groupFilter !== 'all' ? ` of ${students.length}` : ''})</span>
             </p>
             {userRole === 'leader' && groupFilter !== 'all' && groupFilter !== '__none__' && (
               <div className="flex gap-2">
-                <button onClick={() => { setGroupForm({ name: groupFilter, color: groupColor(groupFilter), members: [] }); setShowGroupForm(true); setShowForm(false) }}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 transition">
-                  + Add students
-                </button>
-                <button onClick={() => disbandGroup(groupFilter)}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                  </svg>
-                  Disband
-                </button>
+                <Button variant="ghost" className="tm-btn-sm"
+                  onClick={() => { setGroupForm({ name: groupFilter, color: groupColor(groupFilter), members: [] }); setShowGroupForm(true); setShowForm(false) }}>
+                  <Icon name="plus" size={14} /> Add students
+                </Button>
+                <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-rose)', borderColor: 'color-mix(in srgb, #fb7185 40%, transparent)' }}
+                  onClick={() => disbandGroup(groupFilter)}>
+                  <Icon name="trash" size={14} /> Disband
+                </Button>
               </div>
             )}
           </div>
           {loading ? (
-            <p className="text-white/40 text-sm">Loading...</p>
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 80 }} />)}
+            </div>
+          ) : shownStudents.length === 0 ? (
+            <EmptyState icon={<Icon name="users" size={28} />}
+              title={students.length === 0 ? 'No students yet' : 'No students in this group'}
+              hint={students.length === 0 && userRole === 'leader' ? 'Add your first student to start matching them to tasks.' : undefined} />
           ) : (
             <div className="flex flex-col gap-3">
               {shownStudents.map(s => (
-                <div key={s.id} className={`rounded-lg border border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.02] transition ${menuOpen === s.id ? 'relative z-30' : ''}`}>
-                  <div className="flex items-center gap-4 p-4">
+                <div key={s.id} className={`rounded-xl border transition hover:bg-[var(--tm-surface-1)] hover:border-[var(--tm-border-strong)] ${menuOpen === s.id ? 'relative z-30' : ''}`}
+                  style={{ borderColor: 'var(--tm-border)' }}>
+                  <div className="flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-2 p-4">
                     {s.avatar_url ? (
                       <img src={s.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-white/10 text-white/50 flex items-center justify-center text-base font-medium shrink-0">
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-medium shrink-0" style={AVATAR}>
                         {initials(s.name)}
                       </div>
                     )}
-                    <div className="w-52 shrink-0 min-w-0">
+                    <div className="flex-1 md:flex-none md:w-52 shrink-0 min-w-0">
                       <div className="flex items-center gap-2">
                         {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
-                        <Link href={`/students/${s.id}`} className="text-sm font-medium text-white hover:underline truncate">{s.name}</Link>
+                        <Link href={`/students/${s.id}`} className="text-sm font-medium hover:underline truncate" style={TEXT}>{s.name}</Link>
                         {userRole === 'leader' && (() => {
                           const acct = accountFor(s)
-                          if (!acct) return <span className="text-[11px] text-white/25 shrink-0" title="No login account linked to this roster row">no login</span>
-                          if (acct.role === 'leader') return <span className="text-[11px] text-indigo-300/70 shrink-0" title="This account is a leader">leader</span>
+                          if (!acct) return <span className="text-[11px] shrink-0" style={FAINT} title="No login account linked to this roster row">no login</span>
+                          if (acct.role === 'leader') return <Badge accent="indigo" className="shrink-0 !text-[11px] !py-0">leader</Badge>
                           return null
                         })()}
                       </div>
-                      <p className="text-xs text-white/40 truncate mt-0.5">{s.matric} · {s.programme} · Year {s.year}</p>
+                      <p className="text-xs truncate mt-0.5" style={FAINT}>{s.matric} · {s.programme} · Year {s.year}</p>
                     </div>
 
                     {/* Middle column — skills + what they're working on now (fills the row) */}
-                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                    <div className="order-last md:order-none basis-full md:basis-auto flex-1 min-w-0 flex flex-col gap-1.5 pl-16 md:pl-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {(s.student_skills || []).length === 0 ? (
-                          <span className="text-xs text-white/25">No skills declared</span>
+                          <span className="text-xs" style={FAINT}>No skills declared</span>
                         ) : (s.student_skills || []).slice(0, 5).map((ss: any) => (
-                          <span key={ss.skill_id} className="text-xs px-2 py-0.5 rounded-md border border-white/[0.08] text-white/55">{ss.skills?.skill_name}</span>
+                          <span key={ss.skill_id} className="tm-chip">{ss.skills?.skill_name}</span>
                         ))}
-                        {(s.student_skills || []).length > 5 && <span className="text-[11px] text-white/30">+{(s.student_skills || []).length - 5}</span>}
+                        {(s.student_skills || []).length > 5 && <span className="text-[11px]" style={FAINT}>+{(s.student_skills || []).length - 5}</span>}
                       </div>
                       {(() => {
                         const at = wip[s.id]?.active_tasks || []
                         return at.length === 0
-                          ? <span className="text-[11px] text-white/30 flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-400/60" /> Available · no active tasks</span>
-                          : <span className="text-[11px] text-white/40 truncate">On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
+                          ? <span className="text-[11px] flex items-center gap-1.5" style={FAINT}><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Available · no active tasks</span>
+                          : <span className="text-[11px] truncate" style={MUTED}>On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
                       })()}
                     </div>
 
-                    {userRole === 'leader' && stats[s.id] && (() => {
-                      const st = stats[s.id]
-                      const color = st.band === 'high' ? '#10b981' : st.band === 'avg' ? '#f59e0b' : st.band === 'low' ? '#ef4444' : 'rgba(255,255,255,0.25)'
-                      return (
-                        <div className="flex items-center gap-1.5 shrink-0" title={`Rating: ${st.band} · ${st.completed_count} completed`}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-                          <span className="text-xs text-white/45 tabular-nums w-7">{st.band === 'unrated' ? '—' : st.avg_score}</span>
-                        </div>
-                      )
-                    })()}
+                    {/* Rating + WIP — own line on phones, inline on wider screens */}
+                    <div className="order-last md:order-none basis-full md:basis-auto flex items-center gap-4 shrink-0 pl-16 md:pl-0">
+                      {userRole === 'leader' && stats[s.id] && (() => {
+                        const st = stats[s.id]
+                        const color = st.band === 'unrated' ? 'var(--tm-text-faint)' : `var(--tm-${bandAccent(st.band)})`
+                        return (
+                          <div className="flex items-center gap-1.5 shrink-0" title={`Rating: ${st.band} · ${st.completed_count} completed`}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="text-xs tabular-nums w-7" style={MUTED}>{st.band === 'unrated' ? '—' : st.avg_score}</span>
+                          </div>
+                        )
+                      })()}
 
-                    {wipMeter(s.id)}
+                      {wipMeter(s.id)}
+                    </div>
 
                     {userRole === 'leader' && (
                       <div className="relative shrink-0">
                         <button onClick={() => setMenuOpen(menuOpen === s.id ? null : s.id)}
-                          className="w-8 h-8 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition flex items-center justify-center text-lg leading-none">⋯</button>
+                          aria-label="Student actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
+                          <Icon name="more" size={18} />
+                        </button>
                         {menuOpen === s.id && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
-                            <div className="absolute right-0 top-full mt-1 z-20 w-44 bg-[#202020] border border-white/10 rounded-lg shadow-xl py-1">
-                              <Link href={`/students/${s.id}`} className="block px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 transition">See profile</Link>
-                              <button onClick={() => { setMenuOpen(null); startEditing(s) }} className="block w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 transition">Edit skills &amp; photo</button>
+                            <div className="tm-menu absolute right-0 top-full mt-1 z-20 w-48">
+                              <Link href={`/students/${s.id}`} className="tm-menu-item"><Icon name="user" size={13} /> See profile</Link>
+                              <button onClick={() => { setMenuOpen(null); startEditing(s) }} className="tm-menu-item"><Icon name="star" size={13} /> Edit skills &amp; photo</button>
                               {(() => {
                                 const acct = accountFor(s)
                                 if (!acct) return null
                                 return acct.role === 'leader'
-                                  ? <button onClick={() => { setMenuOpen(null); changeRole(acct, 'student') }} className="block w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 transition">Revoke leader</button>
-                                  : <button onClick={() => { setMenuOpen(null); changeRole(acct, 'leader') }} className="block w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 transition">Make leader</button>
+                                  ? <button onClick={() => { setMenuOpen(null); changeRole(acct, 'student') }} className="tm-menu-item"><Icon name="shield" size={13} /> Revoke leader</button>
+                                  : <button onClick={() => { setMenuOpen(null); changeRole(acct, 'leader') }} className="tm-menu-item"><Icon name="shield" size={13} /> Make leader</button>
                               })()}
-                              {s.group_label && <button onClick={() => { setMenuOpen(null); removeFromGroup(s.id, s.name, s.group_label) }} className="block w-full text-left px-3 py-1.5 text-xs text-amber-400/80 hover:bg-white/10 transition">Remove from group</button>}
-                              <div className="my-1 h-px bg-white/10" />
-                              <button onClick={() => { setMenuOpen(null); removeStudent(s.id, s.name) }} className="block w-full text-left px-3 py-1.5 text-xs text-red-400/80 hover:bg-white/10 transition">Remove from project</button>
+                              {s.group_label && <button onClick={() => { setMenuOpen(null); removeFromGroup(s.id, s.name, s.group_label) }} className="tm-menu-item" style={{ color: 'var(--tm-amber)' }}><Icon name="users" size={13} /> Remove from group</button>}
+                              <div className="my-1 h-px" style={{ background: 'var(--tm-border)' }} />
+                              <button onClick={() => { setMenuOpen(null); removeStudent(s.id, s.name) }} className="tm-menu-item" style={{ color: 'var(--tm-rose)' }}><Icon name="trash" size={13} /> Remove from project</button>
                             </div>
                           </>
                         )}
@@ -673,11 +668,11 @@ export default function Students() {
 
                   {/* Edit panel — leader only */}
                   {editingStudent === s.id && userRole === 'leader' && (
-                    <div className="mx-3 mb-3 pt-3 border-t border-white/10">
+                    <div className="mx-4 mb-4 pt-3" style={{ borderTop: '1px solid var(--tm-border)' }}>
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-white/40">Edit skills for {s.name}</p>
-                        <label className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/60 hover:text-white cursor-pointer transition">
-                          Upload photo
+                        <p className="text-xs" style={MUTED}>Edit skills for {s.name}</p>
+                        <label className="tm-btn tm-btn-ghost tm-btn-sm">
+                          <Icon name="upload" size={14} /> Upload photo
                           <input type="file" accept="image/*" className="hidden"
                             onChange={e => uploadStudentAvatar(s.id, s.name, e.target.files && e.target.files[0] ? e.target.files[0] : undefined)} />
                         </label>
@@ -686,14 +681,8 @@ export default function Students() {
                         <SkillPicker skills={skills} value={editSkills} onChange={setEditSkills} />
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => saveSkills(s.id)}
-                          className="text-xs px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                          Save changes
-                        </button>
-                        <button onClick={() => setEditingStudent(null)}
-                          className="text-xs px-3 py-2 border border-white/10 text-white/60 rounded-lg transition">
-                          Cancel
-                        </button>
+                        <Button className="tm-btn-sm" onClick={() => saveSkills(s.id)}>Save changes</Button>
+                        <Button variant="ghost" className="tm-btn-sm" onClick={() => setEditingStudent(null)}>Cancel</Button>
                       </div>
                     </div>
                   )}
@@ -701,7 +690,7 @@ export default function Students() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </main>
     </div>
   )
