@@ -17,16 +17,32 @@ Same features. Real engineering. This is the current focus.
 |---|---|---|---|
 | 1 | Remove hard-coded Supabase keys | secrets never in code | ✅ done |
 | 2 | Token-based identity on `/assign` `/start` `/complete` `/unassign` | stop forged actions | ✅ done |
-| 3 | Lock CORS to known origins | any site could call the API | ☐ todo |
-| 4 | Validate request bodies with typed schemas (Pydantic) | reject bad data at the door | ☐ todo |
-| 5 | Handle DB/Supabase errors gracefully | no raw 500s | ☐ todo |
+| 3 | Lock CORS to known origins | any site could call the API | ✅ done (`CORS_ORIGINS`) |
+| 4 | Validate request bodies with typed schemas (Pydantic) | reject bad data at the door | ✅ done |
+| 5 | Handle DB/Supabase errors gracefully | no raw 500s | ✅ done (global handler) |
 | 6 | Rate limiting | protect the free tier from abuse | ✅ done |
-| 7 | Test suite for the matcher + core logic | change code safely | ☐ todo |
-| 8 | CI on every push (lint, type-check, tests) | catch breaks automatically | ☐ todo |
-| 9 | API README + setup guide | a marker/dev can run it | ☐ todo |
-| 10 | Structured logging + `/health` detail | see what the server is doing | ☐ todo |
+| 6b | Login required on read endpoints + row-level security on every table | the public key alone can't read or write data | ✅ done (`supabase/rls.sql`) |
+| 7 | Test suite for the matcher + core logic | change code safely | ✅ done (pytest) |
+| 8 | CI on every push (lint, type-check, tests) | catch breaks automatically | ✅ done (lint advisory) |
+| 9 | API README + setup guide | a marker/dev can run it | ✅ done |
+| 10 | Structured logging + `/health` detail | see what the server is doing | ◐ logging done; `/health` is still a bare liveness check |
 
-**Order:** 3 + 4 + 5 together (server hardening) → 7 + 8 (safety net) → 6, 9, 10.
+**Left in Level 1:** `/health` detail (#10), storage policies for the `avatars`
+bucket, and making lint blocking in CI.
+
+### UI refresh (runs alongside Level 1)
+
+Moving every page onto the design system (`app/globals.css` tokens +
+`app/components/ui.tsx`) so light and dark mode both work.
+
+| Page | Status |
+|---|---|
+| Landing, Login | ✅ done |
+| Tasks list, Students list | ✅ done |
+| Task detail, Student detail, My Tasks, Profile | ✅ done |
+| Toasts + confirm dialog | ✅ done |
+| Dashboard | ◐ partly (some panels still use legacy classes) |
+| Logs, Signup | ☐ todo |
 
 ---
 
@@ -58,8 +74,11 @@ Biggest scope. "Startup", not "FYP".
 
 ## Known debt (tracked, not urgent)
 
-- Old repo history still contains the public *publishable* Supabase key. Low-risk,
-  but rotate it in Supabase if you want it gone for good.
+- ~~Old repo history still contains the public *publishable* Supabase key.~~ Done: the
+  key was rotated in Supabase and RLS is on for every table.
+- The `avatars` storage bucket has no storage policies yet (RLS covers tables only).
+- "Complete" still uses the browser's `prompt()` box for hours; replace it with a
+  themed dialog.
 - `role.ts` UI role-toggle is a testing aid; the server now ignores it (correct),
   but it should not reach production unchanged.
 - ~~Supabase client is created separately in ~8 frontend files — one shared helper.~~ Done: `app/lib/supabase.ts`.
