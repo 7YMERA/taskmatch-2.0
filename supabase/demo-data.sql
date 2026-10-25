@@ -150,7 +150,7 @@ begin
     end if;
 
     insert into public.activity_logs (workspace_id, action, entity_type, entity_id, summary, details, actor_email, actor_role, created_at)
-    select ws, 'assignment.assigned', 'assignment', rec.id::text,
+    select ws, 'assignment.assigned', 'assignment', rec.id,
            s.name || ' assigned to task ''' || rec.description || ''' (best match)',
            jsonb_build_object('task_id', rec.id, 'student_id', s.id, 'mode', 'best_match'),
            admin_email, 'admin', now() - make_interval(hours => n)
@@ -182,14 +182,14 @@ begin
 
   -- 9. Audit trail entries for the setup above.
   insert into public.activity_logs (workspace_id, action, entity_type, entity_id, summary, actor_email, actor_role, created_at) values
-    (ws, 'workspace.renamed', 'workspace', ws::text, 'Renamed the workspace to Acme Studio', admin_email, 'admin', now() - interval '3 days'),
-    (ws, 'project.created', 'project', p_plat::text, 'Created project ''Platform rebuild'' (PLAT)', admin_email, 'admin', now() - interval '3 days' + interval '5 minutes'),
-    (ws, 'project.created', 'project', p_mob::text, 'Created project ''Mobile app'' (MOB)', admin_email, 'admin', now() - interval '3 days' + interval '6 minutes'),
-    (ws, 'project.created', 'project', p_web::text, 'Created project ''Website relaunch'' (WEB)', admin_email, 'admin', now() - interval '3 days' + interval '7 minutes'),
-    (ws, 'project.created', 'project', p_data::text, 'Created project ''Data & insights'' (DATA)', admin_email, 'admin', now() - interval '3 days' + interval '8 minutes'),
+    (ws, 'workspace.renamed', 'workspace', ws, 'Renamed the workspace to Acme Studio', admin_email, 'admin', now() - interval '3 days'),
+    (ws, 'project.created', 'project', p_plat, 'Created project ''Platform rebuild'' (PLAT)', admin_email, 'admin', now() - interval '3 days' + interval '5 minutes'),
+    (ws, 'project.created', 'project', p_mob, 'Created project ''Mobile app'' (MOB)', admin_email, 'admin', now() - interval '3 days' + interval '6 minutes'),
+    (ws, 'project.created', 'project', p_web, 'Created project ''Website relaunch'' (WEB)', admin_email, 'admin', now() - interval '3 days' + interval '7 minutes'),
+    (ws, 'project.created', 'project', p_data, 'Created project ''Data & insights'' (DATA)', admin_email, 'admin', now() - interval '3 days' + interval '8 minutes'),
     (ws, 'project.archived', 'project', null, 'Archived project ''Pilot with first client''', admin_email, 'admin', now() - interval '2 days'),
-    (ws, 'workspace.invite_created', 'workspace', ws::text, 'Created an invite link for members (7 days)', admin_email, 'admin', now() - interval '1 day'),
-    (ws, 'workspace.invite_created', 'workspace', ws::text, 'Created an invite link for team leads (1 day)', admin_email, 'admin', now() - interval '4 hours');
+    (ws, 'workspace.invite_created', 'workspace', ws, 'Created an invite link for members (7 days)', admin_email, 'admin', now() - interval '1 day'),
+    (ws, 'workspace.invite_created', 'workspace', ws, 'Created an invite link for team leads (1 day)', admin_email, 'admin', now() - interval '4 hours');
 
   -- 10. A second workspace, so the switcher has somewhere to go. You're a team lead there.
   insert into public.workspaces (name, created_by, created_at)
@@ -201,9 +201,9 @@ begin
   select hack, x from unnest(array['React', 'Python', 'UI/UX', 'API Development', 'Pitching']) x;
 
   insert into public.students (workspace_id, name, email, matric, programme, year) values
-    (hack, 'Jordan Lee', 'jordan@example.com', 'HX0001', 'Computer Science', 3),
-    (hack, 'Priya Menon', 'priya@example.com', 'HX0002', 'Information Technology', 2),
-    (hack, 'Sam Okafor', 'sam@example.com', 'HX0003', 'Information Systems', 4);
+    (hack, 'Jordan Lee', 'jordan@example.com', '90000001', 'Computer Science', 3),
+    (hack, 'Priya Menon', 'priya@example.com', '90000002', 'Information Technology', 2),
+    (hack, 'Sam Okafor', 'sam@example.com', '90000003', 'Information Systems', 4);
 
   insert into public.projects (workspace_id, name, key, description, color)
   values (hack, 'Hackathon MVP', 'HACK', 'Ship a working demo by Sunday evening.', 'rose') returning id into pick;
