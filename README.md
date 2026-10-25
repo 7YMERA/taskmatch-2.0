@@ -184,6 +184,10 @@ existing account joins it with the role it has now. Admins rename it, send invit
 change roles on the **Members & roles** page. New accounts create their own workspace or join
 one with an invite link.
 
+Optional: run [`supabase/demo-data.sql`](supabase/demo-data.sql) to make a fresh install look lived
+in. It names the workspace, adds projects and files your tasks into them, gives open tasks to the
+best-matching people, and adds a second workspace so the switcher has somewhere to go.
+
 ### 3. The frontend
 
 Create `taskmatch/.env.local`:
