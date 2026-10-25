@@ -1,7 +1,8 @@
 'use client'
 
-/* Theme: dark (default) / light. Persisted to localStorage, applied as
-   <html data-theme="..."> so every CSS token flips at once. */
+/* Theme: dark / light. First visit follows the operating system; after that the
+   choice is persisted to localStorage and applied as <html data-theme="...">
+   so every CSS token flips at once. */
 
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/ui'
@@ -14,12 +15,16 @@ export function applyTheme(t: Theme) {
 }
 
 export function getStoredTheme(): Theme {
-  try { return (localStorage.getItem('tm-theme') as Theme) || 'dark' } catch { return 'dark' }
+  try {
+    const t = localStorage.getItem('tm-theme') as Theme | null
+    if (t) return t
+  } catch { /* ignore */ }
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'
 }
 
 /* Runs before paint (in <head>) to avoid a flash of the wrong theme. */
 export const noFlashScript =
-  `(function(){try{var t=localStorage.getItem('tm-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
+  `(function(){try{var t=localStorage.getItem('tm-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
   const [theme, setTheme] = useState<Theme>('dark')
@@ -35,9 +40,8 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
   return (
     <button onClick={flip} aria-label="Toggle light / dark theme"
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className={`tm-btn tm-btn-ghost ${className}`}
-      style={{ padding: '8px 10px', lineHeight: 1 }}>
-      <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+      className={`tm-btn tm-btn-quiet tm-btn-icon ${className}`}>
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
     </button>
   )
 }

@@ -3,230 +3,326 @@
 /* ───────────────────────────────────────────────────────────
    TaskMatch Design System — tokens
    One source of truth for colour, surface, radius and motion.
-   Change a value here and it updates everywhere.
+   Every colour is defined per theme, so nothing is ever "white
+   text on a white card": pages use tokens, never raw hex/white.
    ─────────────────────────────────────────────────────────── */
 :root {
-  /* Base canvas */
-  --tm-bg: #0f0f13;
-  --tm-bg-elev: #16161c;
-  --tm-bg-sidebar: #131318;
+  /* Base canvas (dark is the default theme) */
+  --tm-bg: #09090b;
+  --tm-bg-subtle: #0f0f12;
+  --tm-bg-elev: #131316;
+  --tm-bg-sidebar: #0c0c0f;
 
-  /* Surfaces (cards, inputs) — layered translucency on the dark canvas */
-  --tm-surface-1: rgba(255, 255, 255, 0.035);
-  --tm-surface-2: rgba(255, 255, 255, 0.06);
-  --tm-surface-3: rgba(255, 255, 255, 0.10);
+  /* Surfaces (cards, inputs, hovers) */
+  --tm-surface-1: #131316;
+  --tm-surface-2: #1b1b20;
+  --tm-surface-3: #24242a;
 
   /* Borders */
-  --tm-border: rgba(255, 255, 255, 0.10);
-  --tm-border-strong: rgba(255, 255, 255, 0.16);
+  --tm-border: #232329;
+  --tm-border-strong: #33333b;
 
   /* Text */
-  --tm-text: rgba(255, 255, 255, 0.92);
-  --tm-text-muted: rgba(255, 255, 255, 0.55);
-  --tm-text-faint: rgba(255, 255, 255, 0.35);
+  --tm-text: #f4f4f5;
+  --tm-text-muted: #a1a1aa;
+  --tm-text-faint: #71717a;
 
-  /* Brand accents */
-  --tm-indigo: #6366f1;
-  --tm-violet: #8b5cf6;
+  /* Brand — one primary colour, used with restraint */
+  --tm-primary: #6d6af8;
+  --tm-primary-hover: #7f7cff;
+  --tm-primary-fg: #ffffff;
+  --tm-primary-text: #a5a3ff;           /* brand colour as readable text */
+  --tm-primary-soft: rgba(109, 106, 248, 0.14);
+  --tm-ring: rgba(109, 106, 248, 0.45);
+
+  /* Accents — tuned per theme so text in these colours always passes contrast */
+  --tm-indigo: #a5a3ff;
+  --tm-violet: #c4b5fd;
   --tm-emerald: #34d399;
   --tm-amber: #fbbf24;
   --tm-rose: #fb7185;
-  --tm-sky: #38bdf8;
+  --tm-sky: #7dd3fc;
+  --tm-neutral: #a1a1aa;
 
-  /* Brand gradient — used for the wordmark and primary flourishes */
-  --tm-gradient: linear-gradient(90deg, #818cf8 0%, #a78bfa 28%, #38bdf8 55%, #34d399 78%, #fbbf24 100%);
-  --tm-gradient-btn: linear-gradient(90deg, #4f46e5 0%, #7c3aed 55%, #0ea5e9 100%);
+  /* Status (charts, dots) — same hue family, solid fills */
+  --tm-chart-1: #6d6af8;
+  --tm-chart-2: #22c55e;
+  --tm-chart-3: #38bdf8;
+  --tm-chart-4: #f59e0b;
+  --tm-chart-5: #ef4444;
+  --tm-chart-6: #71717a;
+  --tm-track: #1f1f25;
+
+  --tm-danger: #ef4444;
+  --tm-danger-hover: #dc2626;
+
+  /* Kept for older call sites — now a solid brand fill, not a rainbow */
+  --tm-gradient: linear-gradient(90deg, var(--tm-text), var(--tm-text));
+  --tm-gradient-btn: var(--tm-primary);
 
   /* Radii */
-  --tm-r-sm: 8px;
-  --tm-r-md: 12px;
-  --tm-r-lg: 16px;
-  --tm-r-xl: 20px;
+  --tm-r-sm: 6px;
+  --tm-r-md: 8px;
+  --tm-r-lg: 12px;
+  --tm-r-xl: 16px;
 
   /* Elevation */
-  --tm-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
-  --tm-shadow-glow: 0 10px 40px rgba(99, 102, 241, 0.25);
+  --tm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --tm-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--tm-border);
+  --tm-shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+
+  color-scheme: dark;
 }
 
-/* ─── Light theme overrides ─── applied when <html data-theme="light"> */
+/* ─── Light theme ─── applied when <html data-theme="light"> */
 [data-theme="light"] {
-  --tm-bg: #f6f7fb;
+  --tm-bg: #fafafa;
+  --tm-bg-subtle: #f4f4f5;
   --tm-bg-elev: #ffffff;
   --tm-bg-sidebar: #ffffff;
 
-  --tm-surface-1: rgba(17, 24, 39, 0.03);
-  --tm-surface-2: rgba(17, 24, 39, 0.06);
-  --tm-surface-3: rgba(17, 24, 39, 0.10);
+  --tm-surface-1: #ffffff;
+  --tm-surface-2: #f4f4f5;
+  --tm-surface-3: #e9e9ec;
 
-  --tm-border: rgba(17, 24, 39, 0.10);
-  --tm-border-strong: rgba(17, 24, 39, 0.18);
+  --tm-border: #e4e4e7;
+  --tm-border-strong: #d4d4d8;
 
-  --tm-text: rgba(17, 24, 39, 0.92);
-  --tm-text-muted: rgba(17, 24, 39, 0.62);
-  --tm-text-faint: rgba(17, 24, 39, 0.42);
+  --tm-text: #09090b;
+  --tm-text-muted: #52525b;
+  --tm-text-faint: #71717a;
 
-  --tm-shadow: 0 8px 30px rgba(17, 24, 39, 0.10);
-  --tm-shadow-glow: 0 10px 40px rgba(99, 102, 241, 0.18);
+  --tm-primary: #5048e5;
+  --tm-primary-hover: #4338ca;
+  --tm-primary-fg: #ffffff;
+  --tm-primary-text: #4338ca;
+  --tm-primary-soft: rgba(80, 72, 229, 0.09);
+  --tm-ring: rgba(80, 72, 229, 0.35);
+
+  --tm-indigo: #4338ca;
+  --tm-violet: #6d28d9;
+  --tm-emerald: #047857;
+  --tm-amber: #b45309;
+  --tm-rose: #be123c;
+  --tm-sky: #0369a1;
+  --tm-neutral: #52525b;
+
+  --tm-chart-1: #5048e5;
+  --tm-chart-2: #16a34a;
+  --tm-chart-3: #0284c7;
+  --tm-chart-4: #d97706;
+  --tm-chart-5: #dc2626;
+  --tm-chart-6: #a1a1aa;
+  --tm-track: #ececef;
+
+  --tm-shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.05);
+  --tm-shadow: 0 12px 32px -8px rgba(9, 9, 11, 0.14), 0 0 0 1px var(--tm-border);
+  --tm-shadow-glow: 0 1px 2px rgba(9, 9, 11, 0.06);
+
   color-scheme: light;
 }
 
-/* Smooth the flip between themes */
-html, body, .tm-card, .tm-input, .tm-btn, aside {
-  transition: background-color .25s ease, border-color .25s ease, color .25s ease;
+/* Expose tokens to Tailwind, so pages write `text-fg` / `bg-surface` /
+   `border-line` instead of hard-coded colours that break in one theme. */
+@theme inline {
+  --color-canvas: var(--tm-bg);
+  --color-subtle: var(--tm-bg-subtle);
+  --color-surface: var(--tm-surface-1);
+  --color-surface-2: var(--tm-surface-2);
+  --color-surface-3: var(--tm-surface-3);
+  --color-line: var(--tm-border);
+  --color-line-strong: var(--tm-border-strong);
+  --color-fg: var(--tm-text);
+  --color-muted: var(--tm-text-muted);
+  --color-faint: var(--tm-text-faint);
+  --color-primary: var(--tm-primary);
+  --color-primary-text: var(--tm-primary-text);
+  --color-primary-soft: var(--tm-primary-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-html { background: var(--tm-bg); }
+html, body { background: var(--tm-bg); }
 
 body {
-  background: var(--tm-bg);
   color: var(--tm-text);
   min-height: 100vh;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-html { color-scheme: dark; }
+/* Smooth the flip between themes */
+body, .tm-card, .tm-input, .tm-btn, aside {
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+}
 
 * { box-sizing: border-box; }
 
+::selection { background: var(--tm-primary-soft); color: var(--tm-text); }
+
 option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
+
+:focus-visible { outline: 2px solid var(--tm-ring); outline-offset: 2px; }
 
 /* ─── Reusable component classes (the design system) ─── */
 
-/* Card surface — a faint cool tint + hairline highlight so boxes read as
-   raised panels, not flat dark rectangles. */
 .tm-card {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)) ,
-    var(--tm-surface-1);
+  background: var(--tm-surface-1);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-r-lg);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 20px rgba(0,0,0,0.18);
+  box-shadow: var(--tm-shadow-glow);
 }
-[data-theme="light"] .tm-card {
-  background: linear-gradient(180deg, #ffffff, #fbfbfe);
-  box-shadow: 0 1px 2px rgba(17,24,39,0.04), 0 8px 24px rgba(17,24,39,0.06);
-}
-.tm-card-hover { transition: border-color .2s, background .2s, transform .2s, box-shadow .2s; }
-.tm-card-hover:hover {
-  border-color: var(--tm-border-strong);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
-}
+.tm-card-hover { transition: border-color .15s, background .15s, box-shadow .15s; }
+.tm-card-hover:hover { border-color: var(--tm-border-strong); }
 
-/* Accent-tinted cards — give a box a coloured wash + coloured border for
-   contrast against the dark/light canvas. Use .tm-tint-<accent>. */
-.tm-tint-indigo  { background: color-mix(in srgb, #6366f1 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #6366f1 35%, transparent) !important; }
-.tm-tint-violet  { background: color-mix(in srgb, #8b5cf6 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #8b5cf6 35%, transparent) !important; }
-.tm-tint-emerald { background: color-mix(in srgb, #34d399 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #34d399 35%, transparent) !important; }
-.tm-tint-amber   { background: color-mix(in srgb, #fbbf24 12%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #fbbf24 38%, transparent) !important; }
-.tm-tint-rose    { background: color-mix(in srgb, #fb7185 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #fb7185 35%, transparent) !important; }
-.tm-tint-sky     { background: color-mix(in srgb, #38bdf8 10%, var(--tm-bg-elev)) !important; border-color: color-mix(in srgb, #38bdf8 35%, transparent) !important; }
+/* Accent-tinted cards — a soft wash of an accent, used sparingly for status */
+.tm-tint-indigo  { background: color-mix(in srgb, var(--tm-indigo) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-indigo) 22%, var(--tm-border)) !important; }
+.tm-tint-violet  { background: color-mix(in srgb, var(--tm-violet) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-violet) 22%, var(--tm-border)) !important; }
+.tm-tint-emerald { background: color-mix(in srgb, var(--tm-emerald) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-emerald) 22%, var(--tm-border)) !important; }
+.tm-tint-amber   { background: color-mix(in srgb, var(--tm-amber) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-amber) 22%, var(--tm-border)) !important; }
+.tm-tint-rose    { background: color-mix(in srgb, var(--tm-rose) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-rose) 22%, var(--tm-border)) !important; }
+.tm-tint-sky     { background: color-mix(in srgb, var(--tm-sky) 7%, var(--tm-surface-1)) !important; border-color: color-mix(in srgb, var(--tm-sky) 22%, var(--tm-border)) !important; }
 
-/* Brand wordmark */
+/* Brand wordmark — solid, confident, no rainbow */
 .tm-wordmark {
-  background: var(--tm-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-weight: 700;
+  color: var(--tm-text);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
+
+/* Brand-coloured emphasis inside headings */
+.tm-accent-text { color: var(--tm-primary-text); }
+
+/* Page header */
+.tm-page-title { font-size: 1.5rem; line-height: 2rem; font-weight: 600; letter-spacing: -0.02em; color: var(--tm-text); }
+.tm-page-sub { font-size: .875rem; color: var(--tm-text-muted); margin-top: 2px; }
+.tm-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: .02em; color: var(--tm-primary-text); }
 
 /* Buttons */
 .tm-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font-size: 14px; font-weight: 500; line-height: 1;
-  padding: 10px 18px; border-radius: var(--tm-r-md);
-  border: 1px solid transparent; cursor: pointer;
-  transition: background .18s, border-color .18s, opacity .18s, transform .08s;
+  padding: 10px 16px; border-radius: var(--tm-r-md);
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s, opacity .15s, box-shadow .15s;
 }
-.tm-btn:active { transform: translateY(1px); }
 .tm-btn:disabled { opacity: .5; cursor: not-allowed; }
-.tm-btn-primary { background: var(--tm-gradient-btn); color: #fff; box-shadow: var(--tm-shadow-glow); }
-.tm-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-.tm-btn-ghost { background: transparent; border-color: var(--tm-border-strong); color: var(--tm-text-muted); }
-.tm-btn-ghost:hover:not(:disabled) { background: var(--tm-surface-2); color: var(--tm-text); }
-.tm-btn-danger { background: #dc2626; color: #fff; }
-.tm-btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.tm-btn-primary { background: var(--tm-primary); color: var(--tm-primary-fg); box-shadow: 0 1px 2px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.12); }
+.tm-btn-primary:hover:not(:disabled) { background: var(--tm-primary-hover); }
+.tm-btn-ghost { background: var(--tm-surface-1); border-color: var(--tm-border); color: var(--tm-text); box-shadow: var(--tm-shadow-sm); }
+.tm-btn-ghost:hover:not(:disabled) { background: var(--tm-surface-2); border-color: var(--tm-border-strong); }
+.tm-btn-quiet { background: transparent; color: var(--tm-text-muted); }
+.tm-btn-quiet:hover:not(:disabled) { background: var(--tm-surface-2); color: var(--tm-text); }
+.tm-btn-danger { background: var(--tm-danger); color: #fff; }
+.tm-btn-danger:hover:not(:disabled) { background: var(--tm-danger-hover); }
 
 /* Inputs */
 .tm-input {
   width: 100%;
-  background: var(--tm-surface-1);
+  background: var(--tm-bg-elev);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-r-md);
-  padding: 10px 14px; font-size: 14px; color: var(--tm-text);
-  outline: none; transition: border-color .18s, background .18s;
+  padding: 9px 12px; font-size: 14px; color: var(--tm-text);
+  outline: none; transition: border-color .15s, box-shadow .15s;
+  box-shadow: var(--tm-shadow-sm);
 }
 .tm-input::placeholder { color: var(--tm-text-faint); }
-.tm-input:focus { border-color: var(--tm-indigo); background: var(--tm-surface-2); }
-.tm-label { font-size: 12px; color: var(--tm-text-faint); margin-bottom: 4px; display: block; }
+.tm-input:focus { border-color: var(--tm-primary); box-shadow: 0 0 0 3px var(--tm-primary-soft); }
+.tm-input[aria-invalid="true"] { border-color: var(--tm-danger); }
+.tm-label { font-size: 13px; font-weight: 500; color: var(--tm-text); margin-bottom: 6px; display: block; }
 
 /* Small button + compact select (toolbars, row actions) */
-.tm-btn-sm { font-size: 12px; padding: 7px 12px; border-radius: var(--tm-r-sm); gap: 6px; }
+.tm-btn-sm { font-size: 13px; padding: 7px 12px; border-radius: var(--tm-r-sm); gap: 6px; }
 .tm-btn-icon { padding: 0; width: 32px; height: 32px; border-radius: var(--tm-r-sm); }
 .tm-select-sm {
-  background: var(--tm-surface-1); border: 1px solid var(--tm-border);
-  border-radius: var(--tm-r-sm); padding: 6px 10px; font-size: 12px;
-  color: var(--tm-text); outline: none; transition: border-color .18s;
+  background: var(--tm-bg-elev); border: 1px solid var(--tm-border);
+  border-radius: var(--tm-r-sm); padding: 6px 10px; font-size: 13px;
+  color: var(--tm-text); outline: none; transition: border-color .15s;
 }
-.tm-select-sm:focus { border-color: var(--tm-indigo); }
+.tm-select-sm:focus { border-color: var(--tm-primary); }
 
 /* Quiet chip — skills and other neutral tags */
 .tm-chip {
   display: inline-flex; align-items: center; font-size: 12px; line-height: 1.4;
   padding: 2px 8px; border-radius: 6px;
+  background: var(--tm-surface-2);
   border: 1px solid var(--tm-border); color: var(--tm-text-muted);
 }
 
 /* Selectable row (checkbox-style pickers in forms) */
 .tm-pick {
   display: flex; align-items: center; gap: 8px; text-align: left;
-  font-size: 12px; padding: 8px 12px; border-radius: var(--tm-r-sm);
+  font-size: 13px; padding: 8px 12px; border-radius: var(--tm-r-sm);
   border: 1px solid var(--tm-border); color: var(--tm-text-muted);
   transition: border-color .15s, background .15s, color .15s;
 }
 .tm-pick:hover { color: var(--tm-text); border-color: var(--tm-border-strong); }
 .tm-pick[aria-pressed="true"] {
-  border-color: var(--tm-indigo); color: var(--tm-text);
-  background: color-mix(in srgb, #6366f1 14%, transparent);
+  border-color: var(--tm-primary); color: var(--tm-text);
+  background: var(--tm-primary-soft);
 }
+
+/* Segmented control / filter pills */
+.tm-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--tm-r-md); background: var(--tm-surface-2); border: 1px solid var(--tm-border); }
+.tm-seg > button { font-size: 13px; padding: 5px 10px; border-radius: 6px; color: var(--tm-text-muted); display: inline-flex; align-items: center; gap: 6px; transition: background .15s, color .15s; }
+.tm-seg > button:hover { color: var(--tm-text); }
+.tm-seg > button[aria-pressed="true"] { background: var(--tm-bg-elev); color: var(--tm-text); box-shadow: var(--tm-shadow-sm), 0 0 0 1px var(--tm-border); }
 
 /* Popover menu (row "more" actions) */
 .tm-menu {
-  background: var(--tm-bg-elev); border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-elev); border: 1px solid var(--tm-border);
   border-radius: var(--tm-r-md); box-shadow: var(--tm-shadow); padding: 4px;
 }
 .tm-menu-item {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-  font-size: 12px; padding: 7px 10px; border-radius: 6px; color: var(--tm-text-muted);
+  font-size: 13px; padding: 7px 10px; border-radius: 6px; color: var(--tm-text-muted);
   transition: background .15s, color .15s;
 }
 .tm-menu-item:hover:not(:disabled) { background: var(--tm-surface-2); color: var(--tm-text); }
 .tm-menu-item:disabled { opacity: .35; cursor: not-allowed; }
 
-/* Badges */
+/* Badges — text uses the per-theme accent token, so it is readable in both */
 .tm-badge {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px;
   border: 1px solid transparent;
+  color: var(--tm-badge-c, var(--tm-text-muted));
+  background: color-mix(in srgb, var(--tm-badge-c, var(--tm-text-muted)) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tm-badge-c, var(--tm-text-muted)) 24%, transparent);
 }
-/* Accent text is tuned for the dark canvas — deepen it on light so pills stay readable. */
-.tm-badge { color: var(--tm-badge-c, var(--tm-text-muted)); }
-[data-theme="light"] .tm-badge { color: color-mix(in srgb, var(--tm-badge-c, #6b7280) 62%, #000); }
+
+/* Table */
+.tm-table { width: 100%; font-size: 14px; border-collapse: separate; border-spacing: 0; }
+.tm-table th { text-align: left; font-size: 12px; font-weight: 500; color: var(--tm-text-faint); padding: 10px 16px; border-bottom: 1px solid var(--tm-border); background: var(--tm-bg-subtle); }
+.tm-table td { padding: 12px 16px; border-bottom: 1px solid var(--tm-border); color: var(--tm-text-muted); }
+.tm-table tr:last-child td { border-bottom: 0; }
+.tm-table tbody tr:hover td { background: var(--tm-surface-2); }
+
+/* Subtle dotted grid used behind marketing + auth screens */
+.tm-grid-bg {
+  background-image:
+    linear-gradient(to right, var(--tm-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--tm-border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+}
 
 /* ─── Motion ─── */
 @keyframes tm-toast-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
 @keyframes tm-modal-in { from { opacity: 0; transform: scale(.97) } to { opacity: 1; transform: scale(1) } }
-@keyframes tm-fade-up { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes tm-float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+@keyframes tm-fade-up { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes tm-float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
 @keyframes tm-drift { 0% { transform: translate(0,0) } 50% { transform: translate(24px,-16px) } 100% { transform: translate(0,0) } }
 @keyframes tm-shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
 
-.tm-fade-up { animation: tm-fade-up .5s ease-out both; }
+.tm-fade-up { animation: tm-fade-up .4s ease-out both; }
 
 /* Skeleton loading shimmer */
 .tm-skeleton {
-  background: linear-gradient(90deg, var(--tm-surface-1) 25%, var(--tm-surface-2) 50%, var(--tm-surface-1) 75%);
+  background: linear-gradient(90deg, var(--tm-surface-2) 25%, var(--tm-surface-3) 50%, var(--tm-surface-2) 75%);
   background-size: 800px 100%;
   animation: tm-shimmer 1.4s infinite linear;
   border-radius: var(--tm-r-sm);
@@ -234,32 +330,4 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 
 @media (prefers-reduced-motion: reduce) {
   .tm-fade-up, .tm-skeleton, [class*="animate-"] { animation: none !important; }
-}
-
-/* ───────────────────────────────────────────────────────────
-   Legacy bridge — map the hard-coded Tailwind classes the inner
-   pages still use onto theme tokens, so they flip in light mode
-   without rewriting every file. Full migration replaces these.
-   ─────────────────────────────────────────────────────────── */
-.bg-\[\#1a1a1a\] { background-color: var(--tm-bg-elev) !important; }
-.bg-\[\#111111\], .bg-\[\#111\] { background-color: var(--tm-bg) !important; }
-.border-white\/10 { border-color: var(--tm-border) !important; }
-.border-white\/5 { border-color: var(--tm-border) !important; }
-.bg-white\/5 { background-color: var(--tm-surface-1) !important; }
-.bg-white\/10 { background-color: var(--tm-surface-2) !important; }
-.bg-white\/\[0\.03\] { background-color: var(--tm-surface-1) !important; }
-
-/* NOTE: text-white is intentionally NOT globally remapped in dark mode — it is
-   used on coloured buttons/badges where white must stay. */
-
-/* In LIGHT mode, plain white body text would vanish on light cards, so flip it
-   to the dark text token — but keep white where it sits on a saturated colour. */
-[data-theme="light"] .text-white { color: var(--tm-text) !important; }
-[data-theme="light"] .bg-indigo-600,
-[data-theme="light"] .bg-indigo-600 *,
-[data-theme="light"] .bg-emerald-600, [data-theme="light"] .bg-emerald-600 *,
-[data-theme="light"] .bg-red-600, [data-theme="light"] .bg-red-600 *,
-[data-theme="light"] .tm-btn-primary, [data-theme="light"] .tm-btn-danger,
-[data-theme="light"] [class*="bg-indigo-5"], [data-theme="light"] [class*="bg-indigo-5"] * {
-  color: #fff !important;
 }
