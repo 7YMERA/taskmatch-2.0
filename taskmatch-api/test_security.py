@@ -175,3 +175,14 @@ def test_429_carries_cors_headers(monkeypatch):
     r = c.get("/wip", headers={"Origin": origin})
     assert r.status_code == 429
     assert r.headers.get("access-control-allow-origin") in (origin, "*")
+
+
+def test_table_queries_use_service_role_client_when_configured(monkeypatch):
+    # Under row-level security the publishable key sees nothing, so the API must query
+    # with the service-role client whenever it is configured.
+    service, public = object(), object()
+    monkeypatch.setattr(main, "supabase", public)
+    monkeypatch.setattr(main, "admin", service)
+    assert main.db() is service
+    monkeypatch.setattr(main, "admin", None)
+    assert main.db() is public

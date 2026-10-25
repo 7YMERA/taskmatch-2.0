@@ -28,7 +28,7 @@ cp .env.example .env
 |---|---|---|
 | `SUPABASE_URL` | Your project URL | yes |
 | `SUPABASE_KEY` | Publishable (anon) key — used for normal reads/writes | yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret key — only for admin endpoints (`/accounts`, `/set-role`). Never expose to the browser. | no (those endpoints return 503 without it) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret key. Used for all table queries (so the API works under row-level security, see `supabase/rls.sql`) and for the admin endpoints (`/accounts`, `/set-role`). Never expose to the browser. | yes once RLS is on (without it, table queries use `SUPABASE_KEY` and the admin endpoints return 503) |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, e.g. `https://taskmatch.vercel.app,http://localhost:3000`. **Unset = no cross-origin allowed.** Use `*` only to deliberately open the API. | recommended |
 | `RATE_LIMIT_PER_MINUTE` | Max requests per client IP per minute (default `120`, `0` = off). `/health` is never limited. | no |
 
