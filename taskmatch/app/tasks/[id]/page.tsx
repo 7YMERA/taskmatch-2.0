@@ -13,6 +13,14 @@ import { Card, Badge, Button, Input, Icon, Skeleton, SkeletonCard, EmptyState, b
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 
+// Assignment modes: the server picks one qualified person; every pick comes with its reason.
+type Mode = 'best_match' | 'round_robin' | 'least_loaded'
+const MODES: { key: Mode; label: string; hint: string }[] = [
+  { key: 'best_match', label: 'Best match', hint: 'Top of the ranked list: strongest skill match, then least busy.' },
+  { key: 'round_robin', label: 'Round robin', hint: 'Takes turns: whoever has gone longest without a new task.' },
+  { key: 'least_loaded', label: 'Least loaded', hint: 'Fewest committed hours on their active tasks.' },
+]
+
 // Theme-token text colours, so copy flips correctly between dark and light.
 const TEXT = { color: 'var(--tm-text)' }
 const MUTED = { color: 'var(--tm-text-muted)' }
@@ -33,6 +41,9 @@ export default function TaskDetail() {
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(true)
   const [assigning, setAssigning] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>('best_match')
+  const [pick, setPick] = useState<{ student_id: string | null; name: string | null; reason: string } | null>(null)
+  const [picking, setPicking] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -102,6 +113,28 @@ export default function TaskDetail() {
       await axios.post(`${API}/assign`, { task_id: id, student_id }, { headers: await authHeaders() })
       await refresh()
       toast(`${name} assigned!`, 'success')
+    } catch (err: any) { toast(errMsg(err, 'Could not assign'), 'error') } finally { setAssigning(null) }
+  }
+
+  // Preview who the chosen mode would pick, without assigning anyone yet.
+  const previewPick = async (m: Mode) => {
+    setMode(m)
+    setPicking(true)
+    try {
+      const res = await axios.post(`${API}/auto-assign`, { task_id: id, mode: m, dry_run: true }, { headers: await authHeaders() })
+      setPick(res.data)
+    } catch (err: any) { setPick(null); toast(errMsg(err, 'Could not preview a pick'), 'error') } finally { setPicking(false) }
+  }
+
+  const autoAssign = async () => {
+    if (assigning) return
+    setAssigning('auto')
+    try {
+      const res = await axios.post(`${API}/auto-assign`, { task_id: id, mode }, { headers: await authHeaders() })
+      if (!res.data.student_id) { toast(res.data.reason, 'info'); return }
+      toast(`${res.data.name} assigned (${res.data.mode_label})`, 'success')
+      await refresh()
+      previewPick(mode)
     } catch (err: any) { toast(errMsg(err, 'Could not assign'), 'error') } finally { setAssigning(null) }
   }
 
@@ -300,6 +333,38 @@ export default function TaskDetail() {
                       <span className="mt-px"><Icon name="lock" size={13} /></span>
                       This task is closed (SLA window expired), so assignments are disabled. This is about the task&apos;s deadline — not any student&apos;s skill level.
                     </p>
+                  </div>
+                )}
+                {userRole === 'leader' && !isClosed(task) && (
+                  <div className="mb-3 rounded-lg p-3" style={{ border: '1px solid var(--tm-border)' }}>
+                    <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={TEXT}>
+                      <Icon name="bolt" size={14} /> Auto-assign
+                    </p>
+                    <div className="tm-seg mb-2 max-w-full overflow-x-auto">
+                      {MODES.map(m => (
+                        <button key={m.key} onClick={() => previewPick(m.key)} aria-pressed={pick != null && mode === m.key} className="whitespace-nowrap">
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] mb-2" style={FAINT}>
+                      {pick ? MODES.find(m => m.key === mode)?.hint : 'Choose a mode to see who it would pick. Nothing is assigned until you confirm.'}
+                    </p>
+                    {picking ? <Skeleton style={{ height: 40 }} />
+                      : pick && (
+                        <div className="flex flex-wrap items-center gap-3 rounded-lg p-2.5" style={ROW}>
+                          {pick.student_id && <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style={AVATAR}>{initials(pick.name || '')}</div>}
+                          <div className="flex-1 min-w-0">
+                            {pick.name && <p className="text-sm" style={TEXT}>{pick.name}</p>}
+                            <p className="text-xs" style={FAINT}>{pick.reason}</p>
+                          </div>
+                          {pick.student_id && (
+                            <Button className="tm-btn-sm shrink-0" onClick={autoAssign} disabled={assigning === 'auto'}>
+                              {assigning === 'auto' ? 'Assigning…' : <>Assign {pick.name?.split(' ')[0]}</>}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                   </div>
                 )}
                 {meta?.suggested_pair && (

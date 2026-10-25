@@ -46,6 +46,21 @@ Moving every page onto the design system (`app/globals.css` tokens +
 
 ---
 
+## Feature overhaul (runs alongside)
+
+Making TaskMatch feel like a complete team platform, one phase at a time. Each phase
+ships as its own pull request with before/after screenshots.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Dashboards and analytics (trends, needs attention, matching health, workload heatmap, skills coverage) + assignment modes (best match, round robin, least loaded) | ◐ in review ([PHASE1-DASHBOARD.md](PHASE1-DASHBOARD.md)) |
+| 1b | Tasks and People pages rebuilt (views, saved filters, skills matrix) | ☐ todo |
+| 2 | Roles and permissions, audit trail, user management, "away" status | ☐ todo |
+| 3 | Task board, approvals, notifications, comments, AI-suggested skills and estimates | ☐ todo |
+| 4 | Search, Ctrl+K, exports, settings, multiple teams | ☐ todo |
+
+---
+
 ## Level 2 — Deepen the premise (smarter matching)
 
 The dissertation itself flagged these: workload scored lowest, skills are pure
