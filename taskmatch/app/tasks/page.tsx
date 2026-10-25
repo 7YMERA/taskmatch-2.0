@@ -11,7 +11,8 @@ import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { TaskBoard, TaskCalendar } from '../components/TaskViews'
-import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
+import TaskQuickView from '../components/TaskQuickView'
+import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent, Drawer } from '../components/ui'
 
 const PAGE_SIZE = 5
 const SEVERITIES = ['Low', 'Medium', 'Critical']
@@ -71,6 +72,7 @@ export default function Tasks() {
   const [selected, setSelected] = useState<string[]>([])
   const [allAssignees, setAllAssignees] = useState<Record<string, any[]>>({})
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [quickId, setQuickId] = useState<string | null>(null)   // task open in the side panel
   const urlReady = useRef(false)
 
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function Tasks() {
     if (PRESETS.some(p => p.key === q.get('preset'))) setPreset(q.get('preset')!)
     if (['list', 'board', 'calendar'].includes(q.get('view') || '')) setView(q.get('view') as View)
     if (['due', 'severity', 'status', 'name'].includes(q.get('sort') || '')) setSort(q.get('sort') as Sort)
+    if (q.get('open')) setQuickId(q.get('open'))
+    if (q.get('new') === '1') setShowForm(true)
     try { setSavedViews(JSON.parse(localStorage.getItem(SAVED_KEY) || '[]')) } catch { /* private mode */ }
     urlReady.current = true
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -102,8 +106,9 @@ export default function Tasks() {
     const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
     set('status', statusFilter, 'all'); set('severity', severityFilter, 'all'); set('group', groupFilter, 'all')
     set('q', query.trim(), ''); set('preset', preset, 'all'); set('view', view, 'list'); set('sort', sort, 'due')
+    set('open', quickId || '', ''); u.searchParams.delete('new')
     window.history.replaceState(null, '', u)
-  }, [statusFilter, severityFilter, groupFilter, query, preset, view, sort])
+  }, [statusFilter, severityFilter, groupFilter, query, preset, view, sort, quickId])
 
   const fetchTasks = async () => {
     const [{ data }, { data: asg }] = await Promise.all([
@@ -460,10 +465,17 @@ const updateTaskStatus = async (id: string, status: string) => {
           </Card>
         )}
 
-        {/* Create task form */}
-        {showForm && userRole === 'leader' && (
-          <Card className="p-5 mb-6 tm-fade-up">
-            <p className="text-sm font-medium mb-4" style={TEXT}>New task</p>
+        {/* Create task — side panel */}
+        <Drawer open={showForm && userRole === 'leader'} onClose={() => setShowForm(false)} title="New task"
+          sub="Describe the work and the skills it needs. The matcher uses these to suggest people."
+          footer={<>
+            <Button onClick={createTask}>Create task</Button>
+            <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]) }}>Cancel</Button>
+            <Button variant="ghost" className="ml-auto"
+              onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]) }}>
+              Clear all
+            </Button>
+          </>}>
             <div className="flex flex-col gap-3 mb-4">
               <Field label="Description">
                 <Input
@@ -527,16 +539,7 @@ const updateTaskStatus = async (id: string, status: string) => {
               <SkillPicker skills={skills} value={taskSkills} onChange={setTaskSkills} field="min_proficiency" labels={['Min: Beginner', 'Min: Intermediate', 'Min: Advanced']} />
             </div>
 
-            <div className="flex gap-3">
-              <Button onClick={createTask}>Create task</Button>
-              <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]) }}>Cancel</Button>
-              <Button variant="ghost" className="ml-auto"
-                onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]) }}>
-                Clear all
-              </Button>
-            </div>
-          </Card>
-        )}
+        </Drawer>
 
         {/* Toolbar: search, layout, sort */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -631,11 +634,11 @@ const updateTaskStatus = async (id: string, status: string) => {
         </div>
 
         {view === 'board' && !loading && (
-          <TaskBoard tasks={shownTasks} assignees={allAssignees} canMove={userRole === 'leader'} isLocked={isClosed}
+          <TaskBoard onOpen={setQuickId} tasks={shownTasks} assignees={allAssignees} canMove={userRole === 'leader'} isLocked={isClosed}
             onMove={(id, st) => updateTaskStatus(id, st)}
             flags={t => isDelayed(t) ? <Badge accent="rose" className="!text-[10px] !py-0">delayed</Badge> : isClosed(t) ? <span className="tm-chip !text-[10px] !py-0">closed</span> : null} />
         )}
-        {view === 'calendar' && !loading && <TaskCalendar tasks={shownTasks} />}
+        {view === 'calendar' && !loading && <TaskCalendar tasks={shownTasks} onOpen={setQuickId} />}
 
         {view === 'list' && userRole === 'leader' && !loading && shownTasks.length > 0 && (
           <label className="flex items-center gap-2 text-xs mb-2 pl-1 w-fit cursor-pointer" style={FAINT}>
@@ -672,7 +675,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                   <div className="flex-1 md:flex-none md:w-64 shrink-0 min-w-0">
                     <div className="flex items-center gap-2">
                       {task.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(task.group_label) }} title={task.group_label} />}
-                      <Link href={`/tasks/${task.id}`} onClick={e => e.stopPropagation()} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Open task">{task.description}</Link>
+                      <Link href={`/tasks/${task.id}`} onClick={e => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); e.stopPropagation(); setQuickId(task.id) }} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full page)">{task.description}</Link>
                     </div>
                     <p className="text-xs truncate mt-0.5 flex items-center gap-1" style={FAINT}>
                       <Icon name="clock" size={12} />
@@ -883,6 +886,9 @@ const updateTaskStatus = async (id: string, status: string) => {
             </div>
           </div>
         )}
+        <TaskQuickView task={tasks.find(t => t.id === quickId) || null} assignees={(quickId && allAssignees[quickId]) || []}
+          groups={existingGroups} canEdit={userRole === 'leader'} locked={!!quickId && isClosed(tasks.find(t => t.id === quickId) || {})}
+          onClose={() => setQuickId(null)} onChanged={fetchTasks} />
       </main>
     </div>
   )
