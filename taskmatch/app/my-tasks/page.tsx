@@ -2,19 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import { toast } from '../lib/ui'
 import { effectiveRole } from '../lib/role'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function MyTasks() {
   const router = useRouter()
@@ -66,12 +59,6 @@ export default function MyTasks() {
     await load(s.id)
     await loadTeam(s.group_label, s.id)
     setLoading(false)
-  }
-
-  // Send the caller's Supabase token so the API verifies identity server-side.
-  const authHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
   }
 
   // Teammates' active tasks + due dates, so a student can schedule around the group.
