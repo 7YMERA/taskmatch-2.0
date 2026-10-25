@@ -57,9 +57,9 @@ ships as its own pull request with before/after screenshots.
 | 1b | Tasks and People pages rebuilt (list/board/calendar, search, saved views, bulk actions, people filters, skills matrix) | ✅ done ([PHASE1B-TASKS-PEOPLE.md](PHASE1B-TASKS-PEOPLE.md)) |
 | 1c | My Tasks focus page, task and person quick views, create task in a side panel, People cards | ✅ done ([PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md)) |
 | 2 | Roles and permissions, audit trail, user management, "away" status | ✅ done ([PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md)) |
-| 3 | AI assist: suggested skills, hours and severity for new tasks, each with a confidence level, confirmed by a person | ◐ in review ([PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md)) |
-| 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ☐ next |
-| 3c | Notification centre, approvals | ☐ todo (built on workspaces) |
+| 3 | AI assist: suggested skills, hours and severity for new tasks, each with a confidence level, confirmed by a person | ✅ done ([PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md)) |
+| 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ◐ in review ([PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md)) |
+| 3c | Notification centre, approvals | ☐ next (built on workspaces) |
 | 4 | Search, Ctrl+K, exports, settings, onboarding | ☐ todo |
 
 ---
@@ -84,7 +84,7 @@ Biggest scope. "Startup", not "FYP".
 
 | Task | Why |
 |---|---|
-| Multi-team / multi-org | beyond one UTP class |
+| Multi-team / multi-org | beyond one UTP class (✅ workspaces, Phase 3b) |
 | Integrations (GitHub Issues, Jira) | real workflows |
 | Outcome feedback loop retrains the matcher | learns from results |
 

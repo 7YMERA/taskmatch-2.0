@@ -1,6 +1,9 @@
 import os
 import time
 import logging
+import secrets
+from contextvars import ContextVar
+from datetime import timedelta
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -178,11 +181,66 @@ if admin is None:
     )
 
 
-def db():
-    """Client for table queries. Uses the service-role key when configured so the API keeps
-    working under row-level security; every endpoint checks the caller's login first, so the
-    server, not the browser, is what holds the bypass."""
+def raw_db():
+    """Unscoped client. Uses the service-role key when configured so the API keeps working under
+    row-level security; every endpoint checks the caller's login first, so the server, not the
+    browser, is what holds the bypass. Only the workspace tables themselves use this directly."""
     return admin or supabase
+
+
+# ─── Workspaces: every query is pinned to the caller's current workspace ───
+# require_user() works out the caller's workspace and stores it here for the request. db() then
+# hands out tables that add "workspace_id = <it>" to every select, update and delete, and stamp it
+# on every insert, so an endpoint can't forget and read or change another workspace's rows.
+
+_workspace = ContextVar("workspace", default=None)   # (workspace_id, role, user_id)
+
+WORKSPACE_TABLES = {"students", "tasks", "assignments", "skills", "student_skills", "task_skills",
+                    "groups", "task_comments", "activity_logs", "projects"}
+
+
+class ScopedTable:
+    def __init__(self, table, ws):
+        self._t, self._ws = table, ws
+
+    def select(self, *a, **k):
+        return self._t.select(*a, **k).eq("workspace_id", self._ws)
+
+    def insert(self, rows, *a, **k):
+        if isinstance(rows, list):
+            rows = [{**r, "workspace_id": self._ws} for r in rows]
+        else:
+            rows = {**rows, "workspace_id": self._ws}
+        return self._t.insert(rows, *a, **k)
+
+    def update(self, data, *a, **k):
+        data = {key: v for key, v in data.items() if key != "workspace_id"}  # rows never move
+        return self._t.update(data, *a, **k).eq("workspace_id", self._ws)
+
+    def delete(self, *a, **k):
+        return self._t.delete(*a, **k).eq("workspace_id", self._ws)
+
+
+class ScopedClient:
+    def __init__(self, client, ws):
+        self._c, self._ws = client, ws
+
+    def table(self, name):
+        if name not in WORKSPACE_TABLES:
+            raise RuntimeError(f"{name} is not a workspace table; use raw_db()")
+        return ScopedTable(self._c.table(name), self._ws)
+
+
+def current_workspace():
+    ctx = _workspace.get()
+    if not ctx or not ctx[0]:
+        raise RuntimeError("No workspace for this request: call require_user() first")
+    return ctx[0]
+
+
+def db():
+    """Tables of the caller's current workspace (see ScopedTable)."""
+    return ScopedClient(raw_db(), current_workspace())
 
 
 # ─── Auth helpers — every endpoint except /health requires a login ───
@@ -193,8 +251,26 @@ def _bearer(authorization):
     return authorization.split(" ", 1)[1].strip()
 
 
-def require_user(authorization):
-    """Verify the caller's Supabase access token and return the auth user."""
+def memberships(user_id):
+    """Every workspace the user belongs to, oldest first: [{workspace_id, role, ...}]."""
+    return (raw_db().table("workspace_members").select("workspace_id, role, joined_at")
+            .eq("user_id", user_id).order("joined_at").execute()).data or []
+
+
+def resolve_workspace(user):
+    """The workspace this user is working in and their role there. Their choice is kept in
+    app_metadata.workspace_id (only the server writes it), but membership is checked every time,
+    so someone removed from a workspace loses access at once. Falls back to their first
+    workspace; (None, "none") if they have none yet."""
+    rows = memberships(getattr(user, "id", None))
+    wanted = (getattr(user, "app_metadata", None) or {}).get("workspace_id")
+    pick = next((m for m in rows if m["workspace_id"] == wanted), rows[0] if rows else None)
+    return (pick["workspace_id"], pick["role"]) if pick else (None, "none")
+
+
+def require_user(authorization, need_workspace=True):
+    """Verify the caller's Supabase access token and return the auth user. Also works out their
+    current workspace for this request; without one, 409 (the app sends them to set one up)."""
     token = _bearer(authorization)
     try:
         res = supabase.auth.get_user(token)
@@ -202,13 +278,19 @@ def require_user(authorization):
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     if not res or not res.user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    return res.user
+    user = res.user
+    ws, role = resolve_workspace(user)
+    _workspace.set((ws, role, getattr(user, "id", None)))
+    if need_workspace and not ws:
+        raise HTTPException(status_code=409, detail="no_workspace")
+    return user
 
 
 # ─── Roles and permissions ───
 # Mirrors taskmatch/app/lib/permissions.json (a test keeps the two in step) and supabase/roles.sql.
-# The role lives in the account's app_metadata, which only the service-role key can write.
-# user_metadata is never trusted for this: a signed-in user can edit their own user_metadata.
+# A role belongs to a membership: the same person can be an admin in one workspace and a viewer in
+# another. It lives in workspace_members, which only the server writes. user_metadata (which
+# a signed-in user can edit about themselves) is never trusted for it.
 
 ROLES = ("admin", "lead", "member", "viewer")
 ROLE_PERMISSIONS = {
@@ -225,9 +307,18 @@ ROLE_PERMISSIONS = {
 
 
 def role_of(user):
-    """The account's role from app_metadata. Accounts without one are members."""
-    role = (getattr(user, "app_metadata", None) or {}).get("role")
-    return role if role in ROLES else "member"
+    """The user's role in the current workspace, from workspace_members. Not a member: "none",
+    which has no permissions. app_metadata and user_metadata are never trusted for this."""
+    ctx = _workspace.get()
+    if not ctx or not ctx[0]:
+        return "none"
+    ws, caller_role, caller_id = ctx
+    if getattr(user, "id", None) == caller_id:
+        return caller_role
+    rows = (raw_db().table("workspace_members").select("role")
+            .eq("workspace_id", ws).eq("user_id", user.id).execute()).data
+    role = rows[0]["role"] if rows else "none"
+    return role if role in ROLES else "none"
 
 
 def can(role, permission):
@@ -1093,7 +1184,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
     return {"student_id": student_id, "qualified": qualified_list, "growth": growth_list}
 
 
-# ─── Admin: accounts & roles (leader-gated, service-role) ──────
+# ─── Workspace members & roles (service-role) ──────
 
 def _list_all_users(admin_client):
     """Walk every page of auth users (list_users caps at 50/page by default)."""
@@ -1109,76 +1200,286 @@ def _list_all_users(admin_client):
     return users
 
 
-def _account_view(user, roster_emails):
-    """Trim a Supabase auth user down to what the UI needs."""
-    meta = user.user_metadata or {}
-    email = user.email or ""
+def _members(ws):
+    return (raw_db().table("workspace_members").select("user_id, email, role, joined_at")
+            .eq("workspace_id", ws).execute()).data or []
+
+
+def _account_view(member, user, roster_emails):
+    """One member of the workspace, with what the UI needs from their login account."""
+    meta = (getattr(user, "user_metadata", None) or {}) if user else {}
+    email = (member.get("email") or (user.email if user else "") or "")
     return {
-        "id": user.id,
+        "id": member["user_id"],
         "email": email,
         "name": meta.get("full_name") or meta.get("name"),
-        "role": role_of(user),
-        "last_sign_in_at": str(user.last_sign_in_at) if getattr(user, "last_sign_in_at", None) else None,
+        "role": member["role"],
+        "last_sign_in_at": str(user.last_sign_in_at) if user and getattr(user, "last_sign_in_at", None) else None,
         "on_roster": email.lower() in roster_emails,
-        "created_at": str(user.created_at) if user.created_at else None,
+        "created_at": str(member.get("joined_at") or "") or None,
     }
+
+
+def _remember_workspace(admin_client, user_id, ws, role):
+    """Store the user's chosen workspace (and, for the app's display, their role there) in
+    app_metadata. Only the server can write app_metadata. Access is still checked against
+    workspace_members on every request; this is just which workspace to open."""
+    target = admin_client.auth.admin.get_user_by_id(user_id)
+    tuser = target.user if target else None
+    meta = dict(getattr(tuser, "app_metadata", None) or {}) if tuser else {}
+    meta.update({"workspace_id": ws, "role": role})
+    admin_client.auth.admin.update_user_by_id(user_id, {"app_metadata": meta})
 
 
 @app.get("/accounts")
 def list_accounts(authorization: str = Header(None)):
-    """List every signup (login) account, flagged with whether it's already on the
-    student roster. Lets a leader attach a roster row to an existing account instead of
-    retyping an email that may not match anyone. Needs people.manage."""
+    """Everyone in the current workspace, with their role, last sign-in and whether they're on
+    the roster yet. Needs people.manage."""
     require_permission(authorization, "people.manage")
     admin_client = require_admin_client()
+    ws = current_workspace()
 
-    users = _list_all_users(admin_client)
+    users = {u.id: u for u in _list_all_users(admin_client)}
     roster = db().table("students").select("email").execute().data or []
     roster_emails = {(s.get("email") or "").lower() for s in roster if s.get("email")}
 
-    accounts = [_account_view(u, roster_emails) for u in users]
+    accounts = [_account_view(m, users.get(m["user_id"]), roster_emails) for m in _members(ws)]
     accounts.sort(key=lambda a: (a["email"] or "").lower())
     return {"accounts": accounts}
 
 
 @app.post("/set-role")
 def set_role(body: SetRoleBody, authorization: str = Header(None)):
-    """Change an account's role. Admin-only, with a guard against removing the last admin
-    (which would leave nobody able to manage roles), and every change written to the audit log.
-    The role is stored in app_metadata, which users cannot edit themselves."""
+    """Change someone's role in the current workspace. Admin-only, with a guard against removing
+    the workspace's last admin, and every change written to the audit log."""
     actor = require_permission(authorization, "team.manage")
     admin_client = require_admin_client()
+    ws = current_workspace()
 
-    target = admin_client.auth.admin.get_user_by_id(body.user_id)
-    tuser = target.user if target else None
-    if not tuser:
-        raise HTTPException(status_code=404, detail="Account not found")
+    members = _members(ws)
+    target = next((m for m in members if m["user_id"] == body.user_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="That person isn't in this workspace.")
 
-    current_role = role_of(tuser)
-    new_role = body.role
+    current_role, new_role = target["role"], body.role
     if current_role == new_role:
-        return {"success": True, "unchanged": True, "role": new_role, "email": tuser.email}
+        return {"success": True, "unchanged": True, "role": new_role, "email": target["email"]}
+    if current_role == "admin" and sum(m["role"] == "admin" for m in members) <= 1:
+        raise HTTPException(status_code=400, detail="This is the last admin. Make someone else an admin first.")
 
-    if current_role == "admin":
-        admins = [u for u in _list_all_users(admin_client) if role_of(u) == "admin"]
-        if len(admins) <= 1:
-            raise HTTPException(status_code=400, detail="This is the last admin. Make someone else an admin first.")
-
-    # Merge: update_user_by_id replaces app_metadata wholesale, so keep the rest (e.g. provider).
-    app_meta = dict(getattr(tuser, "app_metadata", None) or {})
-    app_meta["role"] = new_role
-    admin_client.auth.admin.update_user_by_id(body.user_id, {"app_metadata": app_meta})
+    (raw_db().table("workspace_members").update({"role": new_role})
+     .eq("workspace_id", ws).eq("user_id", body.user_id).execute())
+    tuser = admin_client.auth.admin.get_user_by_id(body.user_id)
+    tuser = tuser.user if tuser else None
+    if tuser and (getattr(tuser, "app_metadata", None) or {}).get("workspace_id") == ws:
+        _remember_workspace(admin_client, body.user_id, ws, new_role)
 
     log_activity(
         action="account.role_changed",
         entity_type="account",
         entity_id=body.user_id,
-        summary=f"{tuser.email} role changed: {current_role} → {new_role}",
+        summary=f"{target['email']} role changed: {current_role} → {new_role}",
         actor_email=getattr(actor, "email", None),
         actor_role=role_of(actor),
-        details={"target_email": tuser.email, "from": current_role, "to": new_role},
+        details={"target_email": target["email"], "from": current_role, "to": new_role},
     )
-    return {"success": True, "role": new_role, "email": tuser.email}
+    return {"success": True, "role": new_role, "email": target["email"]}
+
+
+@app.delete("/workspaces/members/{user_id}")
+def remove_member(user_id: str, authorization: str = Header(None)):
+    """Remove someone from the current workspace (admin), or leave it yourself. Their past work
+    and the audit trail stay. The last admin can't leave or be removed."""
+    actor = require_user(authorization)
+    ws = current_workspace()
+    if user_id != actor.id and not can(role_of(actor), "team.manage"):
+        raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
+    members = _members(ws)
+    target = next((m for m in members if m["user_id"] == user_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="That person isn't in this workspace.")
+    if target["role"] == "admin" and sum(m["role"] == "admin" for m in members) <= 1:
+        raise HTTPException(status_code=400, detail="This is the last admin. Make someone else an admin first.")
+    raw_db().table("workspace_members").delete().eq("workspace_id", ws).eq("user_id", user_id).execute()
+    log_activity(
+        action="account.left" if user_id == actor.id else "account.removed",
+        entity_type="account", entity_id=user_id,
+        summary=f"{target['email']} {'left' if user_id == actor.id else 'was removed from'} the workspace",
+        actor_email=actor.email, actor_role=role_of(actor),
+        details={"target_email": target["email"], "role": target["role"]},
+    )
+    return {"success": True}
+
+
+# ─── Workspaces: create, switch, rename, invite, join ──────
+
+STARTER_SKILLS = ["Python", "JavaScript", "React", "Node.js", "Java", "SQL", "Database Design",
+                  "API Development", "UI/UX", "Mobile Development", "Testing / QA", "DevOps / CI-CD",
+                  "Cloud Computing", "Cybersecurity", "Data Analysis", "Machine Learning",
+                  "Project Management", "Technical Writing", "Graphic Design"]
+
+
+class WorkspaceBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+
+class SwitchBody(BaseModel):
+    workspace_id: str = Field(..., min_length=1)
+
+class InviteBody(BaseModel):
+    role: str = Field(default="member", pattern="^(admin|lead|member|viewer)$")
+    days: int = Field(default=7, ge=1, le=30)
+    max_uses: int = Field(default=25, ge=1, le=500)
+
+class JoinBody(BaseModel):
+    code: str = Field(..., min_length=6, max_length=64)
+
+
+def _workspace_list(user_id):
+    rows = memberships(user_id)
+    if not rows:
+        return []
+    ids = [m["workspace_id"] for m in rows]
+    names = {w["id"]: w for w in (raw_db().table("workspaces").select("id, name, created_at")
+                                  .in_("id", ids).execute()).data or []}
+    return [{"id": m["workspace_id"], "name": names.get(m["workspace_id"], {}).get("name", "Workspace"),
+             "role": m["role"]} for m in rows]
+
+
+@app.get("/workspaces")
+def list_workspaces(authorization: str = Header(None)):
+    """The workspaces you belong to and which one you're in. Empty for a brand-new account."""
+    user = require_user(authorization, need_workspace=False)
+    ws, role = _workspace.get()[:2]
+    return {"current": ws, "role": role, "workspaces": _workspace_list(user.id)}
+
+
+@app.post("/workspaces")
+def create_workspace(body: WorkspaceBody, authorization: str = Header(None)):
+    """Start a new workspace. You become its admin and it opens straight away. It comes with a
+    starter skill list that admins can change."""
+    user = require_user(authorization, need_workspace=False)
+    admin_client = require_admin_client()
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Give the workspace a name.")
+    if len(memberships(user.id)) >= 20:
+        raise HTTPException(status_code=400, detail="You're in 20 workspaces already.")
+    ws = raw_db().table("workspaces").insert({"name": name, "created_by": user.id}).execute().data[0]["id"]
+    raw_db().table("workspace_members").insert({"workspace_id": ws, "user_id": user.id, "email": user.email, "role": "admin"}).execute()
+    raw_db().table("skills").insert([{"skill_name": n, "workspace_id": ws} for n in STARTER_SKILLS]).execute()
+    _remember_workspace(admin_client, user.id, ws, "admin")
+    _workspace.set((ws, "admin", user.id))
+    log_activity(action="workspace.created", entity_type="workspace", entity_id=ws,
+                 summary=f"Created workspace '{name}'", actor_email=user.email, actor_role="admin")
+    return {"id": ws, "name": name, "role": "admin"}
+
+
+@app.post("/workspaces/switch")
+def switch_workspace(body: SwitchBody, authorization: str = Header(None)):
+    """Open another workspace you belong to."""
+    user = require_user(authorization, need_workspace=False)
+    admin_client = require_admin_client()
+    pick = next((m for m in memberships(user.id) if m["workspace_id"] == body.workspace_id), None)
+    if not pick:
+        raise HTTPException(status_code=403, detail="You're not a member of that workspace.")
+    _remember_workspace(admin_client, user.id, pick["workspace_id"], pick["role"])
+    return {"id": pick["workspace_id"], "role": pick["role"]}
+
+
+@app.patch("/workspaces/current")
+def rename_workspace(body: WorkspaceBody, authorization: str = Header(None)):
+    actor = require_permission(authorization, "team.manage")
+    ws = current_workspace()
+    old = (raw_db().table("workspaces").select("name").eq("id", ws).execute()).data
+    raw_db().table("workspaces").update({"name": body.name.strip()}).eq("id", ws).execute()
+    log_activity(action="workspace.renamed", entity_type="workspace", entity_id=ws,
+                 summary=f"Workspace renamed: {old[0]['name'] if old else '?'} → {body.name.strip()}",
+                 actor_email=actor.email, actor_role=role_of(actor),
+                 details={"from": old[0]["name"] if old else None, "to": body.name.strip()})
+    return {"success": True, "name": body.name.strip()}
+
+
+def _invite_valid(inv):
+    exp = inv.get("expires_at")
+    try:
+        expired = exp and datetime.fromisoformat(str(exp).replace("Z", "+00:00")) < datetime.now(timezone.utc)
+    except ValueError:
+        expired = True
+    return not inv.get("revoked") and not expired and (inv.get("uses") or 0) < (inv.get("max_uses") or 0)
+
+
+@app.get("/workspaces/invites")
+def list_invites(authorization: str = Header(None)):
+    require_permission(authorization, "team.manage")
+    rows = (raw_db().table("workspace_invites").select("*").eq("workspace_id", current_workspace())
+            .order("created_at", desc=True).execute()).data or []
+    return {"invites": [{**r, "valid": _invite_valid(r)} for r in rows if not r.get("revoked")]}
+
+
+@app.post("/workspaces/invites")
+def create_invite(body: InviteBody, authorization: str = Header(None)):
+    """An invite link for the current workspace: anyone signed in who opens it joins with `role`.
+    Expires after `days` or `max_uses` joins, and can be revoked."""
+    actor = require_permission(authorization, "team.manage")
+    ws = current_workspace()
+    code = secrets.token_urlsafe(12)
+    expires = (datetime.now(timezone.utc) + timedelta(days=body.days)).isoformat()
+    raw_db().table("workspace_invites").insert({"code": code, "workspace_id": ws, "role": body.role,
+                                                "created_by": actor.id, "expires_at": expires,
+                                                "max_uses": body.max_uses}).execute()
+    log_activity(action="workspace.invite_created", entity_type="workspace", entity_id=ws,
+                 summary=f"Created an invite link for {body.role}s ({body.days} days, up to {body.max_uses} people)",
+                 actor_email=actor.email, actor_role=role_of(actor), details={"role": body.role, "days": body.days})
+    return {"code": code, "role": body.role, "expires_at": expires, "max_uses": body.max_uses}
+
+
+@app.delete("/workspaces/invites/{code}")
+def revoke_invite(code: str, authorization: str = Header(None)):
+    actor = require_permission(authorization, "team.manage")
+    ws = current_workspace()
+    raw_db().table("workspace_invites").update({"revoked": True}).eq("workspace_id", ws).eq("code", code).execute()
+    log_activity(action="workspace.invite_revoked", entity_type="workspace", entity_id=ws,
+                 summary="Revoked an invite link", actor_email=actor.email, actor_role=role_of(actor))
+    return {"success": True}
+
+
+@app.get("/invites/{code}")
+def preview_invite(code: str, authorization: str = Header(None)):
+    """What an invite link is for, so the join page can say "Join X as a member"."""
+    require_user(authorization, need_workspace=False)
+    rows = (raw_db().table("workspace_invites").select("*").eq("code", code).execute()).data
+    if not rows:
+        raise HTTPException(status_code=404, detail="This invite link doesn't exist.")
+    inv = rows[0]
+    w = (raw_db().table("workspaces").select("name").eq("id", inv["workspace_id"]).execute()).data
+    return {"workspace": w[0]["name"] if w else "Workspace", "role": inv["role"], "valid": _invite_valid(inv)}
+
+
+@app.post("/workspaces/join")
+def join_workspace(body: JoinBody, authorization: str = Header(None)):
+    """Join a workspace with an invite code, and open it. Joining a workspace you're already in
+    just opens it; it never changes your role."""
+    user = require_user(authorization, need_workspace=False)
+    admin_client = require_admin_client()
+    rows = (raw_db().table("workspace_invites").select("*").eq("code", body.code).execute()).data
+    if not rows or not _invite_valid(rows[0]):
+        raise HTTPException(status_code=400, detail="This invite link has expired or was revoked. Ask for a new one.")
+    inv = rows[0]
+    ws = inv["workspace_id"]
+    existing = next((m for m in memberships(user.id) if m["workspace_id"] == ws), None)
+    role = existing["role"] if existing else inv["role"]
+    if not existing:
+        raw_db().table("workspace_members").insert({"workspace_id": ws, "user_id": user.id,
+                                                    "email": user.email, "role": role}).execute()
+        raw_db().table("workspace_invites").update({"uses": (inv.get("uses") or 0) + 1}).eq("code", body.code).execute()
+    _remember_workspace(admin_client, user.id, ws, role)
+    _workspace.set((ws, role, user.id))
+    if not existing:
+        log_activity(action="account.joined", entity_type="account", entity_id=user.id,
+                     summary=f"{user.email} joined as {role} with an invite link",
+                     actor_email=user.email, actor_role=role, details={"role": role})
+    w = (raw_db().table("workspaces").select("name").eq("id", ws).execute()).data
+    return {"id": ws, "name": w[0]["name"] if w else "Workspace", "role": role, "already_member": bool(existing)}
 
 
 # ─── AI assist ───

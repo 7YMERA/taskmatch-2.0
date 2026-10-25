@@ -13,6 +13,8 @@ import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { TaskBoard, TaskCalendar } from '../components/TaskViews'
 import TaskQuickView from '../components/TaskQuickView'
 import AISuggest, { type AIReview } from '../components/AISuggest'
+import ProjectChip from '../components/ProjectChip'
+import { fetchProjects, projectColor, type Project } from '../lib/projects'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent, Drawer } from '../components/ui'
 
 const PAGE_SIZE = 5
@@ -30,7 +32,7 @@ const PRESETS = [
   { key: 'critical', label: 'Critical' },
 ] as const
 // A saved view is just a named set of filters, kept in this browser.
-type SavedView = { name: string; q: string; status: string; severity: string; group: string; preset: string; sort: Sort; view: View }
+type SavedView = { name: string; q: string; status: string; severity: string; group: string; project?: string; preset: string; sort: Sort; view: View }
 const SAVED_KEY = 'tm-task-views'
 const SEV_RANK: Record<string, number> = { Critical: 0, Medium: 1, Low: 2 }
 const STATUS_RANK: Record<string, number> = { New: 0, 'In Progress': 1, Completed: 2 }
@@ -53,8 +55,10 @@ export default function Tasks() {
   const [aiReview, setAiReview] = useState<AIReview | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' })
+  const [form, setForm] = useState({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '', project_id: '' })
   const [groupFilter, setGroupFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')   // a project id, '__none__' or 'all'
+  const [projects, setProjects] = useState<Project[]>([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
   const [groups, setGroups] = useState<any[]>([])
@@ -84,6 +88,7 @@ export default function Tasks() {
     if (q.get('status')) setStatusFilter(q.get('status')!)
     if (q.get('severity')) setSeverityFilter(q.get('severity')!)
     if (q.get('group')) setGroupFilter(q.get('group')!)
+    if (q.get('project')) setProjectFilter(q.get('project')!)
     if (q.get('q')) setQuery(q.get('q')!)
     if (PRESETS.some(p => p.key === q.get('preset'))) setPreset(q.get('preset')!)
     if (['list', 'board', 'calendar'].includes(q.get('view') || '')) setView(q.get('view') as View)
@@ -100,6 +105,7 @@ export default function Tasks() {
     fetchTasks()
     fetchSkills()
     fetchGroups()
+    fetchProjects().then(setProjects)
   }, [])
 
   // Which suggestion engine the API runs: Claude, or the built-in one. (Only asked by people who
@@ -116,11 +122,11 @@ export default function Tasks() {
     if (!urlReady.current) return
     const u = new URL(window.location.href)
     const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
-    set('status', statusFilter, 'all'); set('severity', severityFilter, 'all'); set('group', groupFilter, 'all')
+    set('status', statusFilter, 'all'); set('severity', severityFilter, 'all'); set('group', groupFilter, 'all'); set('project', projectFilter, 'all')
     set('q', query.trim(), ''); set('preset', preset, 'all'); set('view', view, 'list'); set('sort', sort, 'due')
     set('open', quickId || '', ''); u.searchParams.delete('new')
     window.history.replaceState(null, '', u)
-  }, [statusFilter, severityFilter, groupFilter, query, preset, view, sort, quickId])
+  }, [statusFilter, severityFilter, groupFilter, projectFilter, query, preset, view, sort, quickId])
 
   const fetchTasks = async () => {
     const [{ data }, { data: asg }] = await Promise.all([
@@ -142,14 +148,14 @@ export default function Tasks() {
   const saveCurrentView = async () => {
     const name = (await promptDialog({ title: 'Save this view', message: 'Saves the current search, filters, sort and layout so you can come back in one click.', label: 'View name', placeholder: 'e.g. Critical this week', confirmLabel: 'Save view' }))?.trim()
     if (!name) return
-    persistViews([...savedViews.filter(v => v.name !== name), { name, q: query, status: statusFilter, severity: severityFilter, group: groupFilter, preset, sort, view }])
+    persistViews([...savedViews.filter(v => v.name !== name), { name, q: query, status: statusFilter, severity: severityFilter, group: groupFilter, project: projectFilter, preset, sort, view }])
     toast(`Saved view "${name}"`, 'success')
   }
   const applyView = (v: SavedView) => {
-    setQuery(v.q); setStatusFilter(v.status); setSeverityFilter(v.severity); setGroupFilter(v.group)
+    setQuery(v.q); setStatusFilter(v.status); setSeverityFilter(v.severity); setGroupFilter(v.group); setProjectFilter(v.project || 'all')
     setPreset(v.preset); setSort(v.sort); setView(v.view); setSelected([])
   }
-  const clearFilters = () => { setQuery(''); setStatusFilter('all'); setSeverityFilter('all'); setGroupFilter('all'); setPreset('all') }
+  const clearFilters = () => { setQuery(''); setStatusFilter('all'); setSeverityFilter('all'); setGroupFilter('all'); setProjectFilter('all'); setPreset('all') }
 
   // ── Bulk actions (leader) ──
   const bulkUpdate = async (patch: Record<string, any>, label: string) => {
@@ -221,6 +227,7 @@ export default function Tasks() {
       start_date: form.start_date || null,
       due_date: form.due_date || null,
       group_label: form.group_label.trim() || null,
+      ...(form.project_id ? { project_id: form.project_id } : {}),   // left out entirely on a database without projects
       status: 'New'
     }).select().single()
 
@@ -232,8 +239,8 @@ export default function Tasks() {
 
     await logActivity({
       action: 'task.created', entity_type: 'task', entity_id: data.id,
-      summary: `Created task '${form.description}' (${severity}${form.committed_hours ? `, ${form.committed_hours}h` : ''}${form.group_label ? `, group ${form.group_label}` : ''})`,
-      details: { description: form.description, severity, committed_hours: form.committed_hours, group_label: form.group_label, skills: taskSkills },
+      summary: `Created task '${form.description}' (${severity}${form.committed_hours ? `, ${form.committed_hours}h` : ''}${form.group_label ? `, group ${form.group_label}` : ''}${projectName(form.project_id) ? `, project ${projectName(form.project_id)}` : ''})`,
+      details: { description: form.description, severity, committed_hours: form.committed_hours, group_label: form.group_label, project_id: form.project_id || null, skills: taskSkills },
     })
 
     const aiItems = aiReview?.items || []
@@ -247,7 +254,7 @@ export default function Tasks() {
       })
     }
 
-    setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' })
+    setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '', project_id: '' })
     setTaskSkills([])
     setAiReview(null)
     setShowForm(false)
@@ -343,6 +350,9 @@ const updateTaskStatus = async (id: string, status: string) => {
   // labels present on tasks — so a group made on either tab shows here, even before it has a task.
   const _groupCreatedAt: { [name: string]: number } = {}
   groups.forEach(g => { _groupCreatedAt[g.name] = new Date(g.created_at).getTime() })
+  const projectById = (id?: string | null) => projects.find(p => p.id === id)
+  const projectName = (id?: string | null) => projectById(id)?.name || ''
+  const openProjects = projects.filter(p => !p.archived)
   const existingGroups = (Array.from(new Set([
     ...groups.map(g => g.name),
     ...tasks.map(t => t.group_label).filter(Boolean),
@@ -362,13 +372,16 @@ const updateTaskStatus = async (id: string, status: string) => {
     || (t.group_label || '').toLowerCase().includes(needle)
     || (t.task_skills || []).some((ts: any) => (ts.skills?.skill_name || '').toLowerCase().includes(needle))
     || activeOn(t).some((a: any) => (a.students?.name || '').toLowerCase().includes(needle))
-  const filtersOn = needle !== '' || statusFilter !== 'all' || severityFilter !== 'all' || groupFilter !== 'all' || preset !== 'all'
+  const filtersOn = needle !== '' || statusFilter !== 'all' || severityFilter !== 'all' || groupFilter !== 'all' || projectFilter !== 'all' || preset !== 'all'
 
+  const byProject = projectFilter === 'all' ? tasks
+    : projectFilter === '__none__' ? tasks.filter(t => !t.project_id)
+      : tasks.filter(t => t.project_id === projectFilter)
   const byGroup = groupFilter === 'all'
-    ? tasks
+    ? byProject
     : groupFilter === '__none__'
-      ? tasks.filter(t => !t.group_label)
-      : tasks.filter(t => t.group_label === groupFilter)
+      ? byProject.filter(t => !t.group_label)
+      : byProject.filter(t => t.group_label === groupFilter)
   const shownTasks = byGroup.filter(t => {
     const statusOk = statusFilter === 'all' ? true
       : statusFilter === 'Delayed' ? isDelayed(t)
@@ -413,7 +426,11 @@ const updateTaskStatus = async (id: string, status: string) => {
               <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
                 <Icon name="users" size={16} /> Create group
               </Button>
-              <Button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}>
+              <Button onClick={() => {
+                // Filtering by a project? New tasks start in it.
+                if (!showForm && !form.project_id && projectById(projectFilter)) setForm(f => ({ ...f, project_id: projectFilter }))
+                setShowForm(!showForm); setShowGroupForm(false)
+              }}>
                 <Icon name="plus" size={16} /> New task
               </Button>
             </div>
@@ -496,7 +513,7 @@ const updateTaskStatus = async (id: string, status: string) => {
             <Button onClick={createTask}>Create task</Button>
             <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]); setAiReview(null) }}>Cancel</Button>
             <Button variant="ghost" className="ml-auto"
-              onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]); setAiReview(null) }}>
+              onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '', project_id: '' }); setTaskSkills([]); setAiReview(null) }}>
               Clear all
             </Button>
           </>}>
@@ -552,6 +569,14 @@ const updateTaskStatus = async (id: string, status: string) => {
                   />
                 </Field>
               </div>
+              {openProjects.length > 0 && (
+                <Field label="Project">
+                  <select className="tm-input" value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })}>
+                    <option value="">No project</option>
+                    {openProjects.map(p => <option key={p.id} value={p.id}>{p.key ? `${p.key} · ` : ''}{p.name}</option>)}
+                  </select>
+                </Field>
+              )}
               <Field label="Group / team">
                 <Input
                   list="task-groups"
@@ -650,6 +675,17 @@ const updateTaskStatus = async (id: string, status: string) => {
             </select>
           </div>
           <div className="hidden sm:block w-px h-5" style={{ background: 'var(--tm-border)' }} />
+          {projects.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={FAINT}>Project</span>
+              {projectById(projectFilter) && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: projectColor(projectById(projectFilter)) }} />}
+              <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)} className="tm-select-sm max-w-[14rem]" aria-label="Filter by project">
+                <option value="all">All projects</option>
+                {projects.filter(p => !p.archived || p.id === projectFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="__none__">No project</option>
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs" style={FAINT}>Group</span>
             {groupFilter !== 'all' && groupFilter !== '__none__' && (
@@ -687,7 +723,7 @@ const updateTaskStatus = async (id: string, status: string) => {
             <Card>
               <EmptyState icon={<Icon name="list" size={28} />}
                 title={tasks.length === 0 ? 'No tasks yet' : 'No tasks match these filters'}
-                hint={tasks.length === 0 ? (can(userRole, 'tasks.manage') ? 'Create the first task to start matching students.' : 'Your leader hasn’t created any tasks yet.') : 'Try a different status, severity or group.'} />
+                hint={tasks.length === 0 ? (can(userRole, 'tasks.manage') ? 'Create the first task to start matching students.' : 'Your leader hasn’t created any tasks yet.') : 'Try a different status, severity, project or group.'} />
             </Card>
           ) : (
             shownTasks.map(task => (
@@ -705,6 +741,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: severityDot(task.severity) }} title={`${task.severity || 'Low'} severity`} />
                   <div className="flex-1 md:flex-none md:w-64 shrink-0 min-w-0">
                     <div className="flex items-center gap-2">
+                      <ProjectChip project={projectById(task.project_id)} />
                       {task.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(task.group_label) }} title={task.group_label} />}
                       <Link href={`/tasks/${task.id}`} onClick={e => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); e.stopPropagation(); setQuickId(task.id) }} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full page)">{task.description}</Link>
                     </div>
@@ -906,6 +943,14 @@ const updateTaskStatus = async (id: string, status: string) => {
                 <option value="">Set severity…</option>
                 {SEVERITIES.map(sv => <option key={sv} value={sv}>{sv}</option>)}
               </select>
+              {openProjects.length > 0 && (
+                <select className="tm-select-sm max-w-[10rem]" value="" aria-label="Move to project"
+                  onChange={e => e.target.value && bulkUpdate({ project_id: e.target.value === '__none__' ? null : e.target.value }, e.target.value === '__none__' ? 'Removed from project' : `Moved to ${projectName(e.target.value)}`)}>
+                  <option value="">Move to project…</option>
+                  {openProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <option value="__none__">No project</option>
+                </select>
+              )}
               <select className="tm-select-sm max-w-[10rem]" value="" aria-label="Move to group"
                 onChange={e => e.target.value && bulkUpdate({ group_label: e.target.value === '__none__' ? null : e.target.value }, e.target.value === '__none__' ? 'Removed from group' : `Moved to ${e.target.value}`)}>
                 <option value="">Move to group…</option>
@@ -918,7 +963,7 @@ const updateTaskStatus = async (id: string, status: string) => {
           </div>
         )}
         <TaskQuickView task={tasks.find(t => t.id === quickId) || null} assignees={(quickId && allAssignees[quickId]) || []}
-          groups={existingGroups} canEdit={can(userRole, 'tasks.manage')} locked={!!quickId && isClosed(tasks.find(t => t.id === quickId) || {})}
+          groups={existingGroups} projects={projects} canEdit={can(userRole, 'tasks.manage')} locked={!!quickId && isClosed(tasks.find(t => t.id === quickId) || {})}
           onClose={() => setQuickId(null)} onChanged={fetchTasks} />
       </main>
     </div>

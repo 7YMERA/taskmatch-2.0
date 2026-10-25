@@ -4,7 +4,10 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 3 adds suggestions to the New task panel: skills, hours and severity,
+> **Latest:** Phase 3b makes TaskMatch multi-team, like Jira: workspaces with their own people,
+> tasks and roles, invite links, a workspace switcher, and projects that group tasks: see
+> [PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md).
+> Phase 3 adds suggestions to the New task panel: skills, hours and severity,
 > each with a confidence level, that a lead accepts or dismisses. Claude makes them when an API
 > key is set, otherwise a free built-in engine works from past tasks: see
 > [PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md).
