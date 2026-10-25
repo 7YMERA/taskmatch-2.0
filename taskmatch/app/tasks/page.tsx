@@ -12,6 +12,7 @@ import { effectiveRole, can } from '../lib/role'
 import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { TaskBoard, TaskCalendar } from '../components/TaskViews'
 import TaskQuickView from '../components/TaskQuickView'
+import AISuggest, { type AIReview } from '../components/AISuggest'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent, Drawer } from '../components/ui'
 
 const PAGE_SIZE = 5
@@ -48,6 +49,8 @@ export default function Tasks() {
   const [skills, setSkills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string>('')
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
+  const [aiReview, setAiReview] = useState<AIReview | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' })
@@ -98,6 +101,14 @@ export default function Tasks() {
     fetchSkills()
     fetchGroups()
   }, [])
+
+  // Is AI assist switched on for this server? (Only asked by people who can create tasks.)
+  useEffect(() => {
+    if (!can(userRole, 'tasks.manage') || aiEnabled !== null) return
+    authHeaders().then(headers => axios.get(`${API}/ai/status`, { headers }))
+      .then(res => setAiEnabled(!!res.data.enabled))
+      .catch(() => setAiEnabled(false))
+  }, [userRole])
 
   // Keep the address bar in step with the filters (defaults are left out to keep links short).
   useEffect(() => {
@@ -224,8 +235,20 @@ export default function Tasks() {
       details: { description: form.description, severity, committed_hours: form.committed_hours, group_label: form.group_label, skills: taskSkills },
     })
 
+    const aiItems = aiReview?.items || []
+    if (aiItems.length) {
+      const used = aiItems.filter(i => i.decision === 'accepted')
+      const byConf = (['high', 'medium', 'low'] as const).map(c => [c, used.filter(i => i.confidence === c).length] as const).filter(([, n]) => n)
+      await logActivity({
+        action: 'ai.suggestions_reviewed', entity_type: 'task', entity_id: data.id,
+        summary: `Used ${used.length} of ${aiItems.length} reviewed AI suggestion${aiItems.length === 1 ? '' : 's'} for '${form.description}'${byConf.length ? ` (${byConf.map(([c, n]) => `${n} ${c}`).join(', ')} confidence)` : ''}`,
+        details: { model: aiReview?.model, accepted: used, dismissed: aiItems.filter(i => i.decision === 'dismissed') },
+      })
+    }
+
     setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' })
     setTaskSkills([])
+    setAiReview(null)
     setShowForm(false)
     fetchTasks()
   }
@@ -470,9 +493,9 @@ const updateTaskStatus = async (id: string, status: string) => {
           sub="Describe the work and the skills it needs. The matcher uses these to suggest people."
           footer={<>
             <Button onClick={createTask}>Create task</Button>
-            <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]) }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]); setAiReview(null) }}>Cancel</Button>
             <Button variant="ghost" className="ml-auto"
-              onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]) }}>
+              onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]); setAiReview(null) }}>
               Clear all
             </Button>
           </>}>
@@ -484,6 +507,13 @@ const updateTaskStatus = async (id: string, status: string) => {
                   onChange={e => setForm({ ...form, description: e.target.value })}
                 />
               </Field>
+              <AISuggest description={form.description} enabled={aiEnabled} canConfigure={can(userRole, 'team.manage')}
+                onSkill={(skill_id, min_proficiency) => setTaskSkills(prev => prev.some(x => x.skill_id === skill_id)
+                  ? prev.map(x => x.skill_id === skill_id ? { ...x, min_proficiency } : x)
+                  : [...prev, { skill_id, min_proficiency }])}
+                onHours={h => setForm(f => ({ ...f, committed_hours: String(h) }))}
+                onSeverity={v => setForm(f => ({ ...f, severity: v }))}
+                onReview={setAiReview} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Severity">
                   <select

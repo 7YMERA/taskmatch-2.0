@@ -9,6 +9,8 @@ from supabase import create_client
 from collections import defaultdict, deque
 from datetime import date, datetime, timezone
 
+import ai
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("taskmatch")
 
@@ -130,6 +132,10 @@ class AutoAssignBody(BaseModel):
 class SetRoleBody(BaseModel):
     user_id: str = Field(..., min_length=1)
     role: str = Field(..., pattern="^(admin|lead|member|viewer)$")
+
+class SuggestTaskBody(BaseModel):
+    description: str = Field(..., min_length=3, max_length=500)
+    notes: str = Field(default="", max_length=2000)
 
 
 # ─── Global error handling — no raw stack-trace 500s leak to clients ───
@@ -1172,3 +1178,54 @@ def set_role(body: SetRoleBody, authorization: str = Header(None)):
         details={"target_email": tuser.email, "from": current_role, "to": new_role},
     )
     return {"success": True, "role": new_role, "email": tuser.email}
+
+
+# ─── AI assist ───
+# Suggestions only: the app shows each one with its confidence and the lead accepts or dismisses
+# it. Nothing here writes to the database. See ai.py.
+
+ai_limiter = RateLimiter(int(os.environ.get("AI_RATE_LIMIT_PER_MINUTE", "10")), 60.0)  # per user
+
+
+@app.get("/ai/status")
+def ai_status(authorization: str = Header(None)):
+    """Whether AI suggestions are switched on (the app hides the button when they aren't)."""
+    require_user(authorization)
+    return {"enabled": ai.enabled(), "model": ai.AI_MODEL if ai.enabled() else None}
+
+
+@app.post("/ai/suggest-task")
+def ai_suggest_task(body: SuggestTaskBody, authorization: str = Header(None)):
+    """Suggest skills, hours and severity for a task description, each with a confidence level.
+    Needs tasks.manage. Grounded in the team's own skill list and recently finished tasks."""
+    user = require_permission(authorization, "tasks.manage")
+    if not ai.enabled():
+        raise HTTPException(status_code=503, detail="AI suggestions aren't set up on this server (ANTHROPIC_API_KEY is missing).")
+    wait = ai_limiter.hit(user.email or user.id)
+    if wait is not None:
+        raise HTTPException(status_code=429, detail=f"Too many AI requests. Try again in {int(wait) + 1} seconds.",
+                            headers={"Retry-After": str(int(wait) + 1)})
+
+    skills = db().table("skills").select("id, skill_name").execute().data or []
+    tasks = (
+        db().table("tasks")
+        .select("id, description, committed_hours, task_skills(skills(skill_name)), assignments(actual_hours, status)")
+        .eq("status", "Completed")
+        .order("completed_at", desc=True)
+        .limit(ai.MAX_HISTORY)
+        .execute()
+    ).data or []
+
+    import anthropic
+    try:
+        return ai.suggest(body.description, body.notes, skills, tasks)
+    except ai.AIUnavailable as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except anthropic.RateLimitError:
+        raise HTTPException(status_code=429, detail="The AI service is busy. Try again in a minute.")
+    except anthropic.AuthenticationError:
+        logger.error("ai: ANTHROPIC_API_KEY was rejected")
+        raise HTTPException(status_code=503, detail="The server's AI key was rejected. Check ANTHROPIC_API_KEY.")
+    except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+        logger.warning("ai: request failed: %s", type(e).__name__)
+        raise HTTPException(status_code=502, detail="The AI service didn't respond. Try again.")
