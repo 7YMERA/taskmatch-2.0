@@ -11,18 +11,21 @@ import { logActivity } from '../lib/log'
 import { toast } from '../lib/ui'
 import { Drawer, Icon } from './ui'
 import { severityDot } from './TaskViews'
+import ProjectChip from './ProjectChip'
+import type { Project } from '../lib/projects'
 
 const STATUSES = [['New', 'New'], ['In Progress', 'Ongoing'], ['Completed', 'Completed']]
 const SEVERITIES = ['Low', 'Medium', 'Critical']
 const LEVEL = ['', 'Beginner', 'Intermediate', 'Advanced']
 const initials = (n: string) => (n || '?').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
 
-type Field = 'description' | 'status' | 'severity' | 'due_date' | 'start_date' | 'committed_hours' | 'group_label'
+type Field = 'description' | 'status' | 'severity' | 'due_date' | 'start_date' | 'committed_hours' | 'group_label' | 'project_id'
 
-export default function TaskQuickView({ task, assignees, groups, canEdit, locked, onClose, onChanged }: {
+export default function TaskQuickView({ task, assignees, groups, projects = [], canEdit, locked, onClose, onChanged }: {
   task: any | null
   assignees: { student_id: string; status: string; students?: { name: string } | null }[]
   groups: string[]
+  projects?: Project[]
   canEdit: boolean
   locked: boolean
   onClose: () => void
@@ -42,6 +45,8 @@ export default function TaskQuickView({ task, assignees, groups, canEdit, locked
 
   if (!task || !draft) return null
 
+  const projectName = (id: string | null) => projects.find(p => p.id === id)?.name || 'none'
+
   const save = async (field: Field, raw: any) => {
     const value = raw === '' ? null : field === 'committed_hours' ? (raw == null ? null : Number(raw)) : raw
     if (field === 'committed_hours' && value != null && (isNaN(value) || value < 0)) { toast('Hours must be a positive number.', 'error'); setDraft(task); return }
@@ -51,10 +56,12 @@ export default function TaskQuickView({ task, assignees, groups, canEdit, locked
     const { error } = await supabase.from('tasks').update({ [field]: value }).eq('id', task.id)
     setSaving(null)
     if (error) { toast(error.message, 'error'); setDraft(task); return }
-    const label = { description: 'description', status: 'status', severity: 'severity', due_date: 'due date', start_date: 'start date', committed_hours: 'committed hours', group_label: 'group' }[field]
+    const label = { description: 'description', status: 'status', severity: 'severity', due_date: 'due date', start_date: 'start date', committed_hours: 'committed hours', group_label: 'group', project_id: 'project' }[field]
     await logActivity({
       action: field === 'status' ? 'task.status_changed' : 'task.updated', entity_type: 'task', entity_id: task.id,
-      summary: `Changed ${label} of '${task.description}': ${task[field] ?? 'none'} → ${value ?? 'none'}`,
+      summary: field === 'project_id'
+        ? `Moved '${task.description}' ${value ? `to project ${projectName(value)}` : `out of project ${projectName(task.project_id)}`}`
+        : `Changed ${label} of '${task.description}': ${task[field] ?? 'none'} → ${value ?? 'none'}`,
       details: { field, from: task[field] ?? null, to: value },
     })
     onChanged()
@@ -84,6 +91,12 @@ export default function TaskQuickView({ task, assignees, groups, canEdit, locked
             onBlur={e => save('description', e.target.value.trim())} />}
 
       <div className="mb-5">
+        {projects.length > 0 && row('Project', 'project_id', readOnly
+          ? <span className="text-sm text-fg flex items-center gap-2"><ProjectChip project={projects.find(p => p.id === draft.project_id)} />{draft.project_id ? projectName(draft.project_id) : '—'}</span>
+          : <select id="qv-project_id" className={fieldCls} value={draft.project_id || ''} onChange={e => { setDraft({ ...draft, project_id: e.target.value }); save('project_id', e.target.value) }}>
+              <option value="">No project</option>
+              {projects.filter(p => !p.archived || p.id === draft.project_id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>)}
         {row('Status', 'status', readOnly
           ? <span className="text-sm text-fg">{STATUSES.find(s => s[0] === draft.status)?.[1] || draft.status}</span>
           : <select id="qv-status" className={fieldCls} value={draft.status} onChange={e => { setDraft({ ...draft, status: e.target.value }); save('status', e.target.value) }}>

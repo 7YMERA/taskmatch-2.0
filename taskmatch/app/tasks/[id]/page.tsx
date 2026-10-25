@@ -7,6 +7,8 @@ import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../../lib/log'
 import Sidebar from '../../components/Sidebar'
+import ProjectChip from '../../components/ProjectChip'
+import type { Project } from '../../lib/projects'
 import { toast, confirmDialog, promptDialog } from '../../lib/ui'
 import { effectiveRole, can, roleLabel } from '../../lib/role'
 import { Card, Badge, Button, Input, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
@@ -34,6 +36,7 @@ export default function TaskDetail() {
   const [userEmail, setUserEmail] = useState('')
   const [userRole, setUserRole] = useState('')
   const [task, setTask] = useState<any>(null)
+  const [project, setProject] = useState<Project | null>(null)
   const [assignees, setAssignees] = useState<any[]>([])
   const [recs, setRecs] = useState<any[]>([])
   const [meta, setMeta] = useState<any>(null)
@@ -63,6 +66,7 @@ export default function TaskDetail() {
       .select('*, task_skills(skill_id, min_proficiency, skills(skill_name))')
       .eq('id', id).single()
     setTask(t)
+    if (t?.project_id) supabase.from('projects').select('*').eq('id', t.project_id).maybeSingle().then(({ data }) => setProject(data))
     await Promise.all([loadAssignees(), loadComments(), loadRecs()])
     setLoading(false)
   }
@@ -243,6 +247,11 @@ export default function TaskDetail() {
                 <div className="flex-1 min-w-0">
                   <h1 className="text-xl font-semibold tracking-tight" style={TEXT}>{task.description}</h1>
                   <div className="flex gap-2 mt-3 flex-wrap items-center">
+                    {project && (
+                      <Link href={`/tasks?project=${project.id}`} className="tm-chip gap-1.5 hover:underline" title="All tasks in this project">
+                        <ProjectChip project={project} className="!px-1 !py-0" /> {project.name}
+                      </Link>
+                    )}
                     {task.severity && (
                       <span className="tm-chip gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: severityDot(task.severity) }} />

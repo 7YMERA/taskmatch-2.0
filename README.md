@@ -143,7 +143,7 @@ past its due date is closed and locked automatically.
 ```
 taskmatch/        Next.js frontend (pages in app/, design system in app/components/ui.tsx)
 taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
-supabase/         Database security policies (rls.sql, then roles.sql)
+supabase/         Database security policies (rls.sql, then roles.sql, then workspaces.sql)
 docs/             Roadmap, redesign and Phase 1 write-ups, screenshots
 .github/          CI workflow
 ```
@@ -176,7 +176,13 @@ queries rely on it.
 
 Then run [`supabase/roles.sql`](supabase/roles.sql) once. It moves every account's role to a place
 only the server can change (existing leaders become admins, everyone else members), adds the
-"away" date, and sets the database rules for each role. Admins change roles on the **Team & roles** page.
+"away" date, and sets the database rules for each role.
+
+Then run [`supabase/workspaces.sql`](supabase/workspaces.sql) once. It adds workspaces and
+projects. Everything you already have goes into one workspace called "My team", and every
+existing account joins it with the role it has now. Admins rename it, send invite links and
+change roles on the **Members & roles** page. New accounts create their own workspace or join
+one with an invite link.
 
 ### 3. The frontend
 

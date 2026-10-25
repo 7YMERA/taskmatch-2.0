@@ -89,11 +89,23 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | POST | `/unassign` | admin, lead | remove an assignment |
 | GET | `/wip` | user | work-in-progress status |
 | GET | `/student-stats` | user | per-student performance |
-| GET | `/accounts` | admin, lead | list accounts with role and last sign-in (needs service-role key) |
-| POST | `/set-role` | admin | set an account's role: `admin`, `lead`, `member` or `viewer`; refuses to remove the last admin (needs service-role key) |
+| GET | `/accounts` | admin, lead | members of the current workspace, with role and last sign-in (needs service-role key) |
+| POST | `/set-role` | admin | set a member's role in the current workspace: `admin`, `lead`, `member` or `viewer`; refuses to remove the last admin |
+| DELETE | `/workspaces/members/{user_id}` | admin, or yourself | remove someone from the current workspace, or leave it; not the last admin |
+| GET | `/workspaces` | signed in | your workspaces, the open one and your role there (empty for a new account) |
+| POST | `/workspaces` | signed in | create a workspace; you become its admin and it opens |
+| POST | `/workspaces/switch` | a member of it | open another of your workspaces |
+| PATCH | `/workspaces/current` | admin | rename the current workspace |
+| GET, POST | `/workspaces/invites` | admin | list or create invite links (`role`, `days` 1–30, `max_uses` 1–500) |
+| DELETE | `/workspaces/invites/{code}` | admin | revoke an invite link |
+| GET | `/invites/{code}` | signed in | what an invite is for (workspace name, role, still valid) |
+| POST | `/workspaces/join` | signed in | join with an invite code; never changes the role of someone already in |
 | GET | `/ai/status` | user | which suggestion engine is on: `claude` or `history` (built-in) |
 | POST | `/ai/suggest-task` | admin, lead | suggested skills, hours and severity for a task description, each with a confidence level; writes nothing (Claude with `ANTHROPIC_API_KEY`, otherwise the built-in engine) |
 
-Roles are read from the account's `app_metadata` (only the service-role key can write it), never from
-`user_metadata`, which users can edit about themselves. The permission table is `ROLE_PERMISSIONS` in
+Every request runs inside one workspace: the one in the account's `app_metadata.workspace_id`
+(written only by the server), checked against `workspace_members` on every request. Queries add
+`workspace_id` automatically (`ScopedClient` in `main.py`), and a request from someone with no
+workspace gets `409 no_workspace`. Roles are per workspace and come from `workspace_members`,
+never from `user_metadata`, which users can edit about themselves. The permission table is `ROLE_PERMISSIONS` in
 `main.py`; it matches `taskmatch/app/lib/permissions.json` (a test checks) and `supabase/roles.sql`.

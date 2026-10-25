@@ -143,4 +143,4 @@ a fixed example, not a live call.
 
 ## Next
 
-Workspaces and projects (multi-org, like Jira), then the notification centre built on top of them.
+Workspaces and projects (multi-org, like Jira): see [PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md).

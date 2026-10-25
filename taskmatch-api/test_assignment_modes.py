@@ -153,6 +153,7 @@ def fake(monkeypatch):
     monkeypatch.setattr(main, "supabase", f)
     monkeypatch.setattr(main, "admin", None)
     monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1000))
+    main._workspace.set(("w1", "lead", None))  # for tests that call the matcher directly
     return f
 
 
