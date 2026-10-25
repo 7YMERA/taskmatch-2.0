@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../../lib/log'
@@ -10,12 +10,6 @@ import Sidebar from '../../components/Sidebar'
 import { toast, confirmDialog } from '../../lib/ui'
 import { effectiveRole } from '../../lib/role'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 
 export default function TaskDetail() {
@@ -43,11 +37,6 @@ export default function TaskDetail() {
 
   // Attach the caller's Supabase access token so the API can verify who is acting.
   // The server derives actor identity + permissions from this token — never from
-  // request-body fields, which a client could forge.
-  const authHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
-  }
 
   const loadAll = async () => {
     const { data: t } = await supabase
@@ -76,7 +65,7 @@ export default function TaskDetail() {
 
   const loadRecs = async () => {
     try {
-      const res = await axios.get(`${API}/recommend/${id}`)
+      const res = await axios.get(`${API}/recommend/${id}`, { headers: await authHeaders() })
       setRecs(res.data.recommendations)
       setMeta({ suggested_pair: res.data.suggested_pair, assigned_count: res.data.assigned_count, wip_limit: res.data.wip_limit ?? 3 })
     } catch { setRecs([]) }

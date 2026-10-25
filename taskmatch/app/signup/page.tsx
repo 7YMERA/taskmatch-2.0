@@ -1,16 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 const CREATING_MSGS = ['Creating your account…', 'Setting up your workspace…', 'Getting things ready…', 'Almost there…']
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function SignUp() {
   const router = useRouter()

@@ -2,15 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import { effectiveRole } from '../lib/role'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function Logs() {
   const router = useRouter()

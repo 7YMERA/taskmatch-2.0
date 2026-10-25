@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../lib/log'
@@ -12,12 +12,6 @@ import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PAGE_SIZE = 5
 const SEVERITIES = ['Low', 'Medium', 'Critical']
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
@@ -67,12 +61,6 @@ export default function Tasks() {
     fetchSkills()
     fetchGroups()
   }, [])
-
-  // Send the caller's Supabase token so the API verifies identity server-side.
-  const authHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
-  }
 
   const fetchTasks = async () => {
     const { data } = await supabase
@@ -166,7 +154,7 @@ export default function Tasks() {
     fetchAssignees(task_id)          // who's actually on it (shown for started tasks)
     if (recommendations[task_id]) return
     try {
-      const res = await axios.get(`${API}/recommend/${task_id}`)
+      const res = await axios.get(`${API}/recommend/${task_id}`, { headers: await authHeaders() })
       setRecommendations(prev => ({ ...prev, [task_id]: res.data.recommendations }))
       setRecMeta(prev => ({ ...prev, [task_id]: { suggested_pair: res.data.suggested_pair, assigned_count: res.data.assigned_count } }))
     } catch {
@@ -179,7 +167,7 @@ export default function Tasks() {
     setAssigning(student_id)
     try {
       await axios.post(`${API}/assign`, { task_id, student_id }, { headers: await authHeaders() })
-      const res = await axios.get(`${API}/recommend/${task_id}`)
+      const res = await axios.get(`${API}/recommend/${task_id}`, { headers: await authHeaders() })
       setRecommendations(prev => ({ ...prev, [task_id]: res.data.recommendations }))
       setRecMeta(prev => ({ ...prev, [task_id]: { suggested_pair: res.data.suggested_pair, assigned_count: res.data.assigned_count } }))
       fetchAssignees(task_id)
