@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
+import PersonQuickView from '../components/PersonQuickView'
 import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, bandAccent } from '../components/ui'
@@ -24,7 +25,7 @@ const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-
 const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Skills-matrix cell shades: one hue, light → dark by level.
 const LEVEL_FILL = ['', 'color-mix(in srgb, var(--tm-chart-1) 40%, var(--tm-surface-1))', 'color-mix(in srgb, var(--tm-chart-1) 62%, var(--tm-surface-1))', 'var(--tm-chart-1)']
-type PeopleView = 'roster' | 'matrix'
+type PeopleView = 'roster' | 'cards' | 'matrix'
 type Avail = 'all' | 'free' | 'room' | 'limit'
 type PeopleSort = 'group' | 'name' | 'available' | 'score'
 
@@ -52,6 +53,7 @@ export default function Students() {
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupForm, setGroupForm] = useState<{ name: string, color: string, members: string[] }>({ name: '', color: GROUP_COLORS[0], members: [] })
   const [view, setView] = useState<PeopleView>('roster')
+  const [quickId, setQuickId] = useState<string | null>(null)   // person open in the side panel
   const [query, setQuery] = useState('')
   const [skillFilter, setSkillFilter] = useState('')
   const [minLevel, setMinLevel] = useState(1)
@@ -66,7 +68,8 @@ export default function Students() {
     if (q.get('skill')) setSkillFilter(q.get('skill')!)
     if (['1', '2', '3'].includes(q.get('level') || '')) setMinLevel(Number(q.get('level')))
     if (['free', 'room', 'limit'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
-    if (q.get('view') === 'matrix') setView('matrix')
+    if (['matrix', 'cards'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
+    if (q.get('open')) setQuickId(q.get('open'))
     if (['name', 'available', 'score'].includes(q.get('sort') || '')) setSort(q.get('sort') as PeopleSort)
     if (q.get('group')) setGroupFilter(q.get('group')!)
     urlReady.current = true
@@ -77,8 +80,9 @@ export default function Students() {
     const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
     set('q', query.trim(), ''); set('skill', skillFilter, ''); set('level', skillFilter ? String(minLevel) : '', '')
     set('avail', avail, 'all'); set('view', view, 'roster'); set('sort', sort, 'group'); set('group', groupFilter, 'all')
+    set('open', quickId || '', '')
     window.history.replaceState(null, '', u)
-  }, [query, skillFilter, minLevel, avail, view, sort, groupFilter])
+  }, [query, skillFilter, minLevel, avail, view, sort, groupFilter, quickId])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -297,6 +301,13 @@ export default function Students() {
   // Link roster rows to login accounts by email (the only join between the two).
   const accountByEmail: { [email: string]: any } = {}
   accounts.forEach(a => { if (a.email) accountByEmail[a.email.toLowerCase()] = a })
+  const openQuick = (e: React.MouseEvent, id: string) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); setQuickId(id) }
+  const availability = (s: any) => {
+    const at = wip[s.id]?.active_tasks || []
+    return at.length === 0
+      ? <span className="text-[11px] flex items-center gap-1.5" style={FAINT}><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Available · no active tasks</span>
+      : <span className="text-[11px] truncate" style={MUTED}>On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
+  }
   const accountFor = (s: any) => accountByEmail[(s.email || '').toLowerCase()]
   // Accounts that exist but aren't on the roster yet — the pool for "assign existing account".
   const unassignedAccounts = accounts.filter(a => !a.on_roster)
@@ -590,7 +601,7 @@ export default function Students() {
             <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, matric, email or skill…" className="!pl-9" aria-label="Search people" />
           </div>
           <div className="tm-seg" aria-label="Layout">
-            {([['roster', 'Roster', 'list'], ['matrix', 'Skills matrix', 'grid']] as const).map(([k, label, icon]) => (
+            {([['roster', 'Roster', 'list'], ['cards', 'Cards', 'users'], ['matrix', 'Skills matrix', 'grid']] as const).map(([k, label, icon]) => (
               <button key={k} onClick={() => setView(k)} aria-pressed={view === k}><Icon name={icon} size={14} /> {label}</button>
             ))}
           </div>
@@ -739,6 +750,49 @@ export default function Students() {
             <EmptyState icon={<Icon name="users" size={28} />}
               title={students.length === 0 ? 'No students yet' : peopleFiltersOn ? 'Nobody matches these filters' : 'No students in this group'}
               hint={students.length === 0 && userRole === 'leader' ? 'Add your first student to start matching them to tasks.' : undefined} />
+          ) : view === 'cards' ? (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {shownStudents.map(s => {
+                const top = [...(s.student_skills || [])].sort((a: any, b: any) =>
+                  Number(b.skill_id === skillFilter) - Number(a.skill_id === skillFilter) || b.proficiency - a.proficiency).slice(0, 4)
+                const st = stats[s.id]
+                return (
+                  <div key={s.id} className="rounded-xl border p-4 flex flex-col gap-3 transition hover:border-[var(--tm-border-strong)] hover:bg-[var(--tm-surface-1)]" style={{ borderColor: 'var(--tm-border)' }}>
+                    <div className="flex items-center gap-3">
+                      {s.avatar_url
+                        ? <img src={s.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                        : <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-medium shrink-0" style={AVATAR}>{initials(s.name)}</div>}
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/students/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate block" style={TEXT}>{s.name}</Link>
+                        <p className="text-[11px] truncate flex items-center gap-1.5" style={FAINT}>
+                          {s.group_label && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} />}
+                          {s.group_label ? `${s.group_label} · ` : ''}{s.programme}
+                        </p>
+                      </div>
+                      {wipMeter(s.id)}
+                    </div>
+                    {availability(s)}
+                    <div className="flex flex-col gap-1.5">
+                      {top.length === 0 ? <span className="text-xs" style={FAINT}>No skills declared</span> : top.map((ss: any) => (
+                        <div key={ss.skill_id} className="grid grid-cols-[1fr_3.5rem] items-center gap-3">
+                          <span className="text-xs truncate" style={ss.skill_id === skillFilter ? { color: 'var(--tm-primary-text)', fontWeight: 500 } : MUTED}>{ss.skills?.skill_name}</span>
+                          <span className="flex gap-0.5" title={LEVELS[ss.proficiency]} aria-label={LEVELS[ss.proficiency]}>
+                            {[1, 2, 3].map(l => <span key={l} className="h-1.5 flex-1 rounded-full" style={{ background: l <= ss.proficiency ? 'var(--tm-chart-1)' : 'var(--tm-track)' }} />)}
+                          </span>
+                        </div>
+                      ))}
+                      {(s.student_skills || []).length > 4 && <span className="text-[11px]" style={FAINT}>+{(s.student_skills || []).length - 4} more skills</span>}
+                    </div>
+                    {userRole === 'leader' && st && (
+                      <p className="text-[11px] mt-auto pt-2 flex items-center gap-1.5" style={{ ...FAINT, borderTop: '1px solid var(--tm-border)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.band === 'unrated' ? 'var(--tm-text-faint)' : `var(--tm-${bandAccent(st.band)})` }} />
+                        {st.band === 'unrated' ? 'Not rated yet' : `Avg score ${Number(st.avg_score).toFixed(2)} · ${st.completed_count} finished`}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
               {shownStudents.map(s => (
@@ -755,7 +809,7 @@ export default function Students() {
                     <div className="flex-1 md:flex-none md:w-52 shrink-0 min-w-0">
                       <div className="flex items-center gap-2">
                         {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
-                        <Link href={`/students/${s.id}`} className="text-sm font-medium hover:underline truncate" style={TEXT}>{s.name}</Link>
+                        <Link href={`/students/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full profile)">{s.name}</Link>
                         {userRole === 'leader' && (() => {
                           const acct = accountFor(s)
                           if (!acct) return <span className="text-[11px] shrink-0" style={FAINT} title="No login account linked to this roster row">no login</span>
@@ -857,6 +911,8 @@ export default function Students() {
             </div>
           )}
         </Card>
+        <PersonQuickView person={students.find(x => x.id === quickId) || null} wip={quickId ? wip[quickId] : undefined} wipLimit={wipLimit}
+          stat={quickId ? stats[quickId] : undefined} showScores={userRole === 'leader'} groupColor={groupColor} onClose={() => setQuickId(null)} />
       </main>
     </div>
   )

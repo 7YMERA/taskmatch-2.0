@@ -319,6 +319,8 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 @keyframes tm-shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
 
 .tm-fade-up { animation: tm-fade-up .4s ease-out both; }
+@keyframes tm-drawer-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.tm-drawer { animation: tm-drawer-in .18s ease-out both; }
 
 /* Skeleton loading shimmer */
 .tm-skeleton {
@@ -329,7 +331,7 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tm-fade-up, .tm-skeleton, [class*="animate-"] { animation: none !important; }
+  .tm-fade-up, .tm-drawer, .tm-skeleton, [class*="animate-"] { animation: none !important; }
 }
 
 /* ─── Chart tooltip ─── one floating label per chart (components/charts.tsx) */
