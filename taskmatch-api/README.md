@@ -30,11 +30,20 @@ cp .env.example .env
 | `SUPABASE_KEY` | Publishable (anon) key — used for normal reads/writes | yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret key — only for admin endpoints (`/accounts`, `/set-role`). Never expose to the browser. | no (those endpoints return 503 without it) |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, e.g. `https://taskmatch.vercel.app,http://localhost:3000`. **Unset = no cross-origin allowed.** Use `*` only to deliberately open the API. | recommended |
+| `RATE_LIMIT_PER_MINUTE` | Max requests per client IP per minute (default `120`, `0` = off). `/health` is never limited. | no |
 
 ## Run
 
 ```bash
 uvicorn main:app --reload --port 8000
+```
+
+Behind a reverse proxy (e.g. Render), start it with proxy headers on so the rate
+limiter sees each visitor's real IP instead of the proxy's (otherwise everyone
+shares one limit):
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
 ```
 
 Health check: `GET http://localhost:8000/health`
@@ -47,13 +56,18 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Tests cover the pure logic (score banding, SLA auto-close) and never touch the
-database. CI runs them on every push (`.github/workflows/ci.yml`).
+Tests cover the pure logic (score banding, SLA auto-close) plus the access
+controls (login required, rate limiting), and never touch the database. CI runs them on every push (`.github/workflows/ci.yml`).
 
 ## Security notes
 
 - Identity for `/assign`, `/self-assign`, `/start`, `/complete`, `/unassign`,
   `/set-role` comes from the **verified Supabase token**, never the request body.
+- Every endpoint except `/health` requires a valid Supabase login token
+  (`Authorization: Bearer <access_token>`), including the read-only ones.
+- Each client IP is rate-limited (`RATE_LIMIT_PER_MINUTE`, default 120/min); over
+  the limit returns `429` with a `Retry-After` header. The limit is in memory, so
+  it is per server process.
 - Request bodies are validated with typed schemas — bad input is rejected with a 422.
 - Lock `CORS_ORIGINS` to your real frontend URL before deploying.
 
@@ -62,14 +76,14 @@ database. CI runs them on every push (`.github/workflows/ci.yml`).
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | — | liveness |
-| GET | `/recommend/{task_id}` | — | ranked students for a task |
-| GET | `/recommend-tasks/{student_id}` | — | ranked tasks for a student |
+| GET | `/recommend/{task_id}` | user | ranked students for a task |
+| GET | `/recommend-tasks/{student_id}` | user | ranked tasks for a student |
 | POST | `/assign` | leader | assign a student to a task |
 | POST | `/self-assign` | user | pick up a task for yourself |
 | POST | `/start` | user | start an assigned task |
 | POST | `/complete` | user | complete + score an assignment |
 | POST | `/unassign` | user | remove an assignment |
-| GET | `/wip` | — | work-in-progress status |
-| GET | `/student-stats` | — | per-student performance |
+| GET | `/wip` | user | work-in-progress status |
+| GET | `/student-stats` | user | per-student performance |
 | GET | `/accounts` | leader | list accounts (needs service-role key) |
 | POST | `/set-role` | leader | promote/demote (needs service-role key) |

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../lib/log'
@@ -12,12 +12,6 @@ import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, bandAccent } from '../components/ui'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PROGRAMMES = ['CS', 'IT', 'IS']  // programmes: Computer Science, Information Technology, Information Systems
 // Bright palette that stays readable on the dark background
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
@@ -69,7 +63,7 @@ export default function Students() {
 
   const fetchWip = async () => {
     try {
-      const res = await axios.get(`${API}/wip`)
+      const res = await axios.get(`${API}/wip`, { headers: await authHeaders() })
       const map: { [id: string]: any } = {}
       for (const s of res.data.students) map[s.student_id] = s
       setWip(map)
@@ -77,15 +71,9 @@ export default function Students() {
     } catch { /* backend may be down; WIP just won't show */ }
   }
 
-  // Bearer header for the leader-gated admin endpoints on the API.
-  const authHeader = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
-  }
-
   const fetchAccounts = async () => {
     try {
-      const headers = await authHeader()
+      const headers = await authHeaders()
       const res = await axios.get(`${API}/accounts`, { headers })
       setAccounts(res.data.accounts || [])
     } catch {
@@ -100,7 +88,7 @@ export default function Students() {
       : `Revoke leader from ${acct.email}?\n\nThey become a regular student and lose access to management tools.`
     if (!(await confirmDialog({ message: msg, confirmLabel: promoting ? 'Make leader' : 'Revoke', danger: !promoting }))) return
     try {
-      const headers = await authHeader()
+      const headers = await authHeaders()
       await axios.post(`${API}/set-role`, { user_id: acct.id, role: newRole }, { headers })
       await fetchAccounts()
       toast(`${acct.email} is now a ${newRole}.`, 'success')
@@ -111,7 +99,7 @@ export default function Students() {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API}/student-stats`)
+      const res = await axios.get(`${API}/student-stats`, { headers: await authHeaders() })
       const map: { [id: string]: any } = {}
       for (const s of res.data.stats) map[s.student_id] = s
       setStats(map)
@@ -174,7 +162,6 @@ export default function Students() {
     const { data } = await supabase.from('skills').select('*')
     setSkills(data || [])
   }
-
 
   const addStudent = async () => {
     if (!form.name || !form.matric || !form.email) return toast('Fill in name, matric and email', 'error')

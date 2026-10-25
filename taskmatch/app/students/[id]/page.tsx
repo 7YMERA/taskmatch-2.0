@@ -2,18 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
 import { effectiveRole } from '../../lib/role'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 
 export default function StudentDetail() {
@@ -50,7 +44,7 @@ export default function StudentDetail() {
     setAssignments(a || [])
 
     try {
-      const res = await axios.get(`${API}/student-stats`)
+      const res = await axios.get(`${API}/student-stats`, { headers: await authHeaders() })
       setStat(res.data.stats.find((x: any) => x.student_id === id) || null)
     } catch { /* backend down */ }
     setLoading(false)

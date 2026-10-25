@@ -1,0 +1,177 @@
+"""Tests for the API's access controls: login on the read-only endpoints and the
+per-client rate limit. No database, no network — Supabase is swapped for a fake.
+
+Run from taskmatch-api/:  python -m pytest
+"""
+import os
+import sys
+import importlib
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+os.environ.setdefault("SUPABASE_URL", "https://test.local")
+os.environ.setdefault("SUPABASE_KEY", "test-key")
+
+sys.path.insert(0, os.path.dirname(__file__))
+main = importlib.import_module("main")
+
+
+READ_ENDPOINTS = ["/recommend/t1", "/recommend-tasks/s1", "/wip", "/student-stats"]
+
+
+# ─── A tiny stand-in for the Supabase client ───
+
+class FakeQuery:
+    """Chainable like supabase-py's query builder; every query on a table returns
+    that table's canned rows."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def select(self, *a, **k): return self
+    def eq(self, *a, **k): return self
+    def in_(self, *a, **k): return self
+
+    def execute(self):
+        return SimpleNamespace(data=self._rows)
+
+
+class FakeAuth:
+    def get_user(self, token):
+        if token != "good-token":
+            raise Exception("invalid JWT")
+        return SimpleNamespace(user=SimpleNamespace(email="ali@utp.edu.my", user_metadata={"role": "student"}))
+
+
+class FakeSupabase:
+    TABLES = {
+        "task_skills": [{"task_id": "t1", "skill_id": "k1", "min_proficiency": 2}],
+        "student_skills": [{"student_id": "s1", "skill_id": "k1", "proficiency": 3}],
+        "assignments": [],
+        "skills": [{"id": "k1", "skill_name": "Python"}],
+        "students": [{"id": "s1", "name": "Ali", "matric": "123", "programme": "CS"}],
+        "tasks": [{"id": "t1", "description": "Build API", "status": "New", "due_date": None}],
+    }
+
+    def __init__(self):
+        self.auth = FakeAuth()
+
+    def table(self, name):
+        return FakeQuery(self.TABLES.get(name, []))
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(main, "supabase", FakeSupabase())
+    # A fresh, generous limiter per test so tests never throttle each other.
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1000))
+    return TestClient(main.app)
+
+
+GOOD = {"Authorization": "Bearer good-token"}
+
+
+# ─── Login required on read-only endpoints ───
+
+@pytest.mark.parametrize("path", READ_ENDPOINTS)
+def test_read_endpoint_rejects_anonymous(client, path):
+    r = client.get(path)
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("path", READ_ENDPOINTS)
+def test_read_endpoint_rejects_bad_token(client, path):
+    r = client.get(path, headers={"Authorization": "Bearer forged"})
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("path", READ_ENDPOINTS)
+def test_read_endpoint_allows_logged_in_user(client, path):
+    r = client.get(path, headers=GOOD)
+    assert r.status_code == 200, r.text
+
+
+def test_recommend_still_ranks_students_when_logged_in(client):
+    body = client.get("/recommend/t1", headers=GOOD).json()
+    assert body["recommendations"][0]["student_id"] == "s1"
+    assert body["recommendations"][0]["qualified"] is True
+
+
+def test_health_stays_public(client):
+    assert client.get("/health").status_code == 200
+
+
+# ─── RateLimiter: the sliding window itself ───
+
+class TestRateLimiter:
+    def test_allows_up_to_limit_then_blocks(self):
+        rl = main.RateLimiter(3, window=60)
+        assert [rl.hit("ip", now=t) for t in (0, 1, 2)] == [None, None, None]
+        assert rl.hit("ip", now=3) == pytest.approx(57)  # oldest hit (t=0) expires at 60
+
+    def test_window_slides(self):
+        rl = main.RateLimiter(2, window=60)
+        rl.hit("ip", now=0)
+        rl.hit("ip", now=30)
+        assert rl.hit("ip", now=59) is not None
+        assert rl.hit("ip", now=60) is None  # t=0 has aged out
+
+    def test_blocked_requests_do_not_extend_the_ban(self):
+        rl = main.RateLimiter(1, window=60)
+        rl.hit("ip", now=0)
+        for t in range(1, 60):
+            rl.hit("ip", now=t)
+        assert rl.hit("ip", now=60) is None
+
+    def test_clients_are_counted_separately(self):
+        rl = main.RateLimiter(1, window=60)
+        assert rl.hit("a", now=0) is None
+        assert rl.hit("b", now=0) is None
+        assert rl.hit("a", now=1) is not None
+
+    def test_zero_limit_disables_limiting(self):
+        rl = main.RateLimiter(0)
+        assert all(rl.hit("ip", now=t) is None for t in range(100))
+
+    def test_sweep_forgets_idle_clients(self):
+        rl = main.RateLimiter(5, window=60)
+        rl.hit("old", now=0)
+        rl._sweep(cutoff=100)
+        assert "old" not in rl._hits
+
+
+# ─── Rate limit wired into the app ───
+
+def test_app_returns_429_with_retry_after(client, monkeypatch):
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(2))
+    assert client.get("/wip", headers=GOOD).status_code == 200
+    assert client.get("/wip", headers=GOOD).status_code == 200
+    r = client.get("/wip", headers=GOOD)
+    assert r.status_code == 429
+    assert int(r.headers["Retry-After"]) >= 1
+
+
+def test_anonymous_requests_count_too(client, monkeypatch):
+    # Throttling runs before the login check, so token-guessing is capped as well.
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    assert client.get("/wip").status_code == 401
+    assert client.get("/wip").status_code == 429
+
+
+def test_health_is_never_throttled(client, monkeypatch):
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    for _ in range(5):
+        assert client.get("/health").status_code == 200
+
+
+def test_429_carries_cors_headers(monkeypatch):
+    # The limiter sits inside CORS, so the browser can actually read the 429.
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    origin = "http://localhost:3000"  # allowed via conftest.py
+    c = TestClient(main.app)
+    c.get("/wip", headers={"Origin": origin})
+    r = c.get("/wip", headers={"Origin": origin})
+    assert r.status_code == 429
+    assert r.headers.get("access-control-allow-origin") in (origin, "*")

@@ -2,20 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import Donut from '../components/Donut'
 import { effectiveRole } from '../lib/role'
 import { Card, StatTile, Badge, Icon, bandAccent, Skeleton } from '../components/ui'
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function Dashboard() {
   const router = useRouter()
@@ -48,11 +41,11 @@ export default function Dashboard() {
     setTasks(taskRows || [])
     setAssignments(assignmentRows || [])
     try {
-      const res = await axios.get(`${API}/student-stats`)
+      const res = await axios.get(`${API}/student-stats`, { headers: await authHeaders() })
       setStatsList(res.data.stats)
     } catch { /* backend down — scores just won't show */ }
     try {
-      const wres = await axios.get(`${API}/wip`)
+      const wres = await axios.get(`${API}/wip`, { headers: await authHeaders() })
       setWipData(wres.data)
     } catch { /* backend down — WIP panel just won't show */ }
     setLoading(false)
