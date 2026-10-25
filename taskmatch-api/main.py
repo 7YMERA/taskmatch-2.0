@@ -10,6 +10,7 @@ from collections import defaultdict, deque
 from datetime import date, datetime, timezone
 
 import ai
+import suggest_history
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("taskmatch")
@@ -1189,32 +1190,36 @@ ai_limiter = RateLimiter(int(os.environ.get("AI_RATE_LIMIT_PER_MINUTE", "10")), 
 
 @app.get("/ai/status")
 def ai_status(authorization: str = Header(None)):
-    """Whether AI suggestions are switched on (the app hides the button when they aren't)."""
+    """Which suggestion engine is on: Claude when ANTHROPIC_API_KEY is set, otherwise the
+    built-in one that works from the team's finished tasks (free, no key)."""
     require_user(authorization)
-    return {"enabled": ai.enabled(), "model": ai.AI_MODEL if ai.enabled() else None}
+    on = ai.enabled()
+    return {"enabled": True, "engine": "claude" if on else suggest_history.ENGINE, "model": ai.AI_MODEL if on else None}
 
 
 @app.post("/ai/suggest-task")
 def ai_suggest_task(body: SuggestTaskBody, authorization: str = Header(None)):
     """Suggest skills, hours and severity for a task description, each with a confidence level.
-    Needs tasks.manage. Grounded in the team's own skill list and recently finished tasks."""
+    Needs tasks.manage. Grounded in the team's own skill list and finished tasks. Uses Claude
+    when it's set up, otherwise the built-in engine."""
     user = require_permission(authorization, "tasks.manage")
-    if not ai.enabled():
-        raise HTTPException(status_code=503, detail="AI suggestions aren't set up on this server (ANTHROPIC_API_KEY is missing).")
     wait = ai_limiter.hit(user.email or user.id)
     if wait is not None:
-        raise HTTPException(status_code=429, detail=f"Too many AI requests. Try again in {int(wait) + 1} seconds.",
+        raise HTTPException(status_code=429, detail=f"Too many requests for suggestions. Try again in {int(wait) + 1} seconds.",
                             headers={"Retry-After": str(int(wait) + 1)})
 
     skills = db().table("skills").select("id, skill_name").execute().data or []
     tasks = (
         db().table("tasks")
-        .select("id, description, committed_hours, task_skills(skills(skill_name)), assignments(actual_hours, status)")
+        .select("id, description, committed_hours, severity, task_skills(min_proficiency, skills(skill_name)), assignments(actual_hours, status)")
         .eq("status", "Completed")
         .order("completed_at", desc=True)
-        .limit(ai.MAX_HISTORY)
+        .limit(300)
         .execute()
     ).data or []
+
+    if not ai.enabled():
+        return suggest_history.suggest(body.description, body.notes, skills, tasks)
 
     import anthropic
     try:

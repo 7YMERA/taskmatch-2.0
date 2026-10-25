@@ -4,8 +4,9 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 3 adds AI assist to the New task panel: suggested skills, hours and
-> severity, each with a confidence level, that a lead accepts or dismisses: see
+> **Latest:** Phase 3 adds suggestions to the New task panel: skills, hours and severity,
+> each with a confidence level, that a lead accepts or dismisses. Claude makes them when an API
+> key is set, otherwise a free built-in engine works from past tasks: see
 > [PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md).
 > Phase 2 adds roles (admin, team lead, member, viewer), a Team & roles page,
 > an audit trail and an away status: see [PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md).

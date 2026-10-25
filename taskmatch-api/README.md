@@ -31,9 +31,9 @@ cp .env.example .env
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret key. Used for all table queries (so the API works under row-level security, see `supabase/rls.sql`) and for the admin endpoints (`/accounts`, `/set-role`). Never expose to the browser. | yes once RLS is on (without it, table queries use `SUPABASE_KEY` and the admin endpoints return 503) |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, e.g. `https://taskmatch.vercel.app,http://localhost:3000`. **Unset = no cross-origin allowed.** Use `*` only to deliberately open the API. | recommended |
 | `RATE_LIMIT_PER_MINUTE` | Max requests per client IP per minute (default `120`, `0` = off). `/health` is never limited. | no |
-| `ANTHROPIC_API_KEY` | Claude API key for AI assist (console.anthropic.com → API keys). Without it the AI endpoints return 503 and the app hides the AI button. Never expose to the browser. | no |
+| `ANTHROPIC_API_KEY` | Claude API key for AI assist (console.anthropic.com → API keys). Without it, suggestions come from the free built-in engine (`suggest_history.py`) instead. Never expose to the browser. | no |
 | `AI_MODEL` | Claude model for AI assist (default `claude-opus-5-5`). | no |
-| `AI_RATE_LIMIT_PER_MINUTE` | AI requests per user per minute (default `10`). | no |
+| `AI_RATE_LIMIT_PER_MINUTE` | Suggestion requests per user per minute (default `10`). | no |
 
 ## Run
 
@@ -91,8 +91,8 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | GET | `/student-stats` | user | per-student performance |
 | GET | `/accounts` | admin, lead | list accounts with role and last sign-in (needs service-role key) |
 | POST | `/set-role` | admin | set an account's role: `admin`, `lead`, `member` or `viewer`; refuses to remove the last admin (needs service-role key) |
-| GET | `/ai/status` | user | whether AI assist is switched on |
-| POST | `/ai/suggest-task` | admin, lead | suggested skills, hours and severity for a task description, each with a confidence level; writes nothing (needs `ANTHROPIC_API_KEY`) |
+| GET | `/ai/status` | user | which suggestion engine is on: `claude` or `history` (built-in) |
+| POST | `/ai/suggest-task` | admin, lead | suggested skills, hours and severity for a task description, each with a confidence level; writes nothing (Claude with `ANTHROPIC_API_KEY`, otherwise the built-in engine) |
 
 Roles are read from the account's `app_metadata` (only the service-role key can write it), never from
 `user_metadata`, which users can edit about themselves. The permission table is `ROLE_PERMISSIONS` in

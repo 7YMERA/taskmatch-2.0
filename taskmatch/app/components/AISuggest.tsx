@@ -1,7 +1,8 @@
 'use client'
 
-/* AI suggestions for a new task: skills, hours and severity, each with a confidence level and a
-   reason. Nothing is applied until the lead accepts it. The parent keeps the review (what was
+/* Suggestions for a new task: skills, hours and severity, each with a confidence level and a
+   reason. They come from Claude when the API has a key, otherwise from the built-in engine that
+   works from the team's finished tasks. Nothing is applied until the lead accepts it. The parent keeps the review (what was
    accepted or dismissed, at what confidence) and writes it to the audit trail with the task. */
 
 import { useState } from 'react'
@@ -42,11 +43,11 @@ export function ConfidenceBadge({ c }: { c: Confidence }) {
   )
 }
 
-export default function AISuggest({ description, notes, enabled, canConfigure, onSkill, onHours, onSeverity, onReview }: {
+export default function AISuggest({ description, notes, engine, canConfigure, onSkill, onHours, onSeverity, onReview }: {
   description: string
   notes?: string
-  enabled: boolean | null           // null = still checking
-  canConfigure: boolean             // admins see how to switch it on
+  engine: 'claude' | 'history' | null   // null = still checking or unavailable
+  canConfigure: boolean                 // admins see how to switch on AI
   onSkill: (skill_id: string, min_level: number) => void
   onHours: (hours: number) => void
   onSeverity: (severity: string) => void
@@ -57,14 +58,8 @@ export default function AISuggest({ description, notes, enabled, canConfigure, o
   const [error, setError] = useState('')
   const [decided, setDecided] = useState<Record<string, 'accepted' | 'dismissed'>>({})
 
-  if (enabled === null) return null
-  if (!enabled) {
-    return canConfigure ? (
-      <p className="text-[11px] text-faint flex items-center gap-1.5">
-        <Icon name="sparkle" size={12} /> AI suggestions are off. Add <code>ANTHROPIC_API_KEY</code> to the API&apos;s environment to switch them on.
-      </p>
-    ) : null
-  }
+  if (engine === null) return null
+  const isAI = engine === 'claude'
 
   const ready = description.trim().length >= 3
 
@@ -129,7 +124,7 @@ export default function AISuggest({ description, notes, enabled, canConfigure, o
     <div className="rounded-xl border" style={{ borderColor: 'var(--tm-border)', background: 'var(--tm-surface-2, transparent)' }}>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-fg">
-          <span className="text-primary-text"><Icon name="sparkle" size={14} /></span> AI assist
+          <span className="text-primary-text"><Icon name="sparkle" size={14} /></span> {isAI ? 'AI assist' : 'Smart suggestions'}
         </span>
         <span className="text-[11px] text-faint hidden sm:inline">Suggestions only. You decide what to use.</span>
         <Button variant={sug ? 'ghost' : 'primary'} className="!py-1 !px-3 !text-xs ml-auto" onClick={ask} disabled={!ready || loading}>
@@ -193,7 +188,10 @@ export default function AISuggest({ description, notes, enabled, canConfigure, o
           </div>
 
           <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 mt-1 border-t" style={{ borderColor: 'var(--tm-border)' }}>
-            <span className="text-[11px] text-faint">From your skill list and {sug.examples_considered} finished task{sug.examples_considered === 1 ? '' : 's'}. Check before creating.</span>
+            <span className="text-[11px] text-faint">
+              {isAI ? 'Suggested by AI from' : 'Worked out from'} your skill list and {sug.examples_considered} finished task{sug.examples_considered === 1 ? '' : 's'}. Check before creating.
+              {!isAI && canConfigure && <> Add <code>ANTHROPIC_API_KEY</code> to the API for AI suggestions.</>}
+            </span>
             {highLeft > 0 && <button type="button" className="tm-btn tm-btn-primary tm-btn-sm !py-1 !px-3 !text-xs ml-auto" onClick={acceptAllHigh}>Use all high confidence ({highLeft})</button>}
           </div>
         </div>

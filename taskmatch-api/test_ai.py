@@ -188,11 +188,13 @@ def test_lead_gets_suggestions_with_ids(api):
     assert body["examples_considered"] == 4
 
 
-def test_switched_off_without_a_key(api, monkeypatch):
+def test_without_a_key_the_built_in_engine_answers(api, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY")
-    assert api.get("/ai/status", headers=bearer("member")).json()["enabled"] is False
-    r = api.post("/ai/suggest-task", json={"description": "Build the settings page"}, headers=bearer("admin"))
-    assert r.status_code == 503
+    monkeypatch.setattr(ai, "call_model", lambda *a: pytest.fail("Claude must not be called without a key"))
+    assert api.get("/ai/status", headers=bearer("member")).json()["engine"] == "history"
+    r = api.post("/ai/suggest-task", json={"description": "React settings screen"}, headers=bearer("admin"))
+    assert r.status_code == 200 and r.json()["engine"] == "history"
+    assert r.json()["skills"][0]["skill_name"] == "React"
 
 
 def test_description_length_is_checked(api):
