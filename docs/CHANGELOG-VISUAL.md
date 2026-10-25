@@ -4,7 +4,10 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 2 adds roles (admin, team lead, member, viewer), a Team & roles page,
+> **Latest:** Phase 3 adds AI assist to the New task panel: suggested skills, hours and
+> severity, each with a confidence level, that a lead accepts or dismisses: see
+> [PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md).
+> Phase 2 adds roles (admin, team lead, member, viewer), a Team & roles page,
 > an audit trail and an away status: see [PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md).
 > Phase 1c turns My Tasks into a personal focus page and adds side-panel
 > quick views to Tasks and People: see [PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md).
