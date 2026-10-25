@@ -8,8 +8,9 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Base URL of the FastAPI backend (taskmatch-api).
-export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Base URL of the FastAPI backend (taskmatch-api). A trailing slash in the setting would make
+// every call "//path", which the API answers with 404, so it's trimmed.
+export const API = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
 
 // Bearer header for the API. Every endpoint except /health requires a logged-in user,
 // so send this on reads as well as writes.
