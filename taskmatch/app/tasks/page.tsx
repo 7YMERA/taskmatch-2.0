@@ -10,6 +10,7 @@ import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
+import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +21,14 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PAGE_SIZE = 5
 const SEVERITIES = ['Low', 'Medium', 'Critical']
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const MUTED = { color: 'var(--tm-text-muted)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
+// backdrop-filter/transform on .tm-card would trap the menu's fixed click-away layer inside the card.
+const MENU_HOST = { backdropFilter: 'none', transform: 'none' }
 
 export default function Tasks() {
   const router = useRouter()
@@ -198,16 +207,17 @@ const updateTaskStatus = async (id: string, status: string) => {
   fetchTasks()
 }
 
-  const statusColor = (status: string) => {
-    if (status === 'New') return 'bg-yellow-500/20 text-yellow-400'
-    if (status === 'In Progress') return 'bg-green-500/20 text-green-400'
-    if (status === 'Completed') return 'bg-blue-500/20 text-blue-400'
-    return 'bg-white/10 text-white/40'
-  }
+  // Status / severity → design-system accents (same colours as the dashboard tiles).
+  const statusAccent = (status: string) =>
+    status === 'New' ? 'amber' as const
+      : status === 'In Progress' || status === 'Assigned' ? 'emerald' as const
+        : status === 'Completed' ? 'sky' as const
+          : 'indigo' as const
+  const statusLabel = (s: string) => s === 'In Progress' ? 'Ongoing' : s
 
   // Calm indicators — small dots carry the signal instead of filled pills.
-  const severityDot = (s: string) => s === 'Critical' ? '#ef4444' : s === 'Medium' ? '#f59e0b' : 'rgba(255,255,255,0.35)'
-  const statusDot = (s: string) => s === 'New' ? '#eab308' : s === 'In Progress' ? '#22c55e' : s === 'Completed' ? '#3b82f6' : 'rgba(255,255,255,0.3)'
+  const severityDot = (s: string) => s === 'Critical' ? 'var(--tm-rose)' : s === 'Medium' ? 'var(--tm-amber)' : 'var(--tm-text-faint)'
+  const statusDot = (s: string) => s === 'New' ? 'var(--tm-amber)' : s === 'In Progress' ? 'var(--tm-emerald)' : s === 'Completed' ? 'var(--tm-sky)' : 'var(--tm-text-faint)'
 
   // SLA-style states. Delayed = breached & not done (active). Closed = breached
   // & not done past the grace window (auto-locked). Late = delivered after due.
@@ -219,14 +229,8 @@ const updateTaskStatus = async (id: string, status: string) => {
   const isLate = (t: any) => t.status === 'Completed' && t.completed_at && t.completed_at.slice(0, 10) > t.due_date
 
   const bandChip = (band: string, avg: number | null) => {
-    const map: { [k: string]: string } = {
-      high: 'bg-emerald-500/20 text-emerald-400',
-      avg: 'bg-amber-500/20 text-amber-400',
-      low: 'bg-red-500/20 text-red-400',
-      unrated: 'bg-white/10 text-white/40',
-    }
-    const label = band === 'unrated' ? '— unrated' : `${band} ${avg ?? ''}`.trim()
-    return <span className={`text-xs px-2 py-0.5 rounded-full ${map[band] || map.unrated}`}>{label}</span>
+    if (band === 'unrated') return <span className="tm-chip">unrated</span>
+    return <Badge accent={bandAccent(band)}>{`${band} ${avg ?? ''}`.trim()}</Badge>
   }
 
   const initials = (name: string) =>
@@ -259,211 +263,181 @@ const updateTaskStatus = async (id: string, status: string) => {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8">
-        <div className="flex items-center justify-between mb-6">
+      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             {statusFilter !== 'all' && (
-              <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs text-white/40 hover:text-white transition mb-1">← Back to dashboard</Link>
+              <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-xs mb-1.5 transition hover:opacity-80" style={FAINT}>
+                <Icon name="arrowLeft" size={13} /> Back to dashboard
+              </Link>
             )}
-            <h1 className="text-2xl font-semibold text-white">Tasks</h1>
-            <p className="text-xs text-white/40 mt-1">Click a task to see recommendations{statusFilter !== 'all' ? ` · filtered: ${statusFilter}` : ''}</p>
+            <h1 className="text-2xl font-semibold" style={TEXT}>Tasks</h1>
+            <p className="text-xs mt-1" style={FAINT}>Click a task to see recommendations{statusFilter !== 'all' ? ` · filtered: ${statusFilter}` : ''}</p>
           </div>
           {userRole === 'leader' && (
             <div className="flex gap-2">
-              <button onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}
-                className="flex items-center gap-2 text-sm px-4 py-2 border border-violet-500/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 rounded-lg transition">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Create group
-              </button>
-              <button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}
-                className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                + New task
-              </button>
+              <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
+                <Icon name="users" size={16} /> Create group
+              </Button>
+              <Button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}>
+                <Icon name="plus" size={16} /> New task
+              </Button>
             </div>
           )}
         </div>
 
         {/* Create group form — leader only */}
         {showGroupForm && userRole === 'leader' && (
-          <div className="bg-gradient-to-br from-violet-500/10 to-transparent border border-violet-500/30 rounded-xl p-5 mb-6">
+          <Card tint="violet" className="p-5 mb-6 tm-fade-up">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-lg bg-violet-500/20 text-violet-300 flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(139,92,246,0.18)', color: 'var(--tm-violet)' }}>
+                <Icon name="users" size={18} />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Create / assign group</p>
-                <p className="text-xs text-white/40">Name it (or reuse an existing group), pick a colour, and add tasks</p>
+                <p className="text-sm font-medium" style={TEXT}>Create / assign group</p>
+                <p className="text-xs" style={FAINT}>Name it (or reuse an existing group), pick a colour, and add tasks</p>
               </div>
             </div>
 
-            <input
+            <Input
               list="task-group-names"
               placeholder="Group name e.g. Test Group"
               value={groupForm.name}
               onChange={e => setGroupForm({ ...groupForm, name: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition mb-4"
+              className="mb-4"
             />
             <datalist id="task-group-names">
               {groups.map(g => <option key={g.id} value={g.name} />)}
             </datalist>
 
-            <p className="text-xs text-white/40 mb-2">Colour <span className="text-white/25">(used only when creating a new group)</span></p>
+            <p className="text-xs mb-2" style={MUTED}>Colour <span style={FAINT}>(used only when creating a new group)</span></p>
             <div className="flex gap-2 mb-4">
               {GROUP_COLORS.map(c => (
                 <button key={c} type="button" onClick={() => setGroupForm({ ...groupForm, color: c })}
-                  style={{ backgroundColor: c }}
-                  className={`w-7 h-7 rounded-full border-2 transition ${groupForm.color === c ? 'border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c, outline: groupForm.color === c ? '2px solid var(--tm-text)' : 'none', outlineOffset: 2 }}
+                  className={`w-7 h-7 rounded-full transition ${groupForm.color === c ? 'scale-110' : ''}`}
                   aria-label={c} />
               ))}
             </div>
 
-            <p className="text-xs text-white/40 mb-2">Add tasks ({groupForm.members.length} selected)</p>
+            <p className="text-xs mb-2" style={MUTED}>Add tasks ({groupForm.members.length} selected)</p>
             <div className="flex flex-col gap-1 mb-4 max-h-56 overflow-y-auto">
               {tasks.length === 0 ? (
-                <p className="text-xs text-white/30">No tasks yet — create a task first.</p>
+                <p className="text-xs" style={FAINT}>No tasks yet — create a task first.</p>
               ) : tasks.map(t => {
                 const checked = groupForm.members.includes(t.id)
                 return (
-                  <button key={t.id} type="button"
+                  <button key={t.id} type="button" aria-pressed={checked}
                     onClick={() => setGroupForm(prev => ({
                       ...prev,
                       members: checked ? prev.members.filter(id => id !== t.id) : [...prev.members, t.id],
                     }))}
-                    className={`flex items-center gap-2 text-left text-xs px-3 py-2 rounded-lg border transition ${checked
-                      ? 'border-indigo-500 bg-indigo-500/20 text-white'
-                      : 'border-white/10 text-white/50 hover:text-white'}`}>
-                    <span className={`w-3.5 h-3.5 rounded-sm border shrink-0 ${checked ? 'bg-indigo-400 border-indigo-400' : 'border-white/30'}`} />
-                    {t.description} <span className="text-white/30">· {t.status}</span>
-                    {t.group_label && <span className="ml-auto text-white/30">now: {t.group_label}</span>}
+                    className="tm-pick">
+                    <span className="w-4 h-4 rounded border shrink-0 flex items-center justify-center"
+                      style={checked ? { background: 'var(--tm-indigo)', borderColor: 'var(--tm-indigo)', color: '#fff' } : { borderColor: 'var(--tm-border-strong)' }}>
+                      {checked && <Icon name="check" size={11} strokeWidth={3} />}
+                    </span>
+                    {t.description} <span style={FAINT}>· {statusLabel(t.status)}</span>
+                    {t.group_label && <span className="ml-auto" style={FAINT}>now: {t.group_label}</span>}
                   </button>
                 )
               })}
             </div>
 
             <div className="flex gap-3">
-              <button onClick={createGroup}
-                className="flex items-center gap-2 text-sm px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Save group
-              </button>
-              <button onClick={() => { setShowGroupForm(false); setGroupForm({ name: '', color: GROUP_COLORS[0], members: [] }) }}
-                className="text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
+              <Button onClick={createGroup}>
+                <Icon name="check" size={16} /> Save group
+              </Button>
+              <Button variant="ghost" onClick={() => { setShowGroupForm(false); setGroupForm({ name: '', color: GROUP_COLORS[0], members: [] }) }}>
                 Cancel
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Create task form */}
         {showForm && userRole === 'leader' && (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mb-6">
-            <p className="text-sm font-medium text-white mb-4">New task</p>
+          <Card className="p-5 mb-6 tm-fade-up">
+            <p className="text-sm font-medium mb-4" style={TEXT}>New task</p>
             <div className="flex flex-col gap-3 mb-4">
-              <input
-                placeholder="Task description e.g. Build login page"
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                className="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col">
-                  <label className="text-xs text-white/30 mb-1">Severity</label>
+              <Field label="Description">
+                <Input
+                  placeholder="e.g. Build login page"
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                />
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Severity">
                   <select
                     value={form.severity}
                     onChange={e => setForm({ ...form, severity: e.target.value })}
-                    className={`bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition ${form.severity ? 'text-white' : 'text-white/30'}`}>
+                    className="tm-input"
+                    style={form.severity ? undefined : FAINT}>
                     <option value="" disabled hidden>Severity</option>
-                    {SEVERITIES.map(s => <option key={s} value={s} className="text-white">{s}</option>)}
+                    {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-white/30 mb-1">Committed hours</label>
-                  <input
+                </Field>
+                <Field label="Committed hours">
+                  <Input
                     placeholder="e.g. 8"
                     value={form.committed_hours}
                     onChange={e => setForm({ ...form, committed_hours: e.target.value })}
-                    className="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
                   />
-                </div>
+                </Field>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col">
-                  <label className="text-xs text-white/30 mb-1">Start date</label>
-                  <input
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Start date">
+                  <Input
                     type="date"
                     value={form.start_date}
                     onChange={e => setForm({ ...form, start_date: e.target.value })}
-                    className={`bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 transition ${form.start_date ? 'text-white' : 'text-white/30'}`}
+                    style={form.start_date ? undefined : FAINT}
                   />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-xs text-white/30 mb-1">Due date</label>
-                  <input
+                </Field>
+                <Field label="Due date">
+                  <Input
                     type="date"
                     value={form.due_date}
                     onChange={e => setForm({ ...form, due_date: e.target.value })}
-                    className={`bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 transition ${form.due_date ? 'text-white' : 'text-white/30'}`}
+                    style={form.due_date ? undefined : FAINT}
                   />
-                </div>
+                </Field>
               </div>
-              <div className="flex flex-col">
-                <label className="text-xs text-white/30 mb-1">Group / team</label>
-                <input
+              <Field label="Group / team">
+                <Input
                   list="task-groups"
                   placeholder="Type new or pick existing"
                   value={form.group_label}
                   onChange={e => setForm({ ...form, group_label: e.target.value })}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
                 />
                 <datalist id="task-groups">
                   {existingGroups.map(g => <option key={g} value={g} />)}
                 </datalist>
-              </div>
+              </Field>
             </div>
 
-            <p className="text-xs text-white/40 mb-2">Required skills <span className="text-white/25">— click a skill, then set the minimum B / I / A</span></p>
+            <p className="text-xs mb-2" style={MUTED}>Required skills <span style={FAINT}>— click a skill, then set the minimum B / I / A</span></p>
             <div className="mb-4">
               <SkillPicker skills={skills} value={taskSkills} onChange={setTaskSkills} field="min_proficiency" labels={['Min: Beginner', 'Min: Intermediate', 'Min: Advanced']} />
             </div>
 
             <div className="flex gap-3">
-              <button onClick={createTask}
-                className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                Create task
-              </button>
-              <button onClick={() => { setShowForm(false); setTaskSkills([]) }}
-                className="text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
-                Cancel
-              </button>
-              <button onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]) }}
-                className="ml-auto text-sm px-4 py-2 border border-white/10 text-white/60 hover:text-white rounded-lg transition">
+              <Button onClick={createTask}>Create task</Button>
+              <Button variant="ghost" onClick={() => { setShowForm(false); setTaskSkills([]) }}>Cancel</Button>
+              <Button variant="ghost" className="ml-auto"
+                onClick={() => { setForm({ description: '', committed_hours: '', severity: '', start_date: '', due_date: '', group_label: '' }); setTaskSkills([]) }}>
                 Clear all
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Status + Group filters */}
         <div className="flex gap-3 mb-4 flex-wrap items-center">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-white/40">Status:</span>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none">
+            <span className="text-xs" style={FAINT}>Status</span>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="tm-select-sm">
               <option value="all">All</option>
               <option value="New">New</option>
               <option value="In Progress">Ongoing</option>
@@ -474,21 +448,19 @@ const updateTaskStatus = async (id: string, status: string) => {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-white/40">Severity:</span>
-            <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}
-              className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none">
+            <span className="text-xs" style={FAINT}>Severity</span>
+            <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className="tm-select-sm">
               <option value="all">All</option>
               {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div className="w-px h-5 bg-white/10" />
+          <div className="hidden sm:block w-px h-5" style={{ background: 'var(--tm-border)' }} />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-white/40">Group:</span>
+            <span className="text-xs" style={FAINT}>Group</span>
             {groupFilter !== 'all' && groupFilter !== '__none__' && (
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: groupColor(groupFilter) }} />
             )}
-            <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
-              className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none max-w-[14rem]">
+            <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)} className="tm-select-sm max-w-[14rem]">
               <option value="all">All groups</option>
               {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
               <option value="__none__">No group</option>
@@ -499,107 +471,126 @@ const updateTaskStatus = async (id: string, status: string) => {
         {/* Tasks list */}
         <div className="flex flex-col gap-3">
           {loading ? (
-            <p className="text-white/40 text-sm">Loading...</p>
+            Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           ) : shownTasks.length === 0 ? (
-            <p className="text-white/40 text-sm">{tasks.length === 0 ? 'No tasks yet.' : 'No tasks in this group.'}</p>
+            <Card>
+              <EmptyState icon={<Icon name="list" size={28} />}
+                title={tasks.length === 0 ? 'No tasks yet' : 'No tasks match these filters'}
+                hint={tasks.length === 0 ? (userRole === 'leader' ? 'Create the first task to start matching students.' : 'Your leader hasn’t created any tasks yet.') : 'Try a different status, severity or group.'} />
+            </Card>
           ) : (
             shownTasks.map(task => (
-              <div key={task.id} className={`bg-[#161616] border border-white/[0.06] hover:border-white/[0.12] rounded-xl transition ${taskMenuOpen === task.id ? 'relative z-30' : 'overflow-hidden'}`}>
+              <Card key={task.id} hover={expandedTask !== task.id && taskMenuOpen !== task.id}
+                className={taskMenuOpen === task.id ? 'relative z-30' : 'overflow-hidden'}
+                style={taskMenuOpen === task.id ? MENU_HOST : undefined}>
                 <div
-                  className={`flex items-center gap-3.5 p-4 cursor-pointer hover:bg-white/[0.02] transition ${expandedTask === task.id ? 'rounded-t-xl' : 'rounded-xl'}`}
+                  className="flex flex-wrap md:flex-nowrap items-center gap-x-3.5 gap-y-2 p-4 cursor-pointer"
                   onClick={() => loadRecommendations(task.id)}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: severityDot(task.severity) }} title={`${task.severity || 'Low'} severity`} />
-                  <div className="w-64 shrink-0 min-w-0">
+                  <div className="flex-1 md:flex-none md:w-64 shrink-0 min-w-0">
                     <div className="flex items-center gap-2">
                       {task.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(task.group_label) }} title={task.group_label} />}
-                      <Link href={`/tasks/${task.id}`} onClick={e => e.stopPropagation()} className="text-sm font-medium text-white hover:underline truncate" title="Open task">{task.description}</Link>
+                      <Link href={`/tasks/${task.id}`} onClick={e => e.stopPropagation()} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Open task">{task.description}</Link>
                     </div>
-                    <p className="text-xs text-white/40 truncate mt-0.5">
+                    <p className="text-xs truncate mt-0.5 flex items-center gap-1" style={FAINT}>
+                      <Icon name="clock" size={12} />
                       {task.committed_hours != null ? `${task.committed_hours}h committed` : 'no hours set'}
                       {(task.start_date || task.due_date) && <> · {task.start_date || '…'} → {task.due_date || '…'}</>}
                     </p>
                   </div>
 
                   {/* Middle column — required skills as quiet chips (fills the row) */}
-                  <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                  <div className="order-last md:order-none basis-full md:basis-auto flex-1 min-w-0 flex items-center gap-1.5 flex-wrap pl-5 md:pl-0">
                     {task.task_skills?.length > 0 ? (
                       <>
                         {task.task_skills.slice(0, 4).map((ts: any) => (
-                          <span key={ts.skill_id} className="text-xs px-2 py-0.5 rounded-md border border-white/[0.08] text-white/55">{ts.skills?.skill_name}</span>
+                          <span key={ts.skill_id} className="tm-chip">{ts.skills?.skill_name}</span>
                         ))}
-                        {task.task_skills.length > 4 && <span className="text-[11px] text-white/30">+{task.task_skills.length - 4}</span>}
+                        {task.task_skills.length > 4 && <span className="text-[11px]" style={FAINT}>+{task.task_skills.length - 4}</span>}
                       </>
-                    ) : <span className="text-xs text-white/25">No skills required</span>}
+                    ) : <span className="text-xs" style={FAINT}>No skills required</span>}
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0" title={`Status: ${task.status}`}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusDot(task.status) }} />
-                    <span className="text-xs text-white/45">{task.status === 'In Progress' ? 'Ongoing' : task.status}</span>
+                  {/* Status + SLA flags — own line on phones, inline on wider screens */}
+                  <div className="order-last md:order-none basis-full md:basis-auto flex items-center gap-3.5 shrink-0 pl-5 md:pl-0">
+                    <div className="flex items-center gap-1.5" title={`Status: ${task.status}`}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusDot(task.status) }} />
+                      <span className="text-xs" style={MUTED}>{statusLabel(task.status)}</span>
+                    </div>
+                    {isLate(task) && <Badge accent="amber" className="!text-[11px] !py-0.5"><span title={`Delivered after due ${task.due_date}`}>late</span></Badge>}
+                    {isDelayed(task) && <Badge accent="rose" className="!text-[11px] !py-0.5"><span title={`Past due ${task.due_date}`}>delayed</span></Badge>}
+                    {isClosed(task) && <span className="tm-chip !text-[11px]" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed</span>}
                   </div>
-                  {isLate(task) && <span className="text-[11px] text-amber-400 shrink-0" title={`Delivered after due ${task.due_date}`}>late</span>}
-                  {isDelayed(task) && <span className="text-[11px] text-red-400 shrink-0" title={`Past due ${task.due_date}`}>delayed</span>}
-                  {isClosed(task) && <span className="text-[11px] text-white/40 shrink-0" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed </span>}
 
                   {userRole === 'leader' && (
                     <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
                       <button onClick={() => setTaskMenuOpen(taskMenuOpen === task.id ? null : task.id)}
-                        className="w-8 h-8 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition flex items-center justify-center text-lg leading-none">⋯</button>
+                        aria-label="Task actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
+                        <Icon name="more" size={18} />
+                      </button>
                       {taskMenuOpen === task.id && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setTaskMenuOpen(null)} />
-                          <div className="absolute right-0 top-full mt-1 z-20 w-44 bg-[#202020] border border-white/10 rounded-lg shadow-xl py-1">
-                            <p className="px-3 pt-1 pb-0.5 text-[10px] text-white/30 tracking-wide">SET STATUS</p>
+                          <div className="tm-menu absolute right-0 top-full mt-1 z-20 w-44">
+                            <p className="px-2.5 pt-1 pb-1 text-[10px] tracking-wide" style={FAINT}>SET STATUS</p>
                             {['New', 'In Progress', 'Completed'].map(st => (
                               <button key={st} disabled={isClosed(task)} onClick={() => { setTaskMenuOpen(null); updateTaskStatus(task.id, st) }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 transition disabled:opacity-30">
+                                className="tm-menu-item">
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusDot(st) }} />
-                                {st === 'In Progress' ? 'Ongoing' : st}
-                                {task.status === st && <span className="ml-auto text-white/40">✓</span>}
+                                {statusLabel(st)}
+                                {task.status === st && <Icon name="check" size={13} className="ml-auto" />}
                               </button>
                             ))}
-                            <div className="my-1 h-px bg-white/10" />
-                            <button onClick={() => { setTaskMenuOpen(null); deleteTask(task.id, task.description) }} className="block w-full text-left px-3 py-1.5 text-xs text-red-400/80 hover:bg-white/10 transition">Delete task</button>
+                            <div className="my-1 h-px" style={{ background: 'var(--tm-border)' }} />
+                            <button onClick={() => { setTaskMenuOpen(null); deleteTask(task.id, task.description) }}
+                              className="tm-menu-item" style={{ color: 'var(--tm-rose)' }}>
+                              <Icon name="trash" size={13} /> Delete task
+                            </button>
                           </div>
                         </>
                       )}
                     </div>
                   )}
-                  <span className="text-white/30 text-xs shrink-0">{expandedTask === task.id ? '▲' : '▼'}</span>
+                  <span className="shrink-0 transition-transform" style={{ ...FAINT, transform: expandedTask === task.id ? 'rotate(180deg)' : undefined }}>
+                    <Icon name="chevronDown" size={16} />
+                  </span>
                 </div>
 
                 {/* Expanded panel: assigned team + (for open tasks) recommendations */}
                 {expandedTask === task.id && (
-                  <div className="border-t border-white/10 p-4">
+                  <div className="p-4" style={{ borderTop: '1px solid var(--tm-border)' }}>
                     {/* Who's actually on it — shown once the task has started */}
-                    <p className="text-xs text-white/40 mb-2">Assigned team ({(taskAssignees[task.id] || []).length})</p>
+                    <p className="text-xs mb-2" style={MUTED}>Assigned team ({(taskAssignees[task.id] || []).length})</p>
                     {(taskAssignees[task.id] || []).length === 0 ? (
-                      <p className="text-white/40 text-xs mb-4">No one assigned yet.</p>
+                      <p className="text-xs mb-4" style={FAINT}>No one assigned yet.</p>
                     ) : (
                       <div className="flex flex-col gap-2 mb-4">
                         {taskAssignees[task.id].map((a: any) => (
-                          <div key={a.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5">
-                            <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs font-semibold shrink-0">{initials(a.students?.name)}</div>
-                            <span className="flex-1 text-sm text-white">{a.students?.name}</span>
-                            {a.score != null && <span className="text-xs text-white/40">score {a.score}</span>}
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(a.status)}`}>{a.status}</span>
+                          <div key={a.id} className="flex items-center gap-3 rounded-lg p-2.5" style={{ background: 'var(--tm-surface-1)' }}>
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style={AVATAR}>{initials(a.students?.name)}</div>
+                            <span className="flex-1 text-sm" style={TEXT}>{a.students?.name}</span>
+                            {a.score != null && <span className="text-xs" style={FAINT}>score {a.score}</span>}
+                            <Badge accent={statusAccent(a.status)}>{a.status}</Badge>
                           </div>
                         ))}
                       </div>
                     )}
 
                     {task.status === 'Completed' || isClosed(task) ? (
-                      <p className="text-white/30 text-xs italic">{isClosed(task) ? 'Task closed — assignment locked.' : 'Task completed.'}</p>
+                      <p className="text-xs italic" style={FAINT}>{isClosed(task) ? 'Task closed — assignment locked.' : 'Task completed.'}</p>
                     ) : (
                     <>
-                    <p className="text-xs text-white/40 mb-1">{task.status === 'New' ? 'Recommended students' : 'Recommended to add'}</p>
-                    <p className="text-[11px] text-white/35 mb-3">Ranked by: meets all required skills first → best skill match → least busy (WIP), not by performance band. Already-assigned students are hidden; the rest continue on the next page.</p>
+                    <p className="text-xs mb-1" style={MUTED}>{task.status === 'New' ? 'Recommended students' : 'Recommended to add'}</p>
+                    <p className="text-[11px] mb-3" style={FAINT}>Ranked by: meets all required skills first → best skill match → least busy (WIP), not by performance band. Already-assigned students are hidden; the rest continue on the next page.</p>
                     {!recommendations[task.id] ? (
-                      <p className="text-white/40 text-xs">Loading...</p>
+                      <div className="flex flex-col gap-2">
+                        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 56 }} />)}
+                      </div>
                     ) : (() => {
                       const assignedIds = new Set((taskAssignees[task.id] || []).map((a: any) => a.student_id))
                       const list = recommendations[task.id].filter((r: any) => !assignedIds.has(r.student_id))
                       const meta = recMeta[task.id]
-                      if (list.length === 0) return <p className="text-white/40 text-xs">No more students to add.</p>
+                      if (list.length === 0) return <p className="text-xs" style={FAINT}>No more students to add.</p>
                       const page = recPage[task.id] || 0
                       const pageCount = Math.ceil(list.length / PAGE_SIZE)
                       const start = page * PAGE_SIZE
@@ -607,45 +598,48 @@ const updateTaskStatus = async (id: string, status: string) => {
                       return (
                         <>
                           {meta?.suggested_pair && (
-                            <div className="mb-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3">
-                              <p className="text-xs font-medium text-indigo-300 mb-1">️ Suggested balanced pair</p>
-                              <p className="text-xs text-white/60">{meta.suggested_pair.reason}</p>
-                            </div>
+                            <Card tint="indigo" className="mb-3 p-3 !rounded-lg">
+                              <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-indigo)' }}>
+                                <Icon name="scale" size={14} /> Suggested balanced pair
+                              </p>
+                              <p className="text-xs" style={MUTED}>{meta.suggested_pair.reason}</p>
+                            </Card>
                           )}
                           {meta && meta.assigned_count < 2 && (
-                            <div className="mb-3 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-                              This task has {meta.assigned_count} assignee{meta.assigned_count === 1 ? '' : 's'} — assign at least 2 people.
-                            </div>
+                            <Card tint="amber" className="mb-3 px-3 py-2 !rounded-lg">
+                              <p className="text-xs flex items-center gap-1.5" style={TEXT}>
+                                <span style={{ color: 'var(--tm-amber)' }}><Icon name="alert" size={14} /></span>
+                                This task has {meta.assigned_count} assignee{meta.assigned_count === 1 ? '' : 's'} — assign at least 2 people.
+                              </p>
+                            </Card>
                           )}
                           <div className="flex flex-col gap-2">
                             {pageItems.map((r: any) => (
-                              <div key={r.student_id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${r.qualified ? 'bg-indigo-500/20 text-indigo-400' : 'bg-white/10 text-white/40'}`}>
+                              <div key={r.student_id} className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--tm-surface-1)' }}>
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                                  style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
                                   {initials(r.name)}
                                 </div>
-                                <div className="flex-1">
-                                  <p className="text-sm text-white flex items-center gap-2 flex-wrap">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm flex items-center gap-2 flex-wrap" style={TEXT}>
                                     {r.name}
                                     {bandChip(r.band, r.avg_score)}
                                     {!r.qualified && (
-                                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
-                                        {r.over_wip ? 'WIP full' : 'Skills below min'}
-                                      </span>
+                                      <Badge accent="rose">{r.over_wip ? 'WIP full' : 'Skills below min'}</Badge>
                                     )}
                                   </p>
-                                  <p className="text-xs text-white/40">
+                                  <p className="text-xs" style={FAINT}>
                                     Skill match {r.match_score}/3 · {r.met_count}/{r.total_required} skills ·{' '}
-                                    <span className={r.wip >= 2 ? 'text-orange-400' : 'text-green-400'}>WIP {r.wip}/3</span>
+                                    <span style={{ color: r.wip >= 2 ? 'var(--tm-amber)' : 'var(--tm-emerald)' }}>WIP {r.wip}/3</span>
                                   </p>
-                                  <p className="text-xs text-white/30 mt-0.5 italic">{r.justification}</p>
+                                  <p className="text-xs mt-0.5 italic" style={FAINT}>{r.justification}</p>
                                 </div>
                                 {userRole === 'leader' && (
-                                  <button
+                                  <Button variant="ghost" className="tm-btn-sm shrink-0"
                                     onClick={() => assignStudent(task.id, r.student_id, r.name)}
-                                    disabled={r.over_wip || isClosed(task) || assigning === r.student_id}
-                                    className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/70 hover:bg-white/10 transition disabled:opacity-30 disabled:hover:bg-transparent">
-                                    {assigning === r.student_id ? 'Assigning…' : 'Assign'}
-                                  </button>
+                                    disabled={r.over_wip || isClosed(task) || assigning === r.student_id}>
+                                    {assigning === r.student_id ? 'Assigning…' : <><Icon name="plus" size={14} /> Assign</>}
+                                  </Button>
                                 )}
                               </div>
                             ))}
@@ -653,22 +647,20 @@ const updateTaskStatus = async (id: string, status: string) => {
 
                           {pageCount > 1 && (
                             <div className="flex items-center justify-between mt-3">
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs" style={FAINT}>
                                 {start + 1}–{Math.min(start + PAGE_SIZE, list.length)} of {list.length}
                               </span>
                               <div className="flex gap-2">
-                                <button
+                                <Button variant="ghost" className="tm-btn-sm"
                                   onClick={() => setRecPage(prev => ({ ...prev, [task.id]: page - 1 }))}
-                                  disabled={page === 0}
-                                  className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/70 hover:bg-white/10 transition disabled:opacity-30 disabled:hover:bg-transparent">
-                                  ← Prev
-                                </button>
-                                <button
+                                  disabled={page === 0}>
+                                  <Icon name="arrowLeft" size={13} /> Prev
+                                </Button>
+                                <Button variant="ghost" className="tm-btn-sm"
                                   onClick={() => setRecPage(prev => ({ ...prev, [task.id]: page + 1 }))}
-                                  disabled={page >= pageCount - 1}
-                                  className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/70 hover:bg-white/10 transition disabled:opacity-30 disabled:hover:bg-transparent">
-                                  Next →
-                                </button>
+                                  disabled={page >= pageCount - 1}>
+                                  Next <Icon name="arrowRight" size={13} />
+                                </Button>
                               </div>
                             </div>
                           )}
@@ -679,7 +671,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             ))
           )}
         </div>
