@@ -12,6 +12,7 @@ type IconName =
   | 'sun' | 'moon' | 'arrowRight' | 'arrowDown' | 'check' | 'menu'
   | 'grid' | 'list' | 'star' | 'user' | 'pause'
   | 'plus' | 'more' | 'chevronDown' | 'trash' | 'upload' | 'arrowLeft' | 'alert' | 'clock'
+  | 'search' | 'x' | 'logout' | 'mail' | 'sparkle' | 'target'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
@@ -39,6 +40,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   arrowLeft: <path d="M20 12H4M10 6l-6 6 6 6" />,
   alert: <><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v4M12 17h.01" /></>,
   clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+  search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>,
+  x: <path d="M6 6l12 12M18 6 6 18" />,
+  logout: <><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" /></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3.5 6.5 8.5 6 8.5-6" /></>,
+  sparkle: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />,
+  target: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" /></>,
 }
 
 export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style }:
@@ -55,33 +62,59 @@ export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style
 
 type Accent = 'indigo' | 'violet' | 'emerald' | 'amber' | 'rose' | 'sky'
 
+// Accents resolve to per-theme CSS tokens, so the same accent is readable on
+// the dark and the light canvas. Mix with `soft()` for tinted backgrounds.
 const ACCENT: Record<Accent, string> = {
-  indigo: '#6366f1', violet: '#8b5cf6', emerald: '#34d399',
-  amber: '#fbbf24', rose: '#fb7185', sky: '#38bdf8',
+  indigo: 'var(--tm-indigo)', violet: 'var(--tm-violet)', emerald: 'var(--tm-emerald)',
+  amber: 'var(--tm-amber)', rose: 'var(--tm-rose)', sky: 'var(--tm-sky)',
+}
+export const accentColor = (a: Accent) => ACCENT[a]
+export const soft = (c: string, pct = 12) => `color-mix(in srgb, ${c} ${pct}%, transparent)`
+
+/* ─── Brand mark ─── one shared logo instead of four copies of the SVG */
+export function Logo({ size = 28, withText = true, className = '' }: { size?: number; withText?: boolean; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="TaskMatch logo">
+        <rect width="32" height="32" rx="8" fill="var(--tm-primary)" />
+        <path d="M11 11l10 10" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" opacity="0.85" />
+        <circle cx="10.5" cy="10.5" r="3.4" fill="#fff" />
+        <rect x="18" y="18" width="7" height="7" rx="2" fill="#fff" />
+      </svg>
+      {withText && <span className="tm-wordmark" style={{ fontSize: size * 0.6 }}>TaskMatch</span>}
+    </span>
+  )
 }
 
-/* ─── Ambient glow background (landing / auth screens) ─── */
+/* ─── Page header ─── title, one-line description, optional actions on the right */
+export function PageHeader({ title, sub, actions }: { title: React.ReactNode; sub?: React.ReactNode; actions?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+      <div className="min-w-0">
+        <h1 className="tm-page-title">{title}</h1>
+        {sub && <p className="tm-page-sub">{sub}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </div>
+  )
+}
+
+/* ─── Ambient background (landing / auth screens) ───
+   A faint grid fading out from the top plus one soft brand glow. Quiet on purpose. */
 export function AmbientBackground({ animate = true }: { animate?: boolean }) {
-  const anim = animate ? 'tm-drift 14s ease-in-out infinite' : undefined
+  void animate
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
-        style={{ background: 'rgba(99,102,241,0.22)', animation: anim }} />
-      <div className="absolute top-1/4 -right-24 w-[28rem] h-[28rem] rounded-full blur-3xl"
-        style={{ background: 'rgba(56,189,248,0.18)', animation: animate ? 'tm-drift 18s ease-in-out infinite reverse' : undefined }} />
-      <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full blur-3xl"
-        style={{ background: 'rgba(52,211,153,0.16)', animation: animate ? 'tm-float 10s ease-in-out infinite' : undefined }} />
-      <div className="absolute top-1/2 left-1/2 w-72 h-72 rounded-full blur-3xl"
-        style={{ background: 'rgba(251,191,36,0.10)', animation: animate ? 'tm-drift 22s ease-in-out infinite' : undefined }} />
-      <div className="absolute inset-0 opacity-[0.04]"
-        style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+      <div className="absolute inset-0 tm-grid-bg opacity-60" />
+      <div className="absolute left-1/2 -translate-x-1/2 -top-40 w-[56rem] h-[28rem] rounded-full blur-3xl"
+        style={{ background: 'var(--tm-primary-soft)' }} />
     </div>
   )
 }
 
 /* ─── Button ─── */
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'ghost' | 'quiet' | 'danger'
 }
 export function Button({ variant = 'primary', className = '', ...rest }: BtnProps) {
   return <button className={`tm-btn tm-btn-${variant} ${className}`} {...rest} />
@@ -102,7 +135,7 @@ export function Badge({ accent = 'indigo', children, className = '' }:
   { accent?: Accent; children: React.ReactNode; className?: string }) {
   const c = ACCENT[accent]
   return (
-    <span className={`tm-badge ${className}`} style={{ background: c + '22', borderColor: c + '40', '--tm-badge-c': c } as React.CSSProperties}>
+    <span className={`tm-badge ${className}`} style={{ '--tm-badge-c': c } as React.CSSProperties}>
       {children}
     </span>
   )
@@ -137,7 +170,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 export function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between mb-4">
-      <h2 className="text-lg font-semibold" style={{ color: 'var(--tm-text)' }}>{children}</h2>
+      <h2 className="text-base font-semibold tracking-tight" style={{ color: 'var(--tm-text)' }}>{children}</h2>
       {hint && <span className="text-xs" style={{ color: 'var(--tm-text-faint)' }}>{hint}</span>}
     </div>
   )
@@ -175,11 +208,13 @@ export function StatTile({ label, value, accent = 'indigo', sub }:
   { label: string; value: React.ReactNode; accent?: Accent; sub?: string }) {
   const c = ACCENT[accent]
   return (
-    <Card hover className="p-5 relative overflow-hidden">
-      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl" style={{ background: c + '22' }} />
-      <p className="text-xs relative z-10" style={{ color: 'var(--tm-text-faint)' }}>{label}</p>
-      <p className="text-3xl font-bold mt-1 relative z-10" style={{ color: c }}>{value}</p>
-      {sub && <p className="text-xs mt-1 relative z-10" style={{ color: 'var(--tm-text-muted)' }}>{sub}</p>}
+    <Card className="p-5">
+      <div className="flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: c }} />
+        <p className="text-[13px] font-medium text-muted">{label}</p>
+      </div>
+      <p className="text-3xl font-semibold tracking-tight mt-2 tabular-nums text-fg">{value}</p>
+      {sub && <p className="text-xs mt-1 text-faint">{sub}</p>}
     </Card>
   )
 }

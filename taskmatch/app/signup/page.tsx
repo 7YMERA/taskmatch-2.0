@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Button, Icon } from '../components/ui'
+import { AuthShell, AuthBuffer } from '../components/AuthShell'
 
 const CREATING_MSGS = ['Creating your account…', 'Setting up your workspace…', 'Getting things ready…', 'Almost there…']
 
@@ -53,127 +55,62 @@ export default function SignUp() {
 
   // Buffer screen after a successful sign-up (auto-login), before landing on the dashboard.
   if (creating) {
+    return <AuthBuffer title={`Welcome${name ? `, ${name.split(' ')[0]}` : ''}!`}
+      message={CREATING_MSGS[step]} progress={(step + 1) / CREATING_MSGS.length} />
+  }
+
+  if (done) {
     return (
-      <div className="relative min-h-screen bg-[#111111] overflow-hidden flex items-center justify-center px-6">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl animate-pulse" />
-          <div className="absolute bottom-0 -right-24 w-[28rem] h-[28rem] rounded-full bg-violet-600/20 blur-3xl animate-pulse" />
-          <div className="absolute inset-0 opacity-[0.04]"
-            style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+      <AuthShell title="Check your email" sub={`We sent a confirmation link to ${email}.`}>
+        <div className="rounded-lg p-4 mb-6 flex gap-3 border border-line bg-subtle">
+          <span className="shrink-0 text-primary-text"><Icon name="mail" size={18} /></span>
+          <p className="text-sm text-muted">Confirm your address, then sign in. If email confirmation is off for this project, you can sign in right away.</p>
         </div>
-        <div className="relative z-10 text-center">
-          <div className="mx-auto mb-8 w-20 h-20 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-white/10" />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-400 border-r-violet-400 animate-spin" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2">
-            <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400 bg-clip-text text-transparent">
-              Welcome{name ? `, ${name.split(' ')[0]}` : ''}!
-            </span>
-          </h1>
-          <p className="text-sm text-white/50 transition-opacity duration-300">{CREATING_MSGS[step]}</p>
-          <div className="w-60 h-1.5 rounded-full bg-white/10 overflow-hidden mx-auto mt-6">
-            <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${((step + 1) / CREATING_MSGS.length) * 100}%` }} />
-          </div>
-        </div>
-      </div>
+        <Link href="/login"><Button className="w-full">Go to sign in</Button></Link>
+      </AuthShell>
     )
   }
 
+  const mismatch = !!confirmPassword && confirmPassword !== password
+
   return (
-    <div className="relative min-h-screen bg-[#111111] overflow-hidden flex items-center justify-center px-6">
-      {/* ambient background — same as the landing */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl" />
-        <div className="absolute bottom-0 -right-24 w-[28rem] h-[28rem] rounded-full bg-violet-600/20 blur-3xl" />
-        <div className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
-      </div>
+    <AuthShell title="Create your account" sub="Start matching work to skill in minutes."
+      footer={<>Already have an account? <Link href="/login" className="font-medium text-primary-text hover:underline">Sign in</Link></>}>
+      <form onSubmit={handleSignup} className="flex flex-col gap-4">
+        <div>
+          <label className="tm-label" htmlFor="name">Full name</label>
+          <input id="name" value={name} onChange={e => setName(e.target.value)}
+            placeholder="Your name" autoComplete="name" autoFocus className="tm-input" />
+        </div>
+        <div>
+          <label className="tm-label" htmlFor="email">Email</label>
+          <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com" autoComplete="email" className="tm-input" />
+        </div>
+        <div>
+          <label className="tm-label" htmlFor="pw">Password</label>
+          <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
+            placeholder="At least 6 characters" autoComplete="new-password" className="tm-input" />
+        </div>
+        <div>
+          <label className="tm-label" htmlFor="pw2">Confirm password</label>
+          <input id="pw2" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter your password" autoComplete="new-password" aria-invalid={mismatch} className="tm-input" />
+          {mismatch && <p className="text-xs mt-1.5" style={{ color: 'var(--tm-rose)' }}>Passwords don&apos;t match yet.</p>}
+        </div>
 
-      <div className="relative z-10 w-full max-w-sm bg-white/[0.03] backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-        <Link href="/" className="text-xs text-white/40 hover:text-white">← Home</Link>
-
-        {done ? (
-          <div className="mt-4">
-            <h1 className="text-2xl font-semibold text-white mb-2">Check your email</h1>
-            <p className="text-sm text-white/50 mb-6">
-              We sent a confirmation link to <span className="text-white/80">{email}</span>. Confirm it,
-              then sign in. (If email confirmation is off for the project, you can sign in right away.)
-            </p>
-            <Link href="/login"
-              className="block text-center w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition">
-              Go to sign in
-            </Link>
-          </div>
-        ) : (
-          <>
-            <div className="mt-4 mb-7">
-              <h1 className="text-3xl font-bold">
-                <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400 bg-clip-text text-transparent">TaskMatch</span>
-              </h1>
-              <p className="text-sm text-white/40 mt-1">Create your account to get started.</p>
-            </div>
-
-            <form onSubmit={handleSignup} className="flex flex-col gap-4">
-              <div>
-                <label className="text-xs text-white/40 mb-1 block">Full name</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Your name"
-                  autoFocus
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/40 mb-1 block">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/40 mb-1 block">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/40 mb-1 block">Confirm password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter your password"
-                  className={`w-full bg-white/5 border rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none transition ${confirmPassword && confirmPassword !== password ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-indigo-500'}`}
-                />
-              </div>
-
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition disabled:opacity-50 shadow-lg shadow-indigo-600/20">
-                {loading ? 'Creating account...' : 'Sign up'}
-              </button>
-            </form>
-
-            <p className="text-xs text-white/40 mt-6 text-center">
-              Already have an account?{' '}
-              <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Sign in</Link>
-            </p>
-          </>
+        {error && (
+          <p role="alert" className="text-sm px-3 py-2 rounded-lg flex items-center gap-2"
+            style={{ color: 'var(--tm-rose)', background: 'color-mix(in srgb, var(--tm-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--tm-rose) 25%, transparent)' }}>
+            <Icon name="alert" size={15} /> {error}
+          </p>
         )}
-      </div>
-    </div>
+
+        <Button type="submit" disabled={loading} className="w-full mt-1">
+          {loading ? 'Creating account…' : 'Create account'}
+        </Button>
+        <p className="text-xs text-center text-faint">New accounts start as students. A leader can promote you later.</p>
+      </form>
+    </AuthShell>
   )
 }

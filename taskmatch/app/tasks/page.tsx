@@ -20,7 +20,7 @@ const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2
 const TEXT = { color: 'var(--tm-text)' }
 const MUTED = { color: 'var(--tm-text-muted)' }
 const FAINT = { color: 'var(--tm-text-faint)' }
-const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
 // backdrop-filter/transform on .tm-card would trap the menu's fixed click-away layer inside the card.
 const MENU_HOST = { backdropFilter: 'none', transform: 'none' }
 
@@ -251,7 +251,7 @@ const updateTaskStatus = async (id: string, status: string) => {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             {statusFilter !== 'all' && (
@@ -259,7 +259,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                 <Icon name="arrowLeft" size={13} /> Back to dashboard
               </Link>
             )}
-            <h1 className="text-2xl font-semibold" style={TEXT}>Tasks</h1>
+            <h1 className="tm-page-title">Tasks</h1>
             <p className="text-xs mt-1" style={FAINT}>Click a task to see recommendations{statusFilter !== 'all' ? ` · filtered: ${statusFilter}` : ''}</p>
           </div>
           {userRole === 'leader' && (
@@ -278,7 +278,7 @@ const updateTaskStatus = async (id: string, status: string) => {
         {showGroupForm && userRole === 'leader' && (
           <Card tint="violet" className="p-5 mb-6 tm-fade-up">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(139,92,246,0.18)', color: 'var(--tm-violet)' }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
                 <Icon name="users" size={18} />
               </div>
               <div>
@@ -322,7 +322,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                     }))}
                     className="tm-pick">
                     <span className="w-4 h-4 rounded border shrink-0 flex items-center justify-center"
-                      style={checked ? { background: 'var(--tm-indigo)', borderColor: 'var(--tm-indigo)', color: '#fff' } : { borderColor: 'var(--tm-border-strong)' }}>
+                      style={checked ? { background: 'var(--tm-primary)', borderColor: 'var(--tm-primary)', color: '#fff' } : { borderColor: 'var(--tm-border-strong)' }}>
                       {checked && <Icon name="check" size={11} strokeWidth={3} />}
                     </span>
                     {t.description} <span style={FAINT}>· {statusLabel(t.status)}</span>
@@ -587,7 +587,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                         <>
                           {meta?.suggested_pair && (
                             <Card tint="indigo" className="mb-3 p-3 !rounded-lg">
-                              <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-indigo)' }}>
+                              <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-primary-text)' }}>
                                 <Icon name="scale" size={14} /> Suggested balanced pair
                               </p>
                               <p className="text-xs" style={MUTED}>{meta.suggested_pair.reason}</p>

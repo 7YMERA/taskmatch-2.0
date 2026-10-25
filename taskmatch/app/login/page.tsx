@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AmbientBackground, Button, Icon } from '../components/ui'
-import { ThemeToggle } from '../lib/theme'
+import { Button, Icon } from '../components/ui'
+import { AuthShell, AuthBuffer } from '../components/AuthShell'
 
 const SIGNIN_MSGS = ['Signing you in…', 'Loading your workspace…', 'Almost there…']
 
@@ -44,110 +44,47 @@ export default function Login() {
 
   /* ── Post-login buffer ── */
   if (signingIn) {
-    return (
-      <main className="relative min-h-screen grid place-items-center px-6" style={{ background: 'var(--tm-bg)' }}>
-        <AmbientBackground />
-        <div className="relative z-10 text-center tm-fade-up">
-          <div className="mx-auto mb-8 w-20 h-20 relative">
-            <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: 'var(--tm-border)' }} />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-400 border-r-emerald-400 animate-spin" />
-          </div>
-          <h1 className="text-2xl mb-2">
-            <span className="tm-wordmark">Welcome back{welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}</span>
-          </h1>
-          <p className="text-sm transition-opacity duration-300" style={{ color: 'var(--tm-text-muted)' }}>{SIGNIN_MSGS[step]}</p>
-          <div className="w-60 h-1.5 rounded-full overflow-hidden mx-auto mt-6" style={{ background: 'var(--tm-surface-2)' }}>
-            <div className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${((step + 1) / SIGNIN_MSGS.length) * 100}%`, background: 'var(--tm-gradient-btn)' }} />
-          </div>
-        </div>
-      </main>
-    )
+    return <AuthBuffer title={`Welcome back${welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}`}
+      message={SIGNIN_MSGS[step]} progress={(step + 1) / SIGNIN_MSGS.length} />
   }
 
-  /* ── Single centered sign-in card ── */
   return (
-    <main className="relative min-h-screen grid place-items-center px-4 py-10" style={{ background: 'var(--tm-bg)' }}>
-      <AmbientBackground />
+    <AuthShell title="Welcome back" sub="Sign in to your TaskMatch workspace."
+      footer={<>Don&apos;t have an account? <Link href="/signup" className="font-medium text-primary-text hover:underline">Sign up</Link></>}>
+      <button onClick={fillDemo} type="button"
+        className="w-full flex items-center gap-3 rounded-lg px-3.5 py-3 mb-6 text-left transition-colors border border-dashed border-line-strong bg-subtle hover:bg-surface-2">
+        <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
+          <Icon name="sparkle" size={16} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-fg">Try the demo account</span>
+          <span className="block text-xs truncate text-muted">Fills in demo@taskmatch.app for you</span>
+        </span>
+      </button>
 
-      <div className="absolute top-5 right-5 z-20"><ThemeToggle /></div>
-      <Link href="/" className="absolute top-5 left-5 z-20 inline-flex items-center gap-1.5 text-sm transition hover:opacity-80"
-        style={{ color: 'var(--tm-text-faint)' }}>
-        <Icon name="arrowRight" size={15} className="rotate-180" /> Home
-      </Link>
-
-      <div className="relative z-10 w-full max-w-[400px] tm-fade-up">
-        {/* Logo + wordmark, centered above the card */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative mb-3">
-            <div className="absolute inset-0 rounded-2xl blur-2xl opacity-60" style={{ background: 'var(--tm-gradient)' }} />
-            <svg width="52" height="52" viewBox="0 0 42 42" fill="none" aria-label="TaskMatch"
-              className="relative drop-shadow-[0_4px_16px_rgba(99,102,241,0.45)]">
-              <defs><linearGradient id="lg" x1="4" y1="4" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#6366f1" /><stop offset="0.5" stopColor="#8b5cf6" /><stop offset="1" stopColor="#34d399" />
-              </linearGradient></defs>
-              <rect x="3" y="3" width="36" height="36" rx="11" fill="url(#lg)" />
-              <line x1="15.5" y1="15.5" x2="26.5" y2="26.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
-              <circle cx="15" cy="15" r="3.6" fill="#fff" /><rect x="22.5" y="22.5" width="7" height="7" rx="2.2" fill="#fff" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--tm-text)' }}>Welcome back</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--tm-text-faint)' }}>Sign in to your TaskMatch workspace</p>
+      <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        <div>
+          <label className="tm-label" htmlFor="email">Email</label>
+          <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com" autoComplete="email" autoFocus className="tm-input" />
+        </div>
+        <div>
+          <label className="tm-label" htmlFor="pw">Password</label>
+          <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
+            placeholder="Your password" autoComplete="current-password" className="tm-input" />
         </div>
 
-        {/* The card — with a colored top accent bar */}
-        <div className="tm-card p-7 sm:p-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'var(--tm-gradient)' }} />
-          <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: 'rgba(139,92,246,0.18)' }} />
-          <form onSubmit={handleLogin} className="relative z-10 flex flex-col gap-5">
-            <div>
-              <label className="tm-label" htmlFor="email">Email</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--tm-text-faint)' }}>
-                  <Icon name="user" size={17} />
-                </span>
-                <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com" autoFocus
-                  className="tm-input" style={{ paddingLeft: 40 }} />
-              </div>
-            </div>
+        {error && (
+          <p role="alert" className="text-sm px-3 py-2 rounded-lg flex items-center gap-2"
+            style={{ color: 'var(--tm-rose)', background: 'color-mix(in srgb, var(--tm-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--tm-rose) 25%, transparent)' }}>
+            <Icon name="alert" size={15} /> {error}
+          </p>
+        )}
 
-            <div>
-              <label className="tm-label" htmlFor="pw">Password</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--tm-text-faint)' }}>
-                  <Icon name="lock" size={17} />
-                </span>
-                <input id="pw" type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="tm-input" style={{ paddingLeft: 40 }} />
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-xs px-3 py-2 rounded-lg" style={{ color: 'var(--tm-rose)', background: 'rgba(251,113,133,0.1)', border: '1px solid rgba(251,113,133,0.25)' }}>
-                {error}
-              </p>
-            )}
-
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
-
-          {/* Demo credentials — one click to fill */}
-          <button onClick={fillDemo} type="button"
-            className="relative z-10 w-full mt-4 text-xs rounded-lg py-2.5 transition hover:opacity-100"
-            style={{ border: '1px dashed var(--tm-border-strong)', color: 'var(--tm-text-muted)', background: 'var(--tm-surface-1)' }}>
-            Use demo account&nbsp;·&nbsp;<span style={{ color: 'var(--tm-indigo)' }}>demo@taskmatch.app</span>
-          </button>
-        </div>
-
-        <p className="text-sm mt-6 text-center" style={{ color: 'var(--tm-text-faint)' }}>
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" style={{ color: 'var(--tm-indigo)' }} className="hover:opacity-80 font-medium">Sign up</Link>
-        </p>
-      </div>
-    </main>
+        <Button type="submit" disabled={loading} className="w-full mt-1">
+          {loading ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+    </AuthShell>
   )
 }

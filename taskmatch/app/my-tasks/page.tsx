@@ -6,7 +6,7 @@ import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
-import { toast } from '../lib/ui'
+import { toast, promptDialog } from '../lib/ui'
 import { effectiveRole } from '../lib/role'
 import { Card, Badge, Button, Icon, Skeleton, EmptyState } from '../components/ui'
 
@@ -107,9 +107,7 @@ export default function MyTasks() {
   }
 
   const completeTask = async (assignmentId: string, desc: string) => {
-    const input = prompt(
-      `Complete "${desc}".\n\nHours actually spent (optional — leave blank to use the timer):`
-    )
+    const input = await promptDialog({ title: 'Complete task', message: `"${desc}"\nHow many hours did you actually spend? Leave blank to use the timer.`, label: 'Actual hours (optional)', placeholder: 'e.g. 4.5', inputMode: 'decimal', confirmLabel: 'Complete' })
     if (input === null) return
     const trimmed = input.trim()
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
@@ -146,9 +144,9 @@ export default function MyTasks() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold" style={TEXT}>My Tasks</h1>
+          <h1 className="tm-page-title">My Tasks</h1>
           <p className="text-xs mt-1" style={FAINT}>Start a task to run its timer, then mark it complete when you&apos;re done.</p>
         </div>
 
@@ -233,7 +231,7 @@ export default function MyTasks() {
                 <div className="flex flex-col gap-2">
                   {completed.map(a => (
                     <Card key={a.id} className="p-3.5 flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(56,189,248,0.16)', color: 'var(--tm-sky)' }}>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'color-mix(in srgb, var(--tm-sky) 14%, transparent)', color: 'var(--tm-sky)' }}>
                         <Icon name="check" size={13} strokeWidth={2.4} />
                       </span>
                       <div className="flex-1 min-w-0">

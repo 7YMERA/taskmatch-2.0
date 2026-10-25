@@ -7,7 +7,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { effectiveRole, setRoleOverride } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
-import { Icon } from './ui'
+import { Icon, Logo } from './ui'
 
 export default function Sidebar() {
   const router = useRouter()
@@ -45,77 +45,59 @@ export default function Sidebar() {
   ]
 
   const panel = (
-    <aside className="w-56 p-4 flex flex-col gap-1 shrink-0 h-screen overflow-y-auto"
+    <aside className="w-60 px-3 py-4 flex flex-col gap-0.5 shrink-0 h-screen overflow-y-auto"
       style={{ background: 'var(--tm-bg-sidebar)', borderRight: '1px solid var(--tm-border)' }}>
-      <div className="flex flex-col items-center gap-2 py-3 mb-3" style={{ borderBottom: '1px solid var(--tm-border)' }}>
-        <svg width="44" height="44" viewBox="0 0 42 42" fill="none" aria-label="TaskMatch logo"
-          className="drop-shadow-[0_2px_10px_rgba(99,102,241,0.4)]">
-          <defs>
-            <linearGradient id="tmLogo" x1="4" y1="4" x2="38" y2="38" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#6366f1" /><stop offset="0.5" stopColor="#8b5cf6" /><stop offset="1" stopColor="#34d399" />
-            </linearGradient>
-          </defs>
-          <rect x="3" y="3" width="36" height="36" rx="11" fill="url(#tmLogo)" />
-          <line x1="15.5" y1="15.5" x2="26.5" y2="26.5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
-          <circle cx="15" cy="15" r="3.6" fill="#fff" /><rect x="22.5" y="22.5" width="7" height="7" rx="2.2" fill="#fff" />
-        </svg>
-        <span className="text-lg tracking-tight tm-wordmark">TaskMatch</span>
-      </div>
+      <Link href="/dashboard" className="flex items-center px-2 pb-5 pt-1">
+        <Logo size={26} />
+      </Link>
 
+      <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Workspace</p>
       {nav.map(item => {
-        const activeItem = pathname === item.href
+        const activeItem = pathname === item.href || pathname.startsWith(item.href + '/')
         return (
           <Link key={item.href} href={item.href}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition"
+            className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors hover:bg-surface-2"
             style={{
               color: activeItem ? 'var(--tm-text)' : 'var(--tm-text-muted)',
-              background: activeItem ? 'var(--tm-surface-2)' : 'transparent',
-              borderLeft: activeItem ? '2px solid var(--tm-indigo)' : '2px solid transparent',
+              background: activeItem ? 'var(--tm-surface-2)' : undefined,
+              fontWeight: activeItem ? 500 : 400,
             }}>
-            <span className="shrink-0 opacity-70" style={{ width: 16 }}><Icon name={item.icon} size={16} /></span>{item.label}
+            <span className="shrink-0" style={{ color: activeItem ? 'var(--tm-primary-text)' : 'var(--tm-text-faint)' }}>
+              <Icon name={item.icon} size={16} />
+            </span>
+            {item.label}
           </Link>
         )
       })}
 
-      <div className="mt-auto pt-4" style={{ borderTop: '1px solid var(--tm-border)' }}>
-        <Link href="/profile" className="flex items-center gap-3 px-3 py-2 rounded-lg transition hover:bg-white/5">
-          {avatar
-            ? <img src={avatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-            : <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc' }}>{initials(name || email)}</div>}
-          <div className="min-w-0">
-            <p className="text-xs font-medium" style={{ color: 'var(--tm-text)' }}>My Profile</p>
-            <p className="text-[11px] truncate" style={{ color: 'var(--tm-text-faint)' }}>{email}</p>
-          </div>
-        </Link>
-        <div className="px-3 mt-1 flex items-center justify-between">
-          <span className="px-2 py-0.5 rounded-full text-xs"
-            style={role === 'leader'
-              ? { background: 'rgba(99,102,241,0.2)', color: '#a5b4fc' }
-              : { background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>
-            {role || 'student'}
-          </span>
-          <ThemeToggle />
-        </div>
-
-        <div className="px-3 mt-2">
-          <p className="text-[10px] mb-1" style={{ color: 'var(--tm-text-faint)' }}>Testing — view as</p>
-          <div className="flex gap-1">
+      <div className="mt-auto pt-3 flex flex-col gap-2">
+        <div className="rounded-lg p-2.5 border border-line bg-subtle">
+          <p className="text-[11px] mb-1.5 text-faint">Preview as</p>
+          <div className="tm-seg w-full">
             {['leader', 'student'].map(r => (
-              <button key={r} onClick={() => { setRoleOverride(r); window.location.reload() }}
-                className="flex-1 text-[11px] py-1 rounded border capitalize transition"
-                style={role === r
-                  ? { borderColor: 'var(--tm-indigo)', background: 'rgba(99,102,241,0.2)', color: '#a5b4fc' }
-                  : { borderColor: 'var(--tm-border)', color: 'var(--tm-text-faint)' }}>{r}</button>
+              <button key={r} aria-pressed={role === r} className="flex-1 justify-center capitalize"
+                onClick={() => { setRoleOverride(r); window.location.reload() }}>{r}</button>
             ))}
           </div>
         </div>
 
-        <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut(); router.push('/login') }}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition mt-2 hover:bg-red-500/10"
-          style={{ color: 'rgba(248,113,113,0.7)' }}>
-          Sign out
-        </button>
+        <div className="flex items-center gap-1 pt-2" style={{ borderTop: '1px solid var(--tm-border)' }}>
+          <Link href="/profile" className="flex flex-1 min-w-0 items-center gap-2.5 px-1.5 py-1.5 rounded-md transition-colors hover:bg-surface-2">
+            {avatar
+              ? <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+              : <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                  style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{initials(name || email)}</div>}
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium truncate text-fg">{name || 'My profile'}</p>
+              <p className="text-[11px] truncate capitalize text-faint">{role || 'student'}</p>
+            </div>
+          </Link>
+          <ThemeToggle />
+          <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut(); router.push('/login') }}
+            aria-label="Sign out" title="Sign out" className="tm-btn tm-btn-quiet tm-btn-icon">
+            <Icon name="logout" size={16} />
+          </button>
+        </div>
       </div>
     </aside>
   )
@@ -126,7 +108,7 @@ export default function Sidebar() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-14"
         style={{ background: 'var(--tm-bg-sidebar)', borderBottom: '1px solid var(--tm-border)' }}>
         <button onClick={() => setOpen(true)} aria-label="Open menu" style={{ color: 'var(--tm-text)' }}><Icon name="menu" /></button>
-        <span className="tm-wordmark font-bold">TaskMatch</span>
+        <Logo size={24} />
         <div className="ml-auto"><ThemeToggle /></div>
       </div>
 
@@ -136,7 +118,7 @@ export default function Sidebar() {
       {/* Mobile drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-50" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} />
           <div className="absolute left-0 top-0" onClick={e => e.stopPropagation()}>{panel}</div>
         </div>
       )}

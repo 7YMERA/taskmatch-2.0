@@ -9,7 +9,7 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
-import { toast, confirmDialog } from '../lib/ui'
+import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { Card, Badge, Button, Icon, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
@@ -18,7 +18,7 @@ const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 const TEXT = { color: 'var(--tm-text)' }
 const MUTED = { color: 'var(--tm-text-muted)' }
 const FAINT = { color: 'var(--tm-text-faint)' }
-const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
 const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function Profile() {
@@ -84,9 +84,7 @@ export default function Profile() {
   }
 
   const completeAssignment = async (assignmentId: string, taskDesc: string) => {
-    const input = prompt(
-      `Mark "${taskDesc}" complete.\n\nHours you actually spent on it (optional — leave blank to use the tracked elapsed time):`
-    )
+    const input = await promptDialog({ title: 'Mark task complete', message: `"${taskDesc}"\nHow many hours did you actually spend? Leave blank to use the tracked time.`, label: 'Actual hours (optional)', placeholder: 'e.g. 4.5', inputMode: 'decimal', confirmLabel: 'Mark complete' })
     if (input === null) return // cancelled
     const trimmed = input.trim()
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
@@ -201,9 +199,9 @@ export default function Profile() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold" style={TEXT}>My Profile</h1>
+          <h1 className="tm-page-title">My Profile</h1>
           <p className="text-xs mt-1" style={FAINT}>Your skills, workload and tasks picked for you</p>
         </div>
 
@@ -366,7 +364,7 @@ export default function Profile() {
             <Card className="p-5 mt-6">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium flex items-center gap-2" style={TEXT}>
-                  <span style={{ color: 'var(--tm-indigo)' }}><Icon name="star" size={16} /></span> Suggested for you
+                  <span style={{ color: 'var(--tm-primary-text)' }}><Icon name="star" size={16} /></span> Suggested for you
                 </p>
                 {wip >= 3 && <Badge accent="amber">At workload limit ({wip}/3)</Badge>}
               </div>
