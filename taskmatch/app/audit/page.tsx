@@ -16,6 +16,8 @@ const PAGE = 300
 const RANGES = [{ key: '7', label: '7 days', days: 7 }, { key: '30', label: '30 days', days: 30 }, { key: '90', label: '90 days', days: 90 }, { key: 'all', label: 'All', days: 0 }]
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   task: { label: 'Tasks', color: 'var(--tm-chart-1)' },
+  project: { label: 'Projects', color: 'var(--tm-emerald)' },
+  workspace: { label: 'Workspace', color: 'var(--tm-sky)' },
   assignment: { label: 'Assignments', color: 'var(--tm-chart-2)' },
   student: { label: 'People', color: 'var(--tm-chart-3)' },
   account: { label: 'Accounts & roles', color: 'var(--tm-chart-4)' },

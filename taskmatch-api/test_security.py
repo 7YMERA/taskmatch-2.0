@@ -183,6 +183,42 @@ def test_table_queries_use_service_role_client_when_configured(monkeypatch):
     service, public = object(), object()
     monkeypatch.setattr(main, "supabase", public)
     monkeypatch.setattr(main, "admin", service)
-    assert main.db() is service
+    assert main.raw_db() is service
     monkeypatch.setattr(main, "admin", None)
-    assert main.db() is public
+    assert main.raw_db() is public
+
+
+# ─── Workspace scoping ───
+
+class RecordingTable:
+    def __init__(self): self.calls = []
+    def select(self, *a, **k): self.calls.append(("select", a)); return self
+    def insert(self, rows, *a, **k): self.calls.append(("insert", rows)); return self
+    def update(self, data, *a, **k): self.calls.append(("update", data)); return self
+    def delete(self, *a, **k): self.calls.append(("delete",)); return self
+    def eq(self, col, val): self.calls.append(("eq", col, val)); return self
+
+
+def test_every_query_is_pinned_to_the_current_workspace(monkeypatch):
+    t = RecordingTable()
+    monkeypatch.setattr(main, "admin", SimpleNamespace(table=lambda name: t))
+    main._workspace.set(("w1", "lead", "u1"))
+    main.db().table("tasks").select("id")
+    main.db().table("tasks").update({"status": "New", "workspace_id": "w2"})
+    main.db().table("tasks").delete()
+    main.db().table("tasks").insert([{"description": "a"}, {"description": "b", "workspace_id": "w2"}])
+    assert t.calls == [
+        ("select", ("id",)), ("eq", "workspace_id", "w1"),
+        ("update", {"status": "New"}), ("eq", "workspace_id", "w1"),   # can't move a row out
+        ("delete",), ("eq", "workspace_id", "w1"),
+        ("insert", [{"description": "a", "workspace_id": "w1"}, {"description": "b", "workspace_id": "w1"}]),
+    ]
+
+
+def test_no_workspace_means_no_queries():
+    main._workspace.set(None)
+    with pytest.raises(RuntimeError):
+        main.db()
+    main._workspace.set(("w1", "lead", "u1"))
+    with pytest.raises(RuntimeError):
+        main.db().table("workspace_members")  # not a workspace table: must use raw_db() deliberately

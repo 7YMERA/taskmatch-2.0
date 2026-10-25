@@ -9,8 +9,16 @@ import { AuthShell, AuthBuffer } from '../components/AuthShell'
 
 const CREATING_MSGS = ['Creating your account…', 'Setting up your workspace…', 'Getting things ready…', 'Almost there…']
 
+// Where to go after signing in: ?next=/join/abc from an invite link, otherwise the dashboard.
+function nextPath() {
+  const n = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
+  return n && n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard'
+}
+
 export default function SignUp() {
   const router = useRouter()
+  // Moving between sign in and sign up keeps ?next=, so an invite link still lands on its page.
+  const go = (path: string) => (e: React.MouseEvent) => { e.preventDefault(); router.push(path + window.location.search) }
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +54,7 @@ export default function SignUp() {
     }
     if (data.session) {
       setCreating(true)                                   // show the buffer, then go
-      setTimeout(() => router.push('/dashboard'), 2400)
+      setTimeout(() => router.push(nextPath()), 2400)
     } else {
       setDone(true)
       setLoading(false)
@@ -66,7 +74,7 @@ export default function SignUp() {
           <span className="shrink-0 text-primary-text"><Icon name="mail" size={18} /></span>
           <p className="text-sm text-muted">Confirm your address, then sign in. If email confirmation is off for this project, you can sign in right away.</p>
         </div>
-        <Link href="/login"><Button className="w-full">Go to sign in</Button></Link>
+        <Link href="/login" onClick={go("/login")}><Button className="w-full">Go to sign in</Button></Link>
       </AuthShell>
     )
   }
@@ -75,7 +83,7 @@ export default function SignUp() {
 
   return (
     <AuthShell title="Create your account" sub="Start matching work to skill in minutes."
-      footer={<>Already have an account? <Link href="/login" className="font-medium text-primary-text hover:underline">Sign in</Link></>}>
+      footer={<>Already have an account? <Link href="/login" onClick={go("/login")} className="font-medium text-primary-text hover:underline">Sign in</Link></>}>
       <form onSubmit={handleSignup} className="flex flex-col gap-4">
         <div>
           <label className="tm-label" htmlFor="name">Full name</label>

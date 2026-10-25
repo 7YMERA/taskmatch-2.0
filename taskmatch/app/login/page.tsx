@@ -9,8 +9,16 @@ import { AuthShell, AuthBuffer } from '../components/AuthShell'
 
 const SIGNIN_MSGS = ['Signing you in…', 'Loading your workspace…', 'Almost there…']
 
+// Where to go after signing in: ?next=/join/abc from an invite link, otherwise the dashboard.
+function nextPath() {
+  const n = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
+  return n && n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard'
+}
+
 export default function Login() {
   const router = useRouter()
+  // Moving between sign in and sign up keeps ?next=, so an invite link still lands on its page.
+  const go = (path: string) => (e: React.MouseEvent) => { e.preventDefault(); router.push(path + window.location.search) }
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -36,7 +44,7 @@ export default function Login() {
     } else {
       setWelcomeName(data.user?.user_metadata?.full_name || '')
       setSigningIn(true)
-      setTimeout(() => router.push('/dashboard'), 1900)
+      setTimeout(() => router.push(nextPath()), 1900)
     }
   }
 
@@ -50,7 +58,7 @@ export default function Login() {
 
   return (
     <AuthShell title="Welcome back" sub="Sign in to your TaskMatch workspace."
-      footer={<>Don&apos;t have an account? <Link href="/signup" className="font-medium text-primary-text hover:underline">Sign up</Link></>}>
+      footer={<>Don&apos;t have an account? <Link href="/signup" onClick={go("/signup")} className="font-medium text-primary-text hover:underline">Sign up</Link></>}>
       <button onClick={fillDemo} type="button"
         className="w-full flex items-center gap-3 rounded-lg px-3.5 py-3 mb-6 text-left transition-colors border border-dashed border-line-strong bg-subtle hover:bg-surface-2">
         <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
