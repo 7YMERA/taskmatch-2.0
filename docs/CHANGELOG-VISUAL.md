@@ -4,8 +4,10 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 1 of the feature overhaul (new dashboard, workload heatmap,
-> skills coverage and auto-assign modes) is documented in
+> **Latest:** Phase 1b rebuilds the Tasks and People pages (board and calendar
+> views, saved views, bulk actions, skills matrix): see
+> [PHASE1B-TASKS-PEOPLE.md](PHASE1B-TASKS-PEOPLE.md). Phase 1 (new dashboard,
+> workload heatmap, skills coverage and auto-assign modes) is in
 > [PHASE1-DASHBOARD.md](PHASE1-DASHBOARD.md). The October 2026 modern redesign,
 > with every page in light and dark mode, is in [REDESIGN.md](REDESIGN.md).
 

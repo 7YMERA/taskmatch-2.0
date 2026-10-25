@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
@@ -9,12 +9,29 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
-import { toast, confirmDialog } from '../lib/ui'
+import { toast, confirmDialog, promptDialog } from '../lib/ui'
+import { TaskBoard, TaskCalendar } from '../components/TaskViews'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
 const PAGE_SIZE = 5
 const SEVERITIES = ['Low', 'Medium', 'Critical']
 const GROUP_COLORS = ['#a78bfa', '#34d399', '#38bdf8', '#fbbf24', '#fb7185', '#2dd4bf', '#fb923c', '#f472b6']
+
+type View = 'list' | 'board' | 'calendar'
+type Sort = 'due' | 'severity' | 'status' | 'name'
+// Quick views: one click to the slices a lead looks at most.
+const PRESETS = [
+  { key: 'all', label: 'All tasks' },
+  { key: 'unassigned', label: 'Needs people' },
+  { key: 'due-week', label: 'Due this week' },
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'critical', label: 'Critical' },
+] as const
+// A saved view is just a named set of filters, kept in this browser.
+type SavedView = { name: string; q: string; status: string; severity: string; group: string; preset: string; sort: Sort; view: View }
+const SAVED_KEY = 'tm-task-views'
+const SEV_RANK: Record<string, number> = { Critical: 0, Medium: 1, Low: 2 }
+const STATUS_RANK: Record<string, number> = { New: 0, 'In Progress': 1, Completed: 2 }
 
 // Theme-token text colours, so copy flips correctly between dark and light.
 const TEXT = { color: 'var(--tm-text)' }
@@ -47,11 +64,27 @@ export default function Tasks() {
   const [assigning, setAssigning] = useState<string | null>(null)
   const [taskAssignees, setTaskAssignees] = useState<{ [task_id: string]: any[] }>({})
   const [taskMenuOpen, setTaskMenuOpen] = useState<string | null>(null)   // per-row "⋯" actions menu
+  const [view, setView] = useState<View>('list')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<Sort>('due')
+  const [preset, setPreset] = useState('all')
+  const [selected, setSelected] = useState<string[]>([])
+  const [allAssignees, setAllAssignees] = useState<Record<string, any[]>>({})
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const urlReady = useRef(false)
 
   useEffect(() => {
-    // Open with a status filter if the dashboard (or a link) passed ?status=...
-    const fromUrl = new URLSearchParams(window.location.search).get('status')
-    if (fromUrl) setStatusFilter(fromUrl)
+    // Filters and view come from the URL, so the dashboard (or a shared link) can open a slice.
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('status')) setStatusFilter(q.get('status')!)
+    if (q.get('severity')) setSeverityFilter(q.get('severity')!)
+    if (q.get('group')) setGroupFilter(q.get('group')!)
+    if (q.get('q')) setQuery(q.get('q')!)
+    if (PRESETS.some(p => p.key === q.get('preset'))) setPreset(q.get('preset')!)
+    if (['list', 'board', 'calendar'].includes(q.get('view') || '')) setView(q.get('view') as View)
+    if (['due', 'severity', 'status', 'name'].includes(q.get('sort') || '')) setSort(q.get('sort') as Sort)
+    try { setSavedViews(JSON.parse(localStorage.getItem(SAVED_KEY) || '[]')) } catch { /* private mode */ }
+    urlReady.current = true
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push('/login'); return }
       setUserEmail(session.user.email || '')
@@ -62,14 +95,67 @@ export default function Tasks() {
     fetchGroups()
   }, [])
 
+  // Keep the address bar in step with the filters (defaults are left out to keep links short).
+  useEffect(() => {
+    if (!urlReady.current) return
+    const u = new URL(window.location.href)
+    const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
+    set('status', statusFilter, 'all'); set('severity', severityFilter, 'all'); set('group', groupFilter, 'all')
+    set('q', query.trim(), ''); set('preset', preset, 'all'); set('view', view, 'list'); set('sort', sort, 'due')
+    window.history.replaceState(null, '', u)
+  }, [statusFilter, severityFilter, groupFilter, query, preset, view, sort])
+
   const fetchTasks = async () => {
-    const { data } = await supabase
-      .from('tasks')
-      .select('*, task_skills(skill_id, min_proficiency, skills(skill_name))')
-      .order('status')
+    const [{ data }, { data: asg }] = await Promise.all([
+      supabase.from('tasks').select('*, task_skills(skill_id, min_proficiency, skills(skill_name))').order('status'),
+      supabase.from('assignments').select('task_id, student_id, status, students(name)'),
+    ])
+    const byTask: Record<string, any[]> = {}
+    ;(asg || []).forEach((a: any) => { (byTask[a.task_id] ||= []).push(a) })
+    setAllAssignees(byTask)
     setTasks(data || [])
     setLoading(false)
   }
+
+  // ── Saved views (this browser only) ──
+  const persistViews = (next: SavedView[]) => {
+    setSavedViews(next)
+    try { localStorage.setItem(SAVED_KEY, JSON.stringify(next)) } catch { /* private mode */ }
+  }
+  const saveCurrentView = async () => {
+    const name = (await promptDialog({ title: 'Save this view', message: 'Saves the current search, filters, sort and layout so you can come back in one click.', label: 'View name', placeholder: 'e.g. Critical this week', confirmLabel: 'Save view' }))?.trim()
+    if (!name) return
+    persistViews([...savedViews.filter(v => v.name !== name), { name, q: query, status: statusFilter, severity: severityFilter, group: groupFilter, preset, sort, view }])
+    toast(`Saved view "${name}"`, 'success')
+  }
+  const applyView = (v: SavedView) => {
+    setQuery(v.q); setStatusFilter(v.status); setSeverityFilter(v.severity); setGroupFilter(v.group)
+    setPreset(v.preset); setSort(v.sort); setView(v.view); setSelected([])
+  }
+  const clearFilters = () => { setQuery(''); setStatusFilter('all'); setSeverityFilter('all'); setGroupFilter('all'); setPreset('all') }
+
+  // ── Bulk actions (leader) ──
+  const bulkUpdate = async (patch: Record<string, any>, label: string) => {
+    const ids = selected.filter(id => { const t = tasks.find(x => x.id === id); return t && !(isClosed(t) && 'status' in patch) })
+    if (!ids.length) return toast('Closed tasks are locked and were skipped.', 'info')
+    const { error } = await supabase.from('tasks').update(patch).in('id', ids)
+    if (error) return toast(error.message, 'error')
+    await logActivity({ action: 'task.bulk_updated', entity_type: 'task', summary: `${label} on ${ids.length} task${ids.length === 1 ? '' : 's'}`, details: { ids, ...patch } })
+    toast(`${label} on ${ids.length} task${ids.length === 1 ? '' : 's'}`, 'success')
+    setSelected([])
+    fetchTasks()
+  }
+  const bulkDelete = async () => {
+    const n = selected.length
+    if (!(await confirmDialog({ title: `Delete ${n} task${n === 1 ? '' : 's'}?`, message: 'Their skill requirements and assignments are removed too. This can\'t be undone.', danger: true, confirmLabel: 'Delete' }))) return
+    await supabase.from('task_skills').delete().in('task_id', selected)
+    await supabase.from('assignments').delete().in('task_id', selected)
+    await supabase.from('tasks').delete().in('id', selected)
+    await logActivity({ action: 'task.bulk_deleted', entity_type: 'task', summary: `Deleted ${n} task${n === 1 ? '' : 's'}`, details: { ids: selected } })
+    setSelected([])
+    fetchTasks()
+  }
+  const toggleSelected = (id: string) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   const fetchGroups = async () => {
     const { data } = await supabase.from('groups').select('*')
@@ -232,6 +318,23 @@ const updateTaskStatus = async (id: string, status: string) => {
     ...groups.map(g => g.name),
     ...tasks.map(t => t.group_label).filter(Boolean),
   ])) as string[]).sort((a, b) => (_groupCreatedAt[b] ?? 0) - (_groupCreatedAt[a] ?? 0))
+  const activeOn = (t: any) => (allAssignees[t.id] || []).filter(a => a.status === 'Assigned' || a.status === 'In Progress')
+  const isUnstaffed = (t: any) => t.status !== 'Completed' && !isClosed(t) && activeOn(t).length === 0
+  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const matchesPreset = (t: any) =>
+    preset === 'unassigned' ? isUnstaffed(t)
+      : preset === 'due-week' ? t.status !== 'Completed' && !!t.due_date && t.due_date >= todayStr && t.due_date <= weekAhead
+        : preset === 'overdue' ? t.status !== 'Completed' && !!t.due_date && t.due_date < todayStr
+          : preset === 'critical' ? t.status !== 'Completed' && t.severity === 'Critical'
+            : true
+  const needle = query.trim().toLowerCase()
+  const matchesQuery = (t: any) => !needle
+    || (t.description || '').toLowerCase().includes(needle)
+    || (t.group_label || '').toLowerCase().includes(needle)
+    || (t.task_skills || []).some((ts: any) => (ts.skills?.skill_name || '').toLowerCase().includes(needle))
+    || activeOn(t).some((a: any) => (a.students?.name || '').toLowerCase().includes(needle))
+  const filtersOn = needle !== '' || statusFilter !== 'all' || severityFilter !== 'all' || groupFilter !== 'all' || preset !== 'all'
+
   const byGroup = groupFilter === 'all'
     ? tasks
     : groupFilter === '__none__'
@@ -244,8 +347,20 @@ const updateTaskStatus = async (id: string, status: string) => {
           : statusFilter === 'Late' ? isLate(t)
             : t.status === statusFilter
     const sevOk = severityFilter === 'all' || t.severity === severityFilter
-    return statusOk && sevOk
+    return statusOk && sevOk && matchesQuery(t) && matchesPreset(t)
+  }).sort((a, b) => {
+    if (sort === 'name') return (a.description || '').localeCompare(b.description || '')
+    if (sort === 'severity') return (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3) || (a.due_date || '9').localeCompare(b.due_date || '9')
+    if (sort === 'status') return (STATUS_RANK[a.status] ?? 3) - (STATUS_RANK[b.status] ?? 3) || (a.due_date || '9').localeCompare(b.due_date || '9')
+    // Due date: open work first, soonest due first, undated last.
+    return Number(a.status === 'Completed') - Number(b.status === 'Completed') || (a.due_date || '9').localeCompare(b.due_date || '9')
   })
+  const allShownSelected = shownTasks.length > 0 && shownTasks.every(t => selected.includes(t.id))
+  const counts = {
+    open: tasks.filter(t => t.status !== 'Completed').length,
+    overdue: tasks.filter(t => t.status !== 'Completed' && t.due_date && t.due_date < todayStr).length,
+    unassigned: tasks.filter(isUnstaffed).length,
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -260,7 +375,9 @@ const updateTaskStatus = async (id: string, status: string) => {
               </Link>
             )}
             <h1 className="tm-page-title">Tasks</h1>
-            <p className="text-xs mt-1" style={FAINT}>Click a task to see recommendations{statusFilter !== 'all' ? ` · filtered: ${statusFilter}` : ''}</p>
+            <p className="text-xs mt-1" style={FAINT}>
+              {loading ? 'Loading…' : `${counts.open} open · ${counts.overdue} overdue · ${counts.unassigned} need people`}
+            </p>
           </div>
           {userRole === 'leader' && (
             <div className="flex gap-2">
@@ -421,6 +538,62 @@ const updateTaskStatus = async (id: string, status: string) => {
           </Card>
         )}
 
+        {/* Toolbar: search, layout, sort */}
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="relative flex-1 min-w-[14rem] max-w-md">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={FAINT}><Icon name="search" size={15} /></span>
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tasks, skills, people or groups…" className="!pl-9" aria-label="Search tasks" />
+          </div>
+          <div className="tm-seg" aria-label="Layout">
+            {([['list', 'List', 'list'], ['board', 'Board', 'grid'], ['calendar', 'Calendar', 'clock']] as const).map(([k, label, icon]) => (
+              <button key={k} onClick={() => { setView(k); setSelected([]) }} aria-pressed={view === k}>
+                <Icon name={icon} size={14} /> {label}
+              </button>
+            ))}
+          </div>
+          {view === 'list' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={FAINT}>Sort</span>
+              <select value={sort} onChange={e => setSort(e.target.value as Sort)} className="tm-select-sm">
+                <option value="due">Due date</option>
+                <option value="severity">Severity</option>
+                <option value="status">Status</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Quick views + saved views */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {PRESETS.map(p => (
+            <button key={p.key} onClick={() => setPreset(p.key)} aria-pressed={preset === p.key}
+              className="text-xs px-3 py-1.5 rounded-full border transition"
+              style={preset === p.key
+                ? { borderColor: 'var(--tm-primary)', background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
+                : { borderColor: 'var(--tm-border)', color: 'var(--tm-text-muted)' }}>
+              {p.label}
+              {p.key === 'unassigned' && counts.unassigned > 0 && <span className="ml-1.5 tabular-nums">{counts.unassigned}</span>}
+              {p.key === 'overdue' && counts.overdue > 0 && <span className="ml-1.5 tabular-nums">{counts.overdue}</span>}
+            </button>
+          ))}
+          {savedViews.length > 0 && <div className="w-px h-5 mx-1" style={{ background: 'var(--tm-border)' }} />}
+          {savedViews.map(v => (
+            <span key={v.name} className="inline-flex items-center rounded-full border text-xs" style={{ borderColor: 'var(--tm-border)' }}>
+              <button onClick={() => applyView(v)} className="pl-3 pr-1.5 py-1.5 inline-flex items-center gap-1.5" style={MUTED} title="Apply saved view">
+                <Icon name="star" size={12} /> {v.name}
+              </button>
+              <button onClick={() => persistViews(savedViews.filter(x => x.name !== v.name))} className="pr-2 py-1.5 hover:opacity-70" style={FAINT} aria-label={`Remove saved view ${v.name}`}>
+                <Icon name="x" size={12} />
+              </button>
+            </span>
+          ))}
+          <div className="ml-auto flex items-center gap-2">
+            {filtersOn && <button onClick={clearFilters} className="text-xs hover:underline" style={FAINT}>Clear filters</button>}
+            <Button variant="ghost" className="tm-btn-sm" onClick={saveCurrentView}><Icon name="plus" size={13} /> Save view</Button>
+          </div>
+        </div>
+
         {/* Status + Group filters */}
         <div className="flex gap-3 mb-4 flex-wrap items-center">
           <div className="flex items-center gap-2">
@@ -454,10 +627,26 @@ const updateTaskStatus = async (id: string, status: string) => {
               <option value="__none__">No group</option>
             </select>
           </div>
+          <span className="text-xs ml-auto" style={FAINT}>{loading ? '' : `Showing ${shownTasks.length} of ${tasks.length}`}</span>
         </div>
 
+        {view === 'board' && !loading && (
+          <TaskBoard tasks={shownTasks} assignees={allAssignees} canMove={userRole === 'leader'} isLocked={isClosed}
+            onMove={(id, st) => updateTaskStatus(id, st)}
+            flags={t => isDelayed(t) ? <Badge accent="rose" className="!text-[10px] !py-0">delayed</Badge> : isClosed(t) ? <span className="tm-chip !text-[10px] !py-0">closed</span> : null} />
+        )}
+        {view === 'calendar' && !loading && <TaskCalendar tasks={shownTasks} />}
+
+        {view === 'list' && userRole === 'leader' && !loading && shownTasks.length > 0 && (
+          <label className="flex items-center gap-2 text-xs mb-2 pl-1 w-fit cursor-pointer" style={FAINT}>
+            <input type="checkbox" checked={allShownSelected} className="accent-[var(--tm-primary)]"
+              onChange={() => setSelected(allShownSelected ? [] : shownTasks.map(t => t.id))} />
+            Select all shown
+          </label>
+        )}
+
         {/* Tasks list */}
-        <div className="flex flex-col gap-3">
+        <div className={`flex flex-col gap-3 ${view !== 'list' && !loading ? 'hidden' : ''}`}>
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           ) : shownTasks.length === 0 ? (
@@ -474,6 +663,11 @@ const updateTaskStatus = async (id: string, status: string) => {
                 <div
                   className="flex flex-wrap md:flex-nowrap items-center gap-x-3.5 gap-y-2 p-4 cursor-pointer"
                   onClick={() => loadRecommendations(task.id)}>
+                  {userRole === 'leader' && (
+                    <input type="checkbox" checked={selected.includes(task.id)} aria-label={`Select ${task.description}`}
+                      className="shrink-0 accent-[var(--tm-primary)]"
+                      onClick={e => e.stopPropagation()} onChange={() => toggleSelected(task.id)} />
+                  )}
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: severityDot(task.severity) }} title={`${task.severity || 'Low'} severity`} />
                   <div className="flex-1 md:flex-none md:w-64 shrink-0 min-w-0">
                     <div className="flex items-center gap-2">
@@ -508,6 +702,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                     {isLate(task) && <Badge accent="amber" className="!text-[11px] !py-0.5"><span title={`Delivered after due ${task.due_date}`}>late</span></Badge>}
                     {isDelayed(task) && <Badge accent="rose" className="!text-[11px] !py-0.5"><span title={`Past due ${task.due_date}`}>delayed</span></Badge>}
                     {isClosed(task) && <span className="tm-chip !text-[11px]" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed</span>}
+                    {isUnstaffed(task) && <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--tm-sky)' }} title="Nobody is assigned"><Icon name="user" size={12} /> needs people</span>}
                   </div>
 
                   {userRole === 'leader' && (
@@ -663,6 +858,31 @@ const updateTaskStatus = async (id: string, status: string) => {
             ))
           )}
         </div>
+        {/* Bulk actions — appears once tasks are ticked */}
+        {userRole === 'leader' && view === 'list' && selected.length > 0 && (
+          <div className="sticky bottom-4 z-40 mt-4 flex justify-center pointer-events-none">
+            <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl px-3 py-2"
+              style={{ background: 'var(--tm-surface-1)', border: '1px solid var(--tm-border)', boxShadow: 'var(--tm-shadow)' }}>
+              <span className="text-sm font-medium px-1" style={TEXT}>{selected.length} selected</span>
+              <select className="tm-select-sm" value="" onChange={e => e.target.value && bulkUpdate({ status: e.target.value }, `Status set to ${statusLabel(e.target.value)}`)} aria-label="Set status">
+                <option value="">Set status…</option>
+                {['New', 'In Progress', 'Completed'].map(st => <option key={st} value={st}>{statusLabel(st)}</option>)}
+              </select>
+              <select className="tm-select-sm" value="" onChange={e => e.target.value && bulkUpdate({ severity: e.target.value }, `Severity set to ${e.target.value}`)} aria-label="Set severity">
+                <option value="">Set severity…</option>
+                {SEVERITIES.map(sv => <option key={sv} value={sv}>{sv}</option>)}
+              </select>
+              <select className="tm-select-sm max-w-[10rem]" value="" aria-label="Move to group"
+                onChange={e => e.target.value && bulkUpdate({ group_label: e.target.value === '__none__' ? null : e.target.value }, e.target.value === '__none__' ? 'Removed from group' : `Moved to ${e.target.value}`)}>
+                <option value="">Move to group…</option>
+                {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                <option value="__none__">No group</option>
+              </select>
+              <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-rose)' }} onClick={bulkDelete}><Icon name="trash" size={13} /> Delete</Button>
+              <button className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent" aria-label="Clear selection" onClick={() => setSelected([])}><Icon name="x" size={15} /></button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
