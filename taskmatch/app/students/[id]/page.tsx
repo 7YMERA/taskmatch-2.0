@@ -14,7 +14,7 @@ const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Theme-token text colours, so copy flips correctly between dark and light.
 const TEXT = { color: 'var(--tm-text)' }
 const FAINT = { color: 'var(--tm-text-faint)' }
-const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
 const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function StudentDetail() {
@@ -82,7 +82,7 @@ export default function StudentDetail() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <Link href="/students" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
           <Icon name="arrowLeft" size={13} /> Back to students
         </Link>
@@ -108,7 +108,7 @@ export default function StudentDetail() {
                   ? <img src={student.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover shrink-0" />
                   : <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold shrink-0" style={AVATAR}>{initials(student.name)}</div>}
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-semibold" style={TEXT}>{student.name}</h1>
+                  <h1 className="text-xl font-semibold tracking-tight" style={TEXT}>{student.name}</h1>
                   <p className="text-xs mt-0.5" style={FAINT}>{student.matric} · {student.programme} · Year {student.year}</p>
                 </div>
                 {stat && (
@@ -184,7 +184,7 @@ export default function StudentDetail() {
                 <div className="flex flex-col gap-2">
                   {done.map(a => (
                     <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg p-3" style={ROW}>
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(56,189,248,0.16)', color: 'var(--tm-sky)' }}>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'color-mix(in srgb, var(--tm-sky) 14%, transparent)', color: 'var(--tm-sky)' }}>
                         <Icon name="check" size={13} strokeWidth={2.4} />
                       </span>
                       <Link href={`/tasks/${a.tasks?.id}`} className="flex-1 min-w-0 text-sm hover:underline truncate" style={TEXT}>{a.tasks?.description || '(removed)'}</Link>

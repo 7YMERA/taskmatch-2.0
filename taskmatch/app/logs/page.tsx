@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
-import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import { effectiveRole } from '../lib/role'
+import { Badge, Card, EmptyState, Icon, PageHeader, Skeleton } from '../components/ui'
 
 export default function Logs() {
   const router = useRouter()
@@ -37,11 +37,11 @@ export default function Logs() {
     setLoading(false)
   }
 
-  const actionColor = (action: string) => {
-    if (action.includes('deleted') || action.includes('removed')) return 'bg-red-500/20 text-red-400'
-    if (action.includes('completed')) return 'bg-blue-500/20 text-blue-400'
-    if (action.includes('created') || action.includes('added') || action.includes('assigned')) return 'bg-emerald-500/20 text-emerald-400'
-    return 'bg-white/10 text-white/50'
+  const actionAccent = (action: string) => {
+    if (action.includes('deleted') || action.includes('removed')) return 'rose' as const
+    if (action.includes('completed')) return 'sky' as const
+    if (action.includes('created') || action.includes('added') || action.includes('assigned')) return 'emerald' as const
+    return 'violet' as const
   }
 
   // Filter by entity type + free-text search across actor, action, summary and details.
@@ -60,82 +60,64 @@ export default function Logs() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-2xl font-semibold text-white mb-1">Activity log</h1>
-        <p className="text-xs text-white/40 mb-6">
-          Append-only audit trail of every action. Entries cannot be edited or deleted (enforced at the database).
-        </p>
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10 overflow-y-auto">
+        <PageHeader title="Activity log"
+          sub="Every action, attributed and time-stamped. Entries can't be edited or deleted." />
 
         {!ready ? (
-          <p className="text-white/40 text-sm">Loading...</p>
+          <Card className="p-5 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} style={{ height: 14 }} />)}</Card>
         ) : userRole !== 'leader' ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-lg">
-            <p className="text-sm text-white mb-1">Leaders only.</p>
-            <p className="text-xs text-white/40">
-              The activity log is visible to team leaders. You&apos;re signed in as
-              <span className="text-white/70"> {userEmail}</span> (student).
-            </p>
-          </div>
+          <Card className="max-w-lg">
+            <EmptyState icon={<Icon name="lock" size={28} />} title="Leaders only"
+              hint={`The activity log is visible to team leaders. You're signed in as ${userEmail} (student).`} />
+          </Card>
         ) : (
           <>
-            <div className="relative mb-4 max-w-md">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search by person, action, or anything…"
-                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-9 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:border-indigo-500 transition"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} aria-label="Clear search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white text-sm">✕</button>
-              )}
-            </div>
-
-            <div className="flex gap-2 mb-4 flex-wrap items-center">
-              {filters.map(f => (
-                <button key={f} onClick={() => setFilter(f)}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border capitalize transition ${filter === f
-                    ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
-                    : 'border-white/10 text-white/40 hover:text-white'}`}>
-                  {f}
-                  <span className={`text-[10px] px-1.5 rounded-full ${filter === f ? 'bg-indigo-500/30 text-indigo-200' : 'bg-white/10 text-white/40'}`}>{countFor(f)}</span>
-                </button>
-              ))}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4">
+              <div className="relative w-full lg:max-w-sm">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-faint"><Icon name="search" size={16} /></span>
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search people, actions, details…" className="tm-input" style={{ paddingLeft: 36, paddingRight: 36 }} />
+                {search && (
+                  <button onClick={() => setSearch('')} aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 tm-btn tm-btn-quiet !p-1"><Icon name="x" size={14} /></button>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <div className="tm-seg">
+                  {filters.map(f => (
+                    <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className="capitalize whitespace-nowrap">
+                      {f}<span className="text-[11px] tabular-nums text-faint">{countFor(f)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {loading ? (
-              <p className="text-white/40 text-sm">Loading...</p>
+              <Card className="p-5 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} style={{ height: 14 }} />)}</Card>
             ) : shown.length === 0 ? (
-              <p className="text-white/40 text-sm">{q || filter !== 'all' ? 'No matching activity.' : 'No activity recorded yet.'}</p>
+              <Card>
+                <EmptyState icon={<Icon name="list" size={28} />}
+                  title={q || filter !== 'all' ? 'No matching activity' : 'No activity yet'}
+                  hint={q || filter !== 'all' ? 'Try a different search or filter.' : 'Actions across the workspace will show up here.'} />
+              </Card>
             ) : (
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="tm-card overflow-hidden overflow-x-auto">
+                <table className="tm-table">
                   <thead>
-                    <tr className="text-left text-xs text-white/40 border-b border-white/10">
-                      <th className="px-4 py-3 font-medium">When</th>
-                      <th className="px-4 py-3 font-medium">Actor</th>
-                      <th className="px-4 py-3 font-medium">Action</th>
-                      <th className="px-4 py-3 font-medium">Details</th>
-                    </tr>
+                    <tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr>
                   </thead>
                   <tbody>
                     {shown.map(l => (
-                      <tr key={l.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
-                        <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">
-                          {new Date(l.created_at).toLocaleString()}
+                      <tr key={l.id}>
+                        <td className="whitespace-nowrap tabular-nums text-[13px]">{new Date(l.created_at).toLocaleString()}</td>
+                        <td className="text-[13px]">
+                          <span className="text-fg">{l.actor_email || 'system'}</span>
+                          {l.actor_role && <span className="text-faint"> · {l.actor_role}</span>}
                         </td>
-                        <td className="px-4 py-3 text-xs">
-                          <span className="text-white/80">{l.actor_email || 'system'}</span>
-                          {l.actor_role && <span className="text-white/30"> · {l.actor_role}</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${actionColor(l.action)}`}>{l.action}</span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-white/60">{l.summary}</td>
+                        <td><Badge accent={actionAccent(l.action)}>{l.action}</Badge></td>
+                        <td className="text-[13px]">{l.summary}</td>
                       </tr>
                     ))}
                   </tbody>

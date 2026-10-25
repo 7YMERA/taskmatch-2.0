@@ -7,7 +7,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../../lib/log'
 import Sidebar from '../../components/Sidebar'
-import { toast, confirmDialog } from '../../lib/ui'
+import { toast, confirmDialog, promptDialog } from '../../lib/ui'
 import { effectiveRole } from '../../lib/role'
 import { Card, Badge, Button, Input, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
 
@@ -17,7 +17,7 @@ const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 const TEXT = { color: 'var(--tm-text)' }
 const MUTED = { color: 'var(--tm-text-muted)' }
 const FAINT = { color: 'var(--tm-text-faint)' }
-const AVATAR = { background: 'rgba(99,102,241,0.18)', color: 'var(--tm-indigo)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
 const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function TaskDetail() {
@@ -122,7 +122,7 @@ export default function TaskDetail() {
   }
 
   const completeAssignment = async (assignmentId: string, name: string) => {
-    const input = prompt(`Mark ${name}'s work complete.\n\nActual hours spent (optional — blank uses tracked elapsed time):`)
+    const input = await promptDialog({ title: `Mark ${name}'s work complete`, message: 'How many hours were actually spent? Leave blank to use the tracked time.', label: 'Actual hours (optional)', placeholder: 'e.g. 4.5', inputMode: 'decimal', confirmLabel: 'Mark complete' })
     if (input === null) return
     const trimmed = input.trim()
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
@@ -188,7 +188,7 @@ export default function TaskDetail() {
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <Link href="/tasks" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
           <Icon name="arrowLeft" size={13} /> Back to tasks
         </Link>
@@ -208,7 +208,7 @@ export default function TaskDetail() {
             <Card className="p-5 mt-4 mb-6 tm-fade-up">
               <div className="flex flex-wrap items-start gap-4">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-semibold" style={TEXT}>{task.description}</h1>
+                  <h1 className="text-xl font-semibold tracking-tight" style={TEXT}>{task.description}</h1>
                   <div className="flex gap-2 mt-3 flex-wrap items-center">
                     {task.severity && (
                       <span className="tm-chip gap-1.5">
@@ -304,7 +304,7 @@ export default function TaskDetail() {
                 )}
                 {meta?.suggested_pair && (
                   <Card tint="indigo" className="mb-3 p-3 !rounded-lg">
-                    <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-indigo)' }}>
+                    <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-primary-text)' }}>
                       <Icon name="scale" size={14} /> Suggested balanced pair
                     </p>
                     <p className="text-xs" style={MUTED}>{meta.suggested_pair.reason}</p>
