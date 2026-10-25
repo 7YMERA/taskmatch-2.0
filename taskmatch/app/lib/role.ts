@@ -1,23 +1,54 @@
-// Testing "view as" role override. Purely client-side — it changes the role the UI uses
-// (leader ↔ student) without touching the account's real Supabase role, so testers can try
-// both perspectives from one account. Backend admin actions (promote/demote, list accounts)
-// still verify the REAL role, so this can't grant real privileges.
+import PERMS from './permissions.json'
 
-const KEY = 'tm_role_override'
+// Roles and permissions. The same table lives in taskmatch-api/main.py (ROLE_PERMISSIONS) and
+// in supabase/roles.sql; a backend test checks the API copy against permissions.json.
+//
+// The real role is stored in the account's app_metadata, which only the server (service-role
+// key) can change. user_metadata is NOT used: a signed-in user can edit their own user_metadata.
 
-export function getRoleOverride(): string | null {
-  if (typeof window === 'undefined') return null
-  try { return localStorage.getItem(KEY) } catch { return null }
+export type Role = 'admin' | 'lead' | 'member' | 'viewer'
+export type Permission =
+  | 'tasks.manage' | 'people.manage' | 'assign.others' | 'insights.view' | 'audit.view'
+  | 'team.manage' | 'work.self' | 'comment' | 'away.self'
+
+export const ROLES = PERMS.roles as { key: Role; label: string; description: string }[]
+export const PERMISSIONS = PERMS.permissions as { key: Permission; label: string; roles: Role[] }[]
+const isRole = (r: unknown): r is Role => ROLES.some(x => x.key === r)
+
+const LEGACY: Record<string, string> = { leader: 'Leader', student: 'Student' }   // roles from before Phase 2, still in old log rows
+export const roleLabel = (r?: string | null) => ROLES.find(x => x.key === r)?.label || (r && LEGACY[r]) || 'Member'
+
+export function can(role: string | null | undefined, perm: Permission): boolean {
+  return !!role && !!PERMISSIONS.find(p => p.key === perm)?.roles.includes(role as Role)
 }
 
-export function setRoleOverride(role: string | null) {
+/** The account's real role, from app_metadata. New accounts are members. */
+export function realRole(session: any): Role {
+  const r = session?.user?.app_metadata?.role
+  return isRole(r) ? r : 'member'
+}
+
+// "Preview as": admins can see the UI as another role to check what that role sees. It only
+// changes the UI; the API and database rules still use the real role, so it grants nothing.
+const KEY = 'tm_role_override'
+
+export function getRoleOverride(): Role | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const r = localStorage.getItem(KEY)
+    return isRole(r) ? r : null
+  } catch { return null }
+}
+
+export function setRoleOverride(role: Role | null) {
   try {
     if (role) localStorage.setItem(KEY, role)
     else localStorage.removeItem(KEY)
   } catch { /* private mode */ }
 }
 
-// Effective role for the UI — a testing override wins over the account's real role.
-export function effectiveRole(session: any): string {
-  return getRoleOverride() || session?.user?.user_metadata?.role || 'student'
+/** Role the UI uses: an admin's preview choice, otherwise the real role. */
+export function effectiveRole(session: any): Role {
+  const real = realRole(session)
+  return real === 'admin' ? getRoleOverride() || real : real
 }

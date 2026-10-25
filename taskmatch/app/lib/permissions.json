@@ -1,0 +1,19 @@
+{
+  "roles": [
+    { "key": "admin",  "label": "Admin",     "description": "Runs the workspace: everything a team lead can do, plus roles and team settings." },
+    { "key": "lead",   "label": "Team lead", "description": "Plans the work: creates tasks, manages people and assigns work." },
+    { "key": "member", "label": "Member",    "description": "Does the work: picks up, starts and completes their own tasks." },
+    { "key": "viewer", "label": "Viewer",    "description": "Read only: sees tasks, people and the dashboard but changes nothing." }
+  ],
+  "permissions": [
+    { "key": "tasks.manage",   "label": "Create, edit and delete tasks and groups", "roles": ["admin", "lead"] },
+    { "key": "people.manage",  "label": "Add, edit and remove people and their skills", "roles": ["admin", "lead"] },
+    { "key": "assign.others",  "label": "Assign and unassign anyone, use auto-assign", "roles": ["admin", "lead"] },
+    { "key": "insights.view",  "label": "See scores, timed hours and performance", "roles": ["admin", "lead"] },
+    { "key": "audit.view",     "label": "See the audit trail", "roles": ["admin", "lead"] },
+    { "key": "team.manage",    "label": "Change roles and manage the team", "roles": ["admin"] },
+    { "key": "work.self",      "label": "Pick up, start and complete own tasks", "roles": ["admin", "lead", "member"] },
+    { "key": "comment",        "label": "Comment on tasks", "roles": ["admin", "lead", "member"] },
+    { "key": "away.self",      "label": "Set own away status", "roles": ["admin", "lead", "member"] }
+  ]
+}

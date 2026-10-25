@@ -110,11 +110,11 @@ class FakeQuery:
 
 class FakeAuth:
     def get_user(self, token):
-        roles = {"leader-token": "leader", "student-token": "student"}
+        roles = {"leader-token": "lead", "student-token": "member"}
         if token not in roles:
             raise Exception("invalid JWT")
         return SimpleNamespace(user=SimpleNamespace(email=f"{roles[token]}@example.com",
-                                                    user_metadata={"role": roles[token]}))
+                                                    app_metadata={"role": roles[token]}, user_metadata={}))
 
 
 class FakeSupabase:
@@ -186,3 +186,30 @@ def test_best_match_picks_the_stronger_skill(fake):
     body = TestClient(main.app).post("/auto-assign", headers=LEADER,
                                      json={"task_id": "t1", "mode": "best_match", "dry_run": True}).json()
     assert body["student_id"] == "s1"
+
+
+def test_away_people_are_skipped_by_every_mode(fake, monkeypatch):
+    students = [dict(s) for s in FakeSupabase.TABLES["students"]]
+    students[0]["away_until"] = "2999-01-01"   # Ali is the best match but on leave
+    monkeypatch.setitem(FakeSupabase.TABLES, "students", students)
+    for mode in ("best_match", "round_robin", "least_loaded"):
+        body = TestClient(main.app).post("/auto-assign", headers=LEADER,
+                                         json={"task_id": "t1", "mode": mode, "dry_run": True}).json()
+        assert body["student_id"] == "s2", mode
+
+
+def test_away_shows_in_the_ranked_list(fake, monkeypatch):
+    students = [dict(s) for s in FakeSupabase.TABLES["students"]]
+    students[0]["away_until"] = "2999-01-01"
+    monkeypatch.setitem(FakeSupabase.TABLES, "students", students)
+    ali = next(c for c in main.score_candidates("t1") if c["student_id"] == "s1")
+    assert ali["away"] and not ali["qualified"]
+    assert ali["justification"].startswith("Away until")
+
+
+def test_past_away_date_counts_as_back(fake, monkeypatch):
+    students = [dict(s) for s in FakeSupabase.TABLES["students"]]
+    students[0]["away_until"] = "2000-01-01"
+    monkeypatch.setitem(FakeSupabase.TABLES, "students", students)
+    ali = next(c for c in main.score_candidates("t1") if c["student_id"] == "s1")
+    assert not ali["away"] and ali["qualified"]

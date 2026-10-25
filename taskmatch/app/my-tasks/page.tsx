@@ -7,7 +7,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import { toast } from '../lib/ui'
-import { effectiveRole } from '../lib/role'
+import { effectiveRole, can } from '../lib/role'
 import { buckets, DAY } from '../lib/analytics'
 import { StackedColumns, Legend } from '../components/charts'
 import { severityDot } from '../components/TaskViews'
@@ -180,7 +180,7 @@ export default function MyTasks() {
       const res = await axios.post(`${API}/complete`, { assignment_id: a.id, actual_hours }, { headers: await authHeaders() })
       const d = res.data
       const basis = d.score != null && d.committed_hours != null ? ` — score ${d.score} (${d.committed_hours}h committed vs ${d.elapsed_hours}h actual)` : (d.score != null ? ` — score ${d.score}` : '')
-      toast(`Completed!${userRole === 'leader' ? basis : ''}`, 'success')
+      toast(`Completed!${can(userRole, 'insights.view') ? basis : ''}`, 'success')
       setCompleting(null)
       if (student) await Promise.all([load(student.id), loadSuggested(student.id)])
     } catch (err: any) { toast(errMsg(err, 'Could not complete'), 'error') }
@@ -406,7 +406,7 @@ export default function MyTasks() {
                               <p className="text-[11px] text-faint">
                                 {a.completed_at ? `Finished ${fmtDay(a.completed_at.slice(0, 10))}` : 'Finished'}
                                 {a.actual_hours != null ? ` · ${Math.round(a.actual_hours * 10) / 10}h spent` : ''}
-                                {userRole === 'leader' && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
+                                {can(userRole, 'insights.view') && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
                               </p>
                             </div>
                             {ok != null && (
@@ -414,7 +414,7 @@ export default function MyTasks() {
                                 <Icon name={ok ? 'check' : 'alert'} size={11} /> {ok ? 'On time' : 'Late'}
                               </span>
                             )}
-                            {userRole === 'leader' && a.score != null && <span className="tm-chip shrink-0">score {a.score}</span>}
+                            {can(userRole, 'insights.view') && a.score != null && <span className="tm-chip shrink-0">score {a.score}</span>}
                           </div>
                         )
                       })}

@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { logActivity } from '../../lib/log'
 import Sidebar from '../../components/Sidebar'
 import { toast, confirmDialog, promptDialog } from '../../lib/ui'
-import { effectiveRole } from '../../lib/role'
+import { effectiveRole, can, roleLabel } from '../../lib/role'
 import { Card, Badge, Button, Input, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
@@ -296,7 +296,7 @@ export default function TaskDetail() {
                             {statusLabel(a.status)}
                             {a.score != null ? ` · score ${a.score}` : ''}
                             {a.actual_hours != null ? ` · ${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
-                            {userRole === 'leader' && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
+                            {can(userRole, 'insights.view') && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
                           </p>
                         </div>
                         <div className="flex gap-2 shrink-0">
@@ -310,7 +310,7 @@ export default function TaskDetail() {
                               <Icon name="check" size={13} /> Complete
                             </Button>
                           )}
-                          {userRole === 'leader' && a.status !== 'Completed' && (
+                          {can(userRole, 'assign.others') && a.status !== 'Completed' && (
                             <button onClick={() => removeAssignee(a.id, a.students?.name, a.status)} title="Remove from this task" aria-label="Remove from this task"
                               className="tm-btn tm-btn-ghost tm-btn-icon" style={{ color: 'var(--tm-rose)' }}>
                               <Icon name="trash" size={14} />
@@ -335,7 +335,7 @@ export default function TaskDetail() {
                     </p>
                   </div>
                 )}
-                {userRole === 'leader' && !isClosed(task) && (
+                {can(userRole, 'assign.others') && !isClosed(task) && (
                   <div className="mb-3 rounded-lg p-3" style={{ border: '1px solid var(--tm-border)' }}>
                     <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={TEXT}>
                       <Icon name="bolt" size={14} /> Auto-assign
@@ -387,11 +387,12 @@ export default function TaskDetail() {
                           {r.name}
                           {bandChip(r.band, r.avg_score)}
                           {wipChip(r.wip)}
-                          {!r.qualified && !r.over_wip && <span title="Below the required skill level — can still be assigned as a growth pairing"><Badge accent="rose">below min</Badge></span>}
+                          {r.away && <Badge accent="amber">away until {r.away_until}</Badge>}
+                          {!r.qualified && !r.over_wip && !r.away && <span title="Below the required skill level — can still be assigned as a growth pairing"><Badge accent="rose">below min</Badge></span>}
                         </p>
                         <p className="text-xs italic mt-0.5" style={FAINT}>{r.justification}</p>
                       </div>
-                      {userRole === 'leader' && (
+                      {can(userRole, 'assign.others') && (
                         <Button variant="ghost" className="tm-btn-sm shrink-0"
                           onClick={() => assignStudent(r.student_id, r.name)}
                           disabled={r.over_wip || isClosed(task) || assigning === r.student_id}>
@@ -414,14 +415,14 @@ export default function TaskDetail() {
                   <div key={c.id} className="rounded-lg p-3" style={ROW}>
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <span className="text-xs font-medium" style={MUTED}>{c.author_email}</span>
-                      {c.author_role && <span className="tm-chip !text-[11px] !py-0">{c.author_role}</span>}
+                      {c.author_role && <span className="tm-chip !text-[11px] !py-0">{roleLabel(c.author_role)}</span>}
                       <span className="text-xs ml-auto" style={FAINT}>{new Date(c.created_at).toLocaleString()}</span>
                     </div>
                     <p className="text-sm whitespace-pre-wrap" style={TEXT}>{c.body}</p>
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2">
+              {can(userRole, 'comment') ? <div className="flex gap-2">
                 <Input
                   value={newComment}
                   onChange={e => setNewComment(e.target.value)}
@@ -430,7 +431,7 @@ export default function TaskDetail() {
                   className="flex-1"
                 />
                 <Button onClick={addComment} disabled={!newComment.trim()}>Post</Button>
-              </div>
+              </div> : <p className="text-xs" style={FAINT}>You have view-only access, so you can read comments but not post.</p>}
             </Card>
           </>
         )}

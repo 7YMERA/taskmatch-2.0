@@ -129,7 +129,7 @@ class AutoAssignBody(BaseModel):
 
 class SetRoleBody(BaseModel):
     user_id: str = Field(..., min_length=1)
-    role: str = Field(..., pattern="^(student|leader)$")
+    role: str = Field(..., pattern="^(admin|lead|member|viewer)$")
 
 
 # ─── Global error handling — no raw stack-trace 500s leak to clients ───
@@ -198,14 +198,56 @@ def require_user(authorization):
     return res.user
 
 
-def require_leader(authorization):
-    """Caller must be an authenticated leader. Hiding a button in the UI is not security —
-    this server-side check is the real gate for privileged actions."""
+# ─── Roles and permissions ───
+# Mirrors taskmatch/app/lib/permissions.json (a test keeps the two in step) and supabase/roles.sql.
+# The role lives in the account's app_metadata, which only the service-role key can write.
+# user_metadata is never trusted for this: a signed-in user can edit their own user_metadata.
+
+ROLES = ("admin", "lead", "member", "viewer")
+ROLE_PERMISSIONS = {
+    "tasks.manage":  {"admin", "lead"},
+    "people.manage": {"admin", "lead"},
+    "assign.others": {"admin", "lead"},
+    "insights.view": {"admin", "lead"},
+    "audit.view":    {"admin", "lead"},
+    "team.manage":   {"admin"},
+    "work.self":     {"admin", "lead", "member"},
+    "comment":       {"admin", "lead", "member"},
+    "away.self":     {"admin", "lead", "member"},
+}
+
+
+def role_of(user):
+    """The account's role from app_metadata. Accounts without one are members."""
+    role = (getattr(user, "app_metadata", None) or {}).get("role")
+    return role if role in ROLES else "member"
+
+
+def can(role, permission):
+    return role in ROLE_PERMISSIONS.get(permission, set())
+
+
+def require_permission(authorization, permission):
+    """Caller must be signed in and hold the permission. Hiding a button in the UI is not
+    security; this server-side check is the real gate for privileged actions."""
     user = require_user(authorization)
-    role = (user.user_metadata or {}).get("role", "student")
-    if role != "leader":
-        raise HTTPException(status_code=403, detail="Leader access required")
+    if not can(role_of(user), permission):
+        raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
     return user
+
+
+def require_assignee_or(authorization, student_id, permission="assign.others"):
+    """Caller is the assignee themselves (with work.self) or holds `permission`.
+    Returns (email, role)."""
+    user = require_user(authorization)
+    role = role_of(user)
+    if can(role, permission):
+        return user.email, role
+    if can(role, "work.self"):
+        me = db().table("students").select("id").eq("email", user.email).execute().data
+        if me and me[0]["id"] == student_id:
+            return user.email, role
+    raise HTTPException(status_code=403, detail="You can only change your own assignments.")
 
 
 def require_admin_client():
@@ -224,8 +266,7 @@ def actor_from_token(authorization):
     checks — never read actor_email / actor_role from the request body, since a
     client can forge those. Returns (email, role)."""
     user = require_user(authorization)
-    role = (user.user_metadata or {}).get("role", "student")
-    return user.email, role
+    return user.email, role_of(user)
 
 
 WIP_LIMIT = 3
@@ -368,9 +409,10 @@ def score_candidates(task_id):
     #         qualified float to the top, the rest are ranked below with a reason.
     all_students = (
         db().table("students")
-        .select("id, name, matric, programme")
+        .select("*")   # "*" so this still works before roles.sql adds away_until
         .execute()
     ).data
+    today = str(date.today())
 
     total_required = len(required)
     candidates = []
@@ -378,6 +420,8 @@ def score_candidates(task_id):
         student_id = student["id"]
         skills = student_skill_map.get(student_id, {})
         over_wip = wip_count[student_id] >= WIP_LIMIT
+        away_until = student.get("away_until")
+        away = bool(away_until) and away_until >= today
 
         proficiency_scores = []
         met_count = 0
@@ -398,7 +442,9 @@ def score_candidates(task_id):
         unrated = band == "unrated"
 
         # Why this student appears — fit and/or growth reason.
-        if over_wip:
+        if away:
+            justification = f"Away until {away_until} — not available for new work"
+        elif over_wip:
             justification = "At WIP limit — finish current tasks first"
         elif meets_skills and band == "high":
             justification = "Strong fit — meets all required skills, high performer"
@@ -422,8 +468,10 @@ def score_candidates(task_id):
             "met_count":   met_count,
             "total_required": total_required,
             "wip":         wip_count[student_id],
-            "qualified":   meets_skills and not over_wip,
+            "qualified":   meets_skills and not over_wip and not away,
             "over_wip":    over_wip,
+            "away":        away,
+            "away_until":  away_until if away else None,
             "avg_score":   st["avg_score"],
             "band":        band,
             "unrated":     unrated,
@@ -539,7 +587,7 @@ def pick_assignee(candidates, mode, last_assigned=None, total_assigned=None, act
 def auto_assign(body: AutoAssignBody, authorization: str = Header(None)):
     """Leader picks an assignment mode and the server chooses who gets the task.
     With dry_run the pick is only previewed, so the leader can confirm or override."""
-    require_leader(authorization)
+    require_permission(authorization, "assign.others")
     actor_email, actor_role = actor_from_token(authorization)
 
     rows = (
@@ -652,7 +700,7 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
 def assign(body: AssignBody, authorization: str = Header(None)):
     """Leader assigns a student to a task. Caller must be an authenticated leader;
     the actor recorded in the audit log is taken from the verified token, not the body."""
-    require_leader(authorization)
+    require_permission(authorization, "assign.others")
     actor_email, actor_role = actor_from_token(authorization)
     return _create_assignment(body.task_id, body.student_id,
                               actor_email, actor_role)
@@ -663,8 +711,8 @@ def self_assign(body: SelfAssignBody, authorization: str = Header(None)):
     """A student picks up a task for themselves. The student is resolved from the caller's
     own verified login token — never from the request body — so this can only ever assign
     the caller to their own account, never anyone else."""
-    user = require_user(authorization)
-    role = (user.user_metadata or {}).get("role", "student")
+    user = require_permission(authorization, "work.self")
+    role = role_of(user)
     task_id = body.task_id
 
     srows = db().table("students").select("id, name").eq("email", user.email).execute().data
@@ -677,7 +725,7 @@ def self_assign(body: SelfAssignBody, authorization: str = Header(None)):
 @app.post("/start")
 def start(body: StartBody, authorization: str = Header(None)):
     """Assignee starts their assigned task — the timer begins now (in_progress_at)."""
-    actor_email, actor_role = actor_from_token(authorization)
+    require_user(authorization)
     assignment_id = body.assignment_id
 
     rows = (
@@ -689,6 +737,7 @@ def start(body: StartBody, authorization: str = Header(None)):
     if not rows:
         raise HTTPException(status_code=404, detail="Assignment not found")
     a = rows[0]
+    actor_email, actor_role = require_assignee_or(authorization, a["student_id"])
     if a["status"] == "Completed":
         raise HTTPException(status_code=400, detail="This task is already completed.")
 
@@ -718,6 +767,7 @@ def unassign(body: UnassignBody, authorization: str = Header(None)):
     """Remove a student from a task (undo an assignment). Completed assignments are kept —
     they hold the student's performance record. If removing the last active assignee leaves
     the task with no one working it, roll the task back to 'New'."""
+    require_permission(authorization, "assign.others")
     actor_email, actor_role = actor_from_token(authorization)
     assignment_id = body.assignment_id
 
@@ -766,7 +816,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
     Elapsed defaults to wall-clock (in_progress_at -> now), but a manually
     entered actual_hours overrides it.
     """
-    actor_email, actor_role = actor_from_token(authorization)
+    require_user(authorization)
     assignment_id = body.assignment_id
     actual_hours = body.actual_hours  # optional manual override
 
@@ -779,6 +829,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
     if not rows:
         raise HTTPException(status_code=404, detail="Assignment not found")
     assignment = rows[0]
+    actor_email, actor_role = require_assignee_or(authorization, assignment["student_id"])
     task_id = assignment["task_id"]
 
     completed_at = datetime.now(timezone.utc)
@@ -1059,7 +1110,8 @@ def _account_view(user, roster_emails):
         "id": user.id,
         "email": email,
         "name": meta.get("full_name") or meta.get("name"),
-        "role": meta.get("role", "student"),
+        "role": role_of(user),
+        "last_sign_in_at": str(user.last_sign_in_at) if getattr(user, "last_sign_in_at", None) else None,
         "on_roster": email.lower() in roster_emails,
         "created_at": str(user.created_at) if user.created_at else None,
     }
@@ -1069,8 +1121,8 @@ def _account_view(user, roster_emails):
 def list_accounts(authorization: str = Header(None)):
     """List every signup (login) account, flagged with whether it's already on the
     student roster. Lets a leader attach a roster row to an existing account instead of
-    retyping an email that may not match anyone. Leader-only."""
-    require_leader(authorization)
+    retyping an email that may not match anyone. Needs people.manage."""
+    require_permission(authorization, "people.manage")
     admin_client = require_admin_client()
 
     users = _list_all_users(admin_client)
@@ -1084,43 +1136,39 @@ def list_accounts(authorization: str = Header(None)):
 
 @app.post("/set-role")
 def set_role(body: SetRoleBody, authorization: str = Header(None)):
-    """Promote/demote an account between 'student' and 'leader'. Leader-only, with a guard
-    against demoting the last remaining leader (which would lock everyone out), and every
-    change written to the audit log."""
-    actor = require_leader(authorization)
+    """Change an account's role. Admin-only, with a guard against removing the last admin
+    (which would leave nobody able to manage roles), and every change written to the audit log.
+    The role is stored in app_metadata, which users cannot edit themselves."""
+    actor = require_permission(authorization, "team.manage")
     admin_client = require_admin_client()
 
-    user_id = body.user_id
-    new_role = body.role
-
-    target = admin_client.auth.admin.get_user_by_id(user_id)
+    target = admin_client.auth.admin.get_user_by_id(body.user_id)
     tuser = target.user if target else None
     if not tuser:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    meta = dict(tuser.user_metadata or {})
-    current_role = meta.get("role", "student")
+    current_role = role_of(tuser)
+    new_role = body.role
     if current_role == new_role:
         return {"success": True, "unchanged": True, "role": new_role, "email": tuser.email}
 
-    # Guard: never demote the last leader — that would leave nobody able to manage the project.
-    if current_role == "leader" and new_role == "student":
-        leaders = [u for u in _list_all_users(admin_client)
-                   if (u.user_metadata or {}).get("role") == "leader"]
-        if len(leaders) <= 1:
-            raise HTTPException(status_code=400, detail="Cannot demote the last remaining leader.")
+    if current_role == "admin":
+        admins = [u for u in _list_all_users(admin_client) if role_of(u) == "admin"]
+        if len(admins) <= 1:
+            raise HTTPException(status_code=400, detail="This is the last admin. Make someone else an admin first.")
 
-    # Merge — update_user_by_id replaces user_metadata wholesale, so keep the rest (e.g. full_name).
-    meta["role"] = new_role
-    admin_client.auth.admin.update_user_by_id(user_id, {"user_metadata": meta})
+    # Merge: update_user_by_id replaces app_metadata wholesale, so keep the rest (e.g. provider).
+    app_meta = dict(getattr(tuser, "app_metadata", None) or {})
+    app_meta["role"] = new_role
+    admin_client.auth.admin.update_user_by_id(body.user_id, {"app_metadata": app_meta})
 
     log_activity(
         action="account.role_changed",
         entity_type="account",
-        entity_id=user_id,
+        entity_id=body.user_id,
         summary=f"{tuser.email} role changed: {current_role} → {new_role}",
         actor_email=getattr(actor, "email", None),
-        actor_role="leader",
+        actor_role=role_of(actor),
         details={"target_email": tuser.email, "from": current_role, "to": new_role},
     )
     return {"success": True, "role": new_role, "email": tuser.email}
