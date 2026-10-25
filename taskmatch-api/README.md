@@ -78,13 +78,17 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | GET | `/health` | — | liveness |
 | GET | `/recommend/{task_id}` | user | ranked students for a task |
 | GET | `/recommend-tasks/{student_id}` | user | ranked tasks for a student |
-| POST | `/assign` | leader | assign a student to a task |
-| POST | `/auto-assign` | leader | pick and assign one person by mode: `best_match`, `round_robin` or `least_loaded` (`dry_run: true` previews the pick) |
-| POST | `/self-assign` | user | pick up a task for yourself |
-| POST | `/start` | user | start an assigned task |
-| POST | `/complete` | user | complete + score an assignment |
-| POST | `/unassign` | user | remove an assignment |
+| POST | `/assign` | admin, lead | assign a student to a task |
+| POST | `/auto-assign` | admin, lead | pick and assign one person by mode: `best_match`, `round_robin` or `least_loaded` (`dry_run: true` previews the pick) |
+| POST | `/self-assign` | admin, lead, member | pick up a task for yourself |
+| POST | `/start` | the assignee, or admin/lead | start an assigned task |
+| POST | `/complete` | the assignee, or admin/lead | complete + score an assignment |
+| POST | `/unassign` | admin, lead | remove an assignment |
 | GET | `/wip` | user | work-in-progress status |
 | GET | `/student-stats` | user | per-student performance |
-| GET | `/accounts` | leader | list accounts (needs service-role key) |
-| POST | `/set-role` | leader | promote/demote (needs service-role key) |
+| GET | `/accounts` | admin, lead | list accounts with role and last sign-in (needs service-role key) |
+| POST | `/set-role` | admin | set an account's role: `admin`, `lead`, `member` or `viewer`; refuses to remove the last admin (needs service-role key) |
+
+Roles are read from the account's `app_metadata` (only the service-role key can write it), never from
+`user_metadata`, which users can edit about themselves. The permission table is `ROLE_PERMISSIONS` in
+`main.py`; it matches `taskmatch/app/lib/permissions.json` (a test checks) and `supabase/roles.sql`.

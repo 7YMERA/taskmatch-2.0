@@ -9,7 +9,8 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import PersonQuickView from '../components/PersonQuickView'
-import { effectiveRole } from '../lib/role'
+import { effectiveRole, can, roleLabel } from '../lib/role'
+import { isAway, fmtDay, setAway as saveAway, markAway as askAway } from '../lib/away'
 import { toast, confirmDialog } from '../lib/ui'
 import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, bandAccent } from '../components/ui'
 
@@ -26,7 +27,7 @@ const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Skills-matrix cell shades: one hue, light → dark by level.
 const LEVEL_FILL = ['', 'color-mix(in srgb, var(--tm-chart-1) 40%, var(--tm-surface-1))', 'color-mix(in srgb, var(--tm-chart-1) 62%, var(--tm-surface-1))', 'var(--tm-chart-1)']
 type PeopleView = 'roster' | 'cards' | 'matrix'
-type Avail = 'all' | 'free' | 'room' | 'limit'
+type Avail = 'all' | 'free' | 'room' | 'limit' | 'away'
 type PeopleSort = 'group' | 'name' | 'available' | 'score'
 
 export default function Students() {
@@ -67,7 +68,7 @@ export default function Students() {
     if (q.get('q')) setQuery(q.get('q')!)
     if (q.get('skill')) setSkillFilter(q.get('skill')!)
     if (['1', '2', '3'].includes(q.get('level') || '')) setMinLevel(Number(q.get('level')))
-    if (['free', 'room', 'limit'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
+    if (['free', 'room', 'limit', 'away'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
     if (['matrix', 'cards'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
     if (q.get('open')) setQuickId(q.get('open'))
     if (['name', 'available', 'score'].includes(q.get('sort') || '')) setSort(q.get('sort') as PeopleSort)
@@ -90,7 +91,7 @@ export default function Students() {
       const role = effectiveRole(session)
       setUserRole(role)
       setUserEmail(session.user.email || '')
-      if (role === 'leader') fetchAccounts()   // account list + role controls are leader-only
+      if (can(role, 'people.manage')) fetchAccounts()   // account list is for people managers
     })
     fetchStudents()
     fetchSkills()
@@ -116,22 +117,6 @@ export default function Students() {
       setAccounts(res.data.accounts || [])
     } catch {
       // Not a leader, or the server has no admin key configured — the feature just stays hidden.
-    }
-  }
-
-  const changeRole = async (acct: any, newRole: 'leader' | 'student') => {
-    const promoting = newRole === 'leader'
-    const msg = promoting
-      ? `Make ${acct.email} a leader?\n\nLeaders can add/remove students, manage tasks, change roles, and view the activity log.`
-      : `Revoke leader from ${acct.email}?\n\nThey become a regular student and lose access to management tools.`
-    if (!(await confirmDialog({ message: msg, confirmLabel: promoting ? 'Make leader' : 'Revoke', danger: !promoting }))) return
-    try {
-      const headers = await authHeaders()
-      await axios.post(`${API}/set-role`, { user_id: acct.id, role: newRole }, { headers })
-      await fetchAccounts()
-      toast(`${acct.email} is now a ${newRole}.`, 'success')
-    } catch (e: any) {
-      toast(e?.response?.data?.detail || 'Could not change the role. Check the API is running and configured.', 'error')
     }
   }
 
@@ -304,6 +289,7 @@ export default function Students() {
   const openQuick = (e: React.MouseEvent, id: string) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); setQuickId(id) }
   const availability = (s: any) => {
     const at = wip[s.id]?.active_tasks || []
+    if (isAway(s)) return <span className="text-[11px] flex items-center gap-1.5" style={MUTED}><Icon name="clock" size={11} /> Away until {fmtDay(s.away_until)}</span>
     return at.length === 0
       ? <span className="text-[11px] flex items-center gap-1.5" style={FAINT}><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Available · no active tasks</span>
       : <span className="text-[11px] truncate" style={MUTED}>On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
@@ -361,8 +347,9 @@ export default function Students() {
       || (s.email || '').toLowerCase().includes(needle)
       || (s.student_skills || []).some((ss: any) => (ss.skills?.skill_name || '').toLowerCase().includes(needle)))) return false
     if (skillFilter && levelOf(s, skillFilter) < minLevel) return false
-    if (avail === 'free' && wipOf(s) > 0) return false
-    if (avail === 'room' && wipOf(s) >= wipLimit) return false
+    if (avail === 'free' && (wipOf(s) > 0 || isAway(s))) return false
+    if (avail === 'room' && (wipOf(s) >= wipLimit || isAway(s))) return false
+    if (avail === 'away' && !isAway(s)) return false
     if (avail === 'limit' && wipOf(s) < wipLimit) return false
     return true
   })
@@ -377,7 +364,8 @@ export default function Students() {
     return (a.name || '').localeCompare(b.name || '')
   })
   const peopleFiltersOn = needle !== '' || !!skillFilter || avail !== 'all'
-  const freeCount = students.filter(s => wip[s.id] && wipOf(s) === 0).length
+  const freeCount = students.filter(s => wip[s.id] && wipOf(s) === 0 && !isAway(s)).length
+  const awayCount = students.filter(isAway).length
   const limitCount = students.filter(s => wipOf(s) >= wipLimit).length
   // Matrix columns: skills anyone holds, most widely held first.
   const heldSkills = skills
@@ -392,12 +380,12 @@ export default function Students() {
       <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="tm-page-title">Students</h1>
+            <h1 className="tm-page-title">People</h1>
             <p className="text-xs mt-1" style={FAINT}>
-              {loading ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit`}
+              {loading ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit${awayCount ? ` · ${awayCount} away` : ''}`}
             </p>
           </div>
-          {userRole === 'leader' && (
+          {can(userRole, 'people.manage') && (
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
                 <Icon name="users" size={16} /> Create group
@@ -410,7 +398,7 @@ export default function Students() {
         </div>
 
         {/* Create group form — leader only */}
-        {showGroupForm && userRole === 'leader' && (
+        {showGroupForm && can(userRole, 'people.manage') && (
           <Card tint="violet" className="p-5 mb-6 tm-fade-up">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
@@ -491,7 +479,7 @@ export default function Students() {
         )}
 
         {/* Add student form — leader only */}
-        {showForm && userRole === 'leader' && (
+        {showForm && can(userRole, 'people.manage') && (
           <Card className="p-5 mb-6 tm-fade-up">
             <p className="text-sm font-medium mb-4" style={TEXT}>New student</p>
 
@@ -535,7 +523,7 @@ export default function Students() {
                     <option value="">Select an account…</option>
                     {unassignedAccounts.map(a => (
                       <option key={a.id} value={a.id}>
-                        {a.email}{a.name ? ` — ${a.name}` : ''}{a.role === 'leader' ? ' (leader)' : ''}
+                        {a.email}{a.name ? ` — ${a.name}` : ''}{a.role !== 'member' ? ` (${roleLabel(a.role)})` : ''}
                       </option>
                     ))}
                   </select>
@@ -628,6 +616,7 @@ export default function Students() {
               <option value="free">Free (no active tasks)</option>
               <option value="room">Has room (under {wipLimit})</option>
               <option value="limit">At limit</option>
+              <option value="away">Away</option>
             </select>
           </div>
           {view === 'roster' && (
@@ -637,7 +626,7 @@ export default function Students() {
                 <option value="group">By group</option>
                 <option value="name">Name</option>
                 <option value="available">Most available</option>
-                {userRole === 'leader' && <option value="score">Highest score</option>}
+                {can(userRole, 'insights.view') && <option value="score">Highest score</option>}
               </select>
             </div>
           )}
@@ -729,7 +718,7 @@ export default function Students() {
             <p className="text-sm font-medium" style={TEXT}>
               Team roster <span style={FAINT}>({shownStudents.length}{shownStudents.length !== students.length ? ` of ${students.length}` : ''})</span>
             </p>
-            {userRole === 'leader' && groupFilter !== 'all' && groupFilter !== '__none__' && (
+            {can(userRole, 'people.manage') && groupFilter !== 'all' && groupFilter !== '__none__' && (
               <div className="flex gap-2">
                 <Button variant="ghost" className="tm-btn-sm"
                   onClick={() => { setGroupForm({ name: groupFilter, color: groupColor(groupFilter), members: [] }); setShowGroupForm(true); setShowForm(false) }}>
@@ -749,7 +738,7 @@ export default function Students() {
           ) : shownStudents.length === 0 ? (
             <EmptyState icon={<Icon name="users" size={28} />}
               title={students.length === 0 ? 'No students yet' : peopleFiltersOn ? 'Nobody matches these filters' : 'No students in this group'}
-              hint={students.length === 0 && userRole === 'leader' ? 'Add your first student to start matching them to tasks.' : undefined} />
+              hint={students.length === 0 && can(userRole, 'people.manage') ? 'Add your first student to start matching them to tasks.' : undefined} />
           ) : view === 'cards' ? (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {shownStudents.map(s => {
@@ -783,7 +772,7 @@ export default function Students() {
                       ))}
                       {(s.student_skills || []).length > 4 && <span className="text-[11px]" style={FAINT}>+{(s.student_skills || []).length - 4} more skills</span>}
                     </div>
-                    {userRole === 'leader' && st && (
+                    {can(userRole, 'insights.view') && st && (
                       <p className="text-[11px] mt-auto pt-2 flex items-center gap-1.5" style={{ ...FAINT, borderTop: '1px solid var(--tm-border)' }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.band === 'unrated' ? 'var(--tm-text-faint)' : `var(--tm-${bandAccent(st.band)})` }} />
                         {st.band === 'unrated' ? 'Not rated yet' : `Avg score ${Number(st.avg_score).toFixed(2)} · ${st.completed_count} finished`}
@@ -810,10 +799,10 @@ export default function Students() {
                       <div className="flex items-center gap-2">
                         {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
                         <Link href={`/students/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full profile)">{s.name}</Link>
-                        {userRole === 'leader' && (() => {
+                        {can(userRole, 'people.manage') && (() => {
                           const acct = accountFor(s)
                           if (!acct) return <span className="text-[11px] shrink-0" style={FAINT} title="No login account linked to this roster row">no login</span>
-                          if (acct.role === 'leader') return <Badge accent="indigo" className="shrink-0 !text-[11px] !py-0">leader</Badge>
+                          if (acct.role !== 'member') return <Badge accent="indigo" className="shrink-0 !text-[11px] !py-0">{roleLabel(acct.role)}</Badge>
                           return null
                         })()}
                       </div>
@@ -835,6 +824,7 @@ export default function Students() {
                       </div>
                       {(() => {
                         const at = wip[s.id]?.active_tasks || []
+                        if (isAway(s)) return <span className="text-[11px] flex items-center gap-1.5" style={MUTED}><Icon name="clock" size={11} /> Away until {fmtDay(s.away_until)}</span>
                         return at.length === 0
                           ? <span className="text-[11px] flex items-center gap-1.5" style={FAINT}><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Available · no active tasks</span>
                           : <span className="text-[11px] truncate" style={MUTED}>On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
@@ -843,7 +833,7 @@ export default function Students() {
 
                     {/* Rating + WIP — own line on phones, inline on wider screens */}
                     <div className="order-last md:order-none basis-full md:basis-auto flex items-center gap-4 shrink-0 pl-16 md:pl-0">
-                      {userRole === 'leader' && stats[s.id] && (() => {
+                      {can(userRole, 'insights.view') && stats[s.id] && (() => {
                         const st = stats[s.id]
                         const color = st.band === 'unrated' ? 'var(--tm-text-faint)' : `var(--tm-${bandAccent(st.band)})`
                         return (
@@ -857,7 +847,7 @@ export default function Students() {
                       {wipMeter(s.id)}
                     </div>
 
-                    {userRole === 'leader' && (
+                    {can(userRole, 'people.manage') && (
                       <div className="relative shrink-0">
                         <button onClick={() => setMenuOpen(menuOpen === s.id ? null : s.id)}
                           aria-label="Student actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
@@ -869,13 +859,10 @@ export default function Students() {
                             <div className="tm-menu absolute right-0 top-full mt-1 z-20 w-48">
                               <Link href={`/students/${s.id}`} className="tm-menu-item"><Icon name="user" size={13} /> See profile</Link>
                               <button onClick={() => { setMenuOpen(null); startEditing(s) }} className="tm-menu-item"><Icon name="star" size={13} /> Edit skills &amp; photo</button>
-                              {(() => {
-                                const acct = accountFor(s)
-                                if (!acct) return null
-                                return acct.role === 'leader'
-                                  ? <button onClick={() => { setMenuOpen(null); changeRole(acct, 'student') }} className="tm-menu-item"><Icon name="shield" size={13} /> Revoke leader</button>
-                                  : <button onClick={() => { setMenuOpen(null); changeRole(acct, 'leader') }} className="tm-menu-item"><Icon name="shield" size={13} /> Make leader</button>
-                              })()}
+                              {isAway(s)
+                                ? <button onClick={() => { setMenuOpen(null); saveAway(s, null).then(ok => { if (ok) fetchStudents() }) }} className="tm-menu-item"><Icon name="check" size={13} /> Mark as back</button>
+                                : <button onClick={() => { setMenuOpen(null); askAway(s).then(ok => { if (ok) fetchStudents() }) }} className="tm-menu-item"><Icon name="clock" size={13} /> Mark as away</button>}
+                              {can(userRole, 'team.manage') && accountFor(s) && <Link href="/team" className="tm-menu-item"><Icon name="shield" size={13} /> Change role</Link>}
                               {s.group_label && <button onClick={() => { setMenuOpen(null); removeFromGroup(s.id, s.name, s.group_label) }} className="tm-menu-item" style={{ color: 'var(--tm-amber)' }}><Icon name="users" size={13} /> Remove from group</button>}
                               <div className="my-1 h-px" style={{ background: 'var(--tm-border)' }} />
                               <button onClick={() => { setMenuOpen(null); removeStudent(s.id, s.name) }} className="tm-menu-item" style={{ color: 'var(--tm-rose)' }}><Icon name="trash" size={13} /> Remove from project</button>
@@ -887,7 +874,7 @@ export default function Students() {
                   </div>
 
                   {/* Edit panel — leader only */}
-                  {editingStudent === s.id && userRole === 'leader' && (
+                  {editingStudent === s.id && can(userRole, 'people.manage') && (
                     <div className="mx-4 mb-4 pt-3" style={{ borderTop: '1px solid var(--tm-border)' }}>
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-xs" style={MUTED}>Edit skills for {s.name}</p>
@@ -912,7 +899,7 @@ export default function Students() {
           )}
         </Card>
         <PersonQuickView person={students.find(x => x.id === quickId) || null} wip={quickId ? wip[quickId] : undefined} wipLimit={wipLimit}
-          stat={quickId ? stats[quickId] : undefined} showScores={userRole === 'leader'} groupColor={groupColor} onClose={() => setQuickId(null)} />
+          stat={quickId ? stats[quickId] : undefined} showScores={can(userRole, 'insights.view')} groupColor={groupColor} onClose={() => setQuickId(null)} />
       </main>
     </div>
   )

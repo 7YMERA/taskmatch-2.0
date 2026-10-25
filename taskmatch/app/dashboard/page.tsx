@@ -169,7 +169,7 @@ export default function Dashboard() {
   ]
   const severityData = SEV.map(s => ({ ...s, value: tasks.filter(t => (t.severity || 'Medium') === s.label).length })).filter(s => s.value > 0)
 
-  const isLeader = userRole === 'leader'
+  const isLeader = userRole !== '' && userRole !== 'member'   // admins, leads and viewers get the team dashboard
 
   // ── Leader analytics for the chosen range (definitions live in lib/analytics.ts) ──
   const rangeDays = RANGES.find(r => r.key === range)!.days
