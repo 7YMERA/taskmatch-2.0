@@ -21,7 +21,7 @@ const CATEGORIES: Record<string, { label: string; color: string }> = {
   account: { label: 'Accounts & roles', color: 'var(--tm-chart-4)' },
   group: { label: 'Groups', color: 'var(--tm-chart-6)' },
   comment: { label: 'Comments', color: 'var(--tm-chart-6)' },
-  ai: { label: 'AI suggestions', color: 'var(--tm-violet)' },
+  suggestion: { label: 'Suggestions', color: 'var(--tm-violet)' },
 }
 const categoryOf = (action: string) => {
   const c = (action || '').split('.')[0]

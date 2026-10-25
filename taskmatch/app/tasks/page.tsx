@@ -49,7 +49,7 @@ export default function Tasks() {
   const [skills, setSkills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string>('')
-  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
+  const [suggestEngine, setSuggestEngine] = useState<'claude' | 'history' | null>(null)
   const [aiReview, setAiReview] = useState<AIReview | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -102,12 +102,13 @@ export default function Tasks() {
     fetchGroups()
   }, [])
 
-  // Is AI assist switched on for this server? (Only asked by people who can create tasks.)
+  // Which suggestion engine the API runs: Claude, or the built-in one. (Only asked by people who
+  // can create tasks; an older API without the endpoint just hides the panel.)
   useEffect(() => {
-    if (!can(userRole, 'tasks.manage') || aiEnabled !== null) return
+    if (!can(userRole, 'tasks.manage') || suggestEngine !== null) return
     authHeaders().then(headers => axios.get(`${API}/ai/status`, { headers }))
-      .then(res => setAiEnabled(!!res.data.enabled))
-      .catch(() => setAiEnabled(false))
+      .then(res => setSuggestEngine(res.data.engine === 'claude' ? 'claude' : 'history'))
+      .catch(() => setSuggestEngine(null))
   }, [userRole])
 
   // Keep the address bar in step with the filters (defaults are left out to keep links short).
@@ -240,8 +241,8 @@ export default function Tasks() {
       const used = aiItems.filter(i => i.decision === 'accepted')
       const byConf = (['high', 'medium', 'low'] as const).map(c => [c, used.filter(i => i.confidence === c).length] as const).filter(([, n]) => n)
       await logActivity({
-        action: 'ai.suggestions_reviewed', entity_type: 'task', entity_id: data.id,
-        summary: `Used ${used.length} of ${aiItems.length} reviewed AI suggestion${aiItems.length === 1 ? '' : 's'} for '${form.description}'${byConf.length ? ` (${byConf.map(([c, n]) => `${n} ${c}`).join(', ')} confidence)` : ''}`,
+        action: 'suggestion.reviewed', entity_type: 'task', entity_id: data.id,
+        summary: `Used ${used.length} of ${aiItems.length} reviewed ${aiReview?.model === 'history' ? 'built-in' : 'AI'} suggestion${aiItems.length === 1 ? '' : 's'} for '${form.description}'${byConf.length ? ` (${byConf.map(([c, n]) => `${n} ${c}`).join(', ')} confidence)` : ''}`,
         details: { model: aiReview?.model, accepted: used, dismissed: aiItems.filter(i => i.decision === 'dismissed') },
       })
     }
@@ -507,7 +508,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                   onChange={e => setForm({ ...form, description: e.target.value })}
                 />
               </Field>
-              <AISuggest description={form.description} enabled={aiEnabled} canConfigure={can(userRole, 'team.manage')}
+              <AISuggest description={form.description} engine={suggestEngine} canConfigure={can(userRole, 'team.manage')}
                 onSkill={(skill_id, min_proficiency) => setTaskSkills(prev => prev.some(x => x.skill_id === skill_id)
                   ? prev.map(x => x.skill_id === skill_id ? { ...x, min_proficiency } : x)
                   : [...prev, { skill_id, min_proficiency }])}
