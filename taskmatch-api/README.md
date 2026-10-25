@@ -79,6 +79,7 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | GET | `/recommend/{task_id}` | user | ranked students for a task |
 | GET | `/recommend-tasks/{student_id}` | user | ranked tasks for a student |
 | POST | `/assign` | leader | assign a student to a task |
+| POST | `/auto-assign` | leader | pick and assign one person by mode: `best_match`, `round_robin` or `least_loaded` (`dry_run: true` previews the pick) |
 | POST | `/self-assign` | user | pick up a task for yourself |
 | POST | `/start` | user | start an assigned task |
 | POST | `/complete` | user | complete + score an assignment |
