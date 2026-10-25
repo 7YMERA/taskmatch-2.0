@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 main = importlib.import_module("main")
 
 
-READ_ENDPOINTS = ["/recommend/t1", "/recommend-tasks/s1", "/wip", "/student-stats"]
+READ_ENDPOINTS = ["/recommend/t1", "/recommend-tasks/s1", "/wip", "/student-stats", "/people/insights"]
 
 
 # ─── A tiny stand-in for the Supabase client ───
