@@ -186,7 +186,9 @@ one with an invite link.
 
 Optional: run [`supabase/demo-data.sql`](supabase/demo-data.sql) to make a fresh install look lived
 in. It names the workspace, adds projects and files your tasks into them, gives open tasks to the
-best-matching people, and adds a second workspace so the switcher has somewhere to go.
+best-matching people, and adds a second workspace so the switcher has somewhere to go. Then run
+[`supabase/demo-data-more.sql`](supabase/demo-data-more.sql) for a fuller task list: about 50 more
+tasks, two months of finished work for the dashboard trends, and comments.
 
 ### 3. The frontend
 
