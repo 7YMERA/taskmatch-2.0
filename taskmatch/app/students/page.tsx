@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
@@ -21,6 +21,12 @@ const TEXT = { color: 'var(--tm-text)' }
 const MUTED = { color: 'var(--tm-text-muted)' }
 const FAINT = { color: 'var(--tm-text-faint)' }
 const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
+const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
+// Skills-matrix cell shades: one hue, light → dark by level.
+const LEVEL_FILL = ['', 'color-mix(in srgb, var(--tm-chart-1) 40%, var(--tm-surface-1))', 'color-mix(in srgb, var(--tm-chart-1) 62%, var(--tm-surface-1))', 'var(--tm-chart-1)']
+type PeopleView = 'roster' | 'matrix'
+type Avail = 'all' | 'free' | 'room' | 'limit'
+type PeopleSort = 'group' | 'name' | 'available' | 'score'
 
 export default function Students() {
   const router = useRouter()
@@ -45,6 +51,34 @@ export default function Students() {
   const [groups, setGroups] = useState<any[]>([])
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupForm, setGroupForm] = useState<{ name: string, color: string, members: string[] }>({ name: '', color: GROUP_COLORS[0], members: [] })
+  const [view, setView] = useState<PeopleView>('roster')
+  const [query, setQuery] = useState('')
+  const [skillFilter, setSkillFilter] = useState('')
+  const [minLevel, setMinLevel] = useState(1)
+  const [avail, setAvail] = useState<Avail>('all')
+  const [sort, setSort] = useState<PeopleSort>('group')
+  const urlReady = useRef(false)
+
+  // Search, filters and layout live in the URL so a slice like "React, Intermediate+, free" can be shared.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('q')) setQuery(q.get('q')!)
+    if (q.get('skill')) setSkillFilter(q.get('skill')!)
+    if (['1', '2', '3'].includes(q.get('level') || '')) setMinLevel(Number(q.get('level')))
+    if (['free', 'room', 'limit'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
+    if (q.get('view') === 'matrix') setView('matrix')
+    if (['name', 'available', 'score'].includes(q.get('sort') || '')) setSort(q.get('sort') as PeopleSort)
+    if (q.get('group')) setGroupFilter(q.get('group')!)
+    urlReady.current = true
+  }, [])
+  useEffect(() => {
+    if (!urlReady.current) return
+    const u = new URL(window.location.href)
+    const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
+    set('q', query.trim(), ''); set('skill', skillFilter, ''); set('level', skillFilter ? String(minLevel) : '', '')
+    set('avail', avail, 'all'); set('view', view, 'roster'); set('sort', sort, 'group'); set('group', groupFilter, 'all')
+    window.history.replaceState(null, '', u)
+  }, [query, skillFilter, minLevel, avail, view, sort, groupFilter])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -307,12 +341,38 @@ export default function Students() {
       ? students.filter(s => !s.group_label)
       : students.filter(s => s.group_label === groupFilter)
 
-  // Clustered: newest group block on top, then by name within each group.
-  const shownStudents = filteredStudents.slice().sort((a, b) => {
+  const levelOf = (s: any, skillId: string) => (s.student_skills || []).find((ss: any) => ss.skill_id === skillId)?.proficiency || 0
+  const wipOf = (s: any) => wip[s.id]?.wip ?? 0
+  const needle = query.trim().toLowerCase()
+  const searched = filteredStudents.filter(s => {
+    if (needle && !((s.name || '').toLowerCase().includes(needle)
+      || (s.matric || '').toLowerCase().includes(needle)
+      || (s.email || '').toLowerCase().includes(needle)
+      || (s.student_skills || []).some((ss: any) => (ss.skills?.skill_name || '').toLowerCase().includes(needle)))) return false
+    if (skillFilter && levelOf(s, skillFilter) < minLevel) return false
+    if (avail === 'free' && wipOf(s) > 0) return false
+    if (avail === 'room' && wipOf(s) >= wipLimit) return false
+    if (avail === 'limit' && wipOf(s) < wipLimit) return false
+    return true
+  })
+
+  // Default: clustered, newest group block on top, then by name within each group.
+  const shownStudents = searched.slice().sort((a, b) => {
+    if (sort === 'name') return (a.name || '').localeCompare(b.name || '')
+    if (sort === 'available') return wipOf(a) - wipOf(b) || (skillFilter ? levelOf(b, skillFilter) - levelOf(a, skillFilter) : 0) || (a.name || '').localeCompare(b.name || '')
+    if (sort === 'score') return (stats[b.id]?.avg_score ?? -1) - (stats[a.id]?.avg_score ?? -1) || (a.name || '').localeCompare(b.name || '')
     const ra = groupRank(a.group_label), rb = groupRank(b.group_label)
     if (ra !== rb) return ra - rb
     return (a.name || '').localeCompare(b.name || '')
   })
+  const peopleFiltersOn = needle !== '' || !!skillFilter || avail !== 'all'
+  const freeCount = students.filter(s => wip[s.id] && wipOf(s) === 0).length
+  const limitCount = students.filter(s => wipOf(s) >= wipLimit).length
+  // Matrix columns: skills anyone holds, most widely held first.
+  const heldSkills = skills
+    .map(sk => ({ ...sk, holders: students.filter(s => levelOf(s, sk.id) > 0).length }))
+    .filter(sk => sk.holders > 0 || sk.id === skillFilter)
+    .sort((a, b) => (a.id === skillFilter ? -1 : b.id === skillFilter ? 1 : 0) || b.holders - a.holders || a.skill_name.localeCompare(b.skill_name))
 
   return (
     <div className="flex min-h-screen">
@@ -322,7 +382,9 @@ export default function Students() {
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <h1 className="tm-page-title">Students</h1>
-            <p className="text-xs mt-1" style={FAINT}>Your team roster, skills and current workload</p>
+            <p className="text-xs mt-1" style={FAINT}>
+              {loading ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit`}
+            </p>
           </div>
           {userRole === 'leader' && (
             <div className="flex gap-2">
@@ -521,6 +583,58 @@ export default function Students() {
           </Card>
         )}
 
+        {/* Toolbar: search, layout */}
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="relative flex-1 min-w-[14rem] max-w-md">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={FAINT}><Icon name="search" size={15} /></span>
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, matric, email or skill…" className="!pl-9" aria-label="Search people" />
+          </div>
+          <div className="tm-seg" aria-label="Layout">
+            {([['roster', 'Roster', 'list'], ['matrix', 'Skills matrix', 'grid']] as const).map(([k, label, icon]) => (
+              <button key={k} onClick={() => setView(k)} aria-pressed={view === k}><Icon name={icon} size={14} /> {label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* "Who knows X and is free?" — skill + level + availability */}
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={FAINT}>Knows</span>
+            <select value={skillFilter} onChange={e => setSkillFilter(e.target.value)} className="tm-select-sm max-w-[12rem]">
+              <option value="">Any skill</option>
+              {[...skills].sort((a, b) => a.skill_name.localeCompare(b.skill_name)).map(sk => <option key={sk.id} value={sk.id}>{sk.skill_name}</option>)}
+            </select>
+            {skillFilter && (
+              <select value={minLevel} onChange={e => setMinLevel(Number(e.target.value))} className="tm-select-sm" aria-label="Minimum level">
+                {[1, 2, 3].map(l => <option key={l} value={l}>{LEVELS[l]}+</option>)}
+              </select>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={FAINT}>Availability</span>
+            <select value={avail} onChange={e => setAvail(e.target.value as Avail)} className="tm-select-sm">
+              <option value="all">Anyone</option>
+              <option value="free">Free (no active tasks)</option>
+              <option value="room">Has room (under {wipLimit})</option>
+              <option value="limit">At limit</option>
+            </select>
+          </div>
+          {view === 'roster' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={FAINT}>Sort</span>
+              <select value={sort} onChange={e => setSort(e.target.value as PeopleSort)} className="tm-select-sm">
+                <option value="group">By group</option>
+                <option value="name">Name</option>
+                <option value="available">Most available</option>
+                {userRole === 'leader' && <option value="score">Highest score</option>}
+              </select>
+            </div>
+          )}
+          {peopleFiltersOn && (
+            <button onClick={() => { setQuery(''); setSkillFilter(''); setMinLevel(1); setAvail('all') }} className="text-xs hover:underline ml-auto" style={FAINT}>Clear filters</button>
+          )}
+        </div>
+
         {/* Group filter — a compact dropdown so a long group list stays tidy */}
         <div className="flex gap-2 mb-4 items-center">
           <span className="text-xs" style={FAINT}>Group</span>
@@ -536,11 +650,73 @@ export default function Students() {
           </select>
         </div>
 
+        {view === 'matrix' && (
+          <Card className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div>
+                <p className="text-sm font-medium" style={TEXT}>Skills matrix <span style={FAINT}>({shownStudents.length} {shownStudents.length === 1 ? 'person' : 'people'} × {heldSkills.length} skills)</span></p>
+                <p className="text-xs mt-0.5" style={FAINT}>Darker = higher level. Busiest people are marked so you can see who is actually free.</p>
+              </div>
+              <div className="flex items-center gap-3 text-xs" style={MUTED}>
+                {[1, 2, 3].map(l => (
+                  <span key={l} className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: LEVEL_FILL[l] }} />{LEVELS[l]}</span>
+                ))}
+              </div>
+            </div>
+            {loading ? <Skeleton style={{ height: 240 }} />
+              : shownStudents.length === 0 ? <EmptyState icon={<Icon name="users" size={28} />} title="Nobody matches these filters" hint="Try a lower level, another skill, or clear the filters." />
+              : (
+                <div className="overflow-x-auto -mx-1">
+                  <table className="border-separate text-xs" style={{ borderSpacing: 3 }}>
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-10 text-left font-normal pr-3 align-bottom" style={{ background: 'var(--tm-surface-1)', ...FAINT }}>Person</th>
+                        <th className="font-normal px-1 align-bottom text-left" style={FAINT}>Load</th>
+                        {heldSkills.map(sk => (
+                          <th key={sk.id} className="font-normal align-bottom h-28 w-8 p-0">
+                            <button onClick={() => setSkillFilter(skillFilter === sk.id ? '' : sk.id)} title={`${sk.skill_name}: ${sk.holders} ${sk.holders === 1 ? 'person' : 'people'} · click to filter`}
+                              className="block mx-auto whitespace-nowrap hover:underline"
+                              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: sk.id === skillFilter ? 'var(--tm-primary-text)' : 'var(--tm-text-muted)', fontWeight: sk.id === skillFilter ? 600 : 400 }}>
+                              {sk.skill_name}
+                            </button>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shownStudents.map(s => (
+                        <tr key={s.id}>
+                          <td className="sticky left-0 z-10 pr-3 whitespace-nowrap" style={{ background: 'var(--tm-surface-1)' }}>
+                            <Link href={`/students/${s.id}`} className="hover:underline flex items-center gap-2" style={TEXT}>
+                              {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
+                              {s.name}
+                            </Link>
+                          </td>
+                          <td className="px-1">{wipMeter(s.id)}</td>
+                          {heldSkills.map(sk => {
+                            const l = levelOf(s, sk.id)
+                            return (
+                              <td key={sk.id} title={`${s.name} · ${sk.skill_name}: ${l ? LEVELS[l] : 'none'}`}
+                                className="w-8 h-8 rounded-[4px] text-center text-[10px] font-medium"
+                                style={{ background: l ? LEVEL_FILL[l] : 'var(--tm-track)', color: l === 3 ? '#fff' : 'var(--tm-text-muted)', outline: sk.id === skillFilter ? '1px solid var(--tm-primary)' : undefined }}>
+                                {l ? LEVELS[l][0] : ''}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          </Card>
+        )}
+
         {/* Students list */}
-        <Card className="p-5">
+        <Card className={`p-5 ${view === 'matrix' ? 'hidden' : ''}`}>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <p className="text-sm font-medium" style={TEXT}>
-              Team roster <span style={FAINT}>({shownStudents.length}{groupFilter !== 'all' ? ` of ${students.length}` : ''})</span>
+              Team roster <span style={FAINT}>({shownStudents.length}{shownStudents.length !== students.length ? ` of ${students.length}` : ''})</span>
             </p>
             {userRole === 'leader' && groupFilter !== 'all' && groupFilter !== '__none__' && (
               <div className="flex gap-2">
@@ -561,7 +737,7 @@ export default function Students() {
             </div>
           ) : shownStudents.length === 0 ? (
             <EmptyState icon={<Icon name="users" size={28} />}
-              title={students.length === 0 ? 'No students yet' : 'No students in this group'}
+              title={students.length === 0 ? 'No students yet' : peopleFiltersOn ? 'Nobody matches these filters' : 'No students in this group'}
               hint={students.length === 0 && userRole === 'leader' ? 'Add your first student to start matching them to tasks.' : undefined} />
           ) : (
             <div className="flex flex-col gap-3">
@@ -595,9 +771,12 @@ export default function Students() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {(s.student_skills || []).length === 0 ? (
                           <span className="text-xs" style={FAINT}>No skills declared</span>
-                        ) : (s.student_skills || []).slice(0, 5).map((ss: any) => (
-                          <span key={ss.skill_id} className="tm-chip">{ss.skills?.skill_name}</span>
-                        ))}
+                        ) : [...(s.student_skills || [])]
+                          // The skill being searched for goes first, highlighted with its level.
+                          .sort((a: any, b: any) => Number(b.skill_id === skillFilter) - Number(a.skill_id === skillFilter))
+                          .slice(0, 5).map((ss: any) => ss.skill_id === skillFilter
+                            ? <span key={ss.skill_id} className="tm-chip" style={{ borderColor: 'var(--tm-primary)', background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{ss.skills?.skill_name} · {LEVELS[ss.proficiency]}</span>
+                            : <span key={ss.skill_id} className="tm-chip">{ss.skills?.skill_name}</span>)}
                         {(s.student_skills || []).length > 5 && <span className="text-[11px]" style={FAINT}>+{(s.student_skills || []).length - 5}</span>}
                       </div>
                       {(() => {
