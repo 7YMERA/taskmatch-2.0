@@ -37,7 +37,7 @@ export default function SignUp() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role: 'student', full_name: name } },
+      options: { data: { full_name: name } },  // role is set server-side (app_metadata); new accounts are members
     })
     if (error) {
       setError(error.message)

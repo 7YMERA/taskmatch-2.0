@@ -8,7 +8,8 @@ import Link from 'next/link'
 import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
-import { effectiveRole } from '../lib/role'
+import { effectiveRole, realRole, roleLabel, can } from '../lib/role'
+import { isAway, fmtDay, setAway, markAway } from '../lib/away'
 import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { Card, Badge, Button, Icon, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
@@ -25,6 +26,7 @@ export default function Profile() {
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string>('')
   const [userRole, setUserRole] = useState<string>('')
+  const [myRole, setMyRole] = useState<string>('member')
   const [student, setStudent] = useState<any>(null)
   const [skills, setSkills] = useState<any[]>([])
   const [mySkills, setMySkills] = useState<{ skill_id: string, proficiency: number }[]>([])
@@ -43,6 +45,7 @@ export default function Profile() {
     if (!session) { router.push('/login'); return }
     setUserEmail(session.user.email || '')
     setUserRole(effectiveRole(session))
+    setMyRole(realRole(session))
 
     const { data: skillData } = await supabase.from('skills').select('*')
     setSkills(skillData || [])
@@ -248,6 +251,16 @@ export default function Profile() {
                   <p className="text-xs mt-0.5" style={FAINT}>
                     {student.matric} · {student.programme} · Year {student.year}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <Badge accent="indigo" className="!text-[11px] !py-0">{roleLabel(myRole)}</Badge>
+                    {isAway(student) && <Badge accent="amber" className="!text-[11px] !py-0"><Icon name="clock" size={11} /> Away until {fmtDay(student.away_until)}</Badge>}
+                    {can(myRole, 'away.self') && (isAway(student)
+                      ? <button className="tm-btn tm-btn-ghost tm-btn-sm" onClick={async () => { if (await setAway(student, null, true)) setStudent({ ...student, away_until: null }) }}>I&apos;m back</button>
+                      : <button className="tm-btn tm-btn-ghost tm-btn-sm" onClick={async () => {
+                          const ok = await markAway(student, true)
+                          if (ok) { const { data } = await supabase.from('students').select('away_until').eq('id', student.id).maybeSingle(); setStudent({ ...student, away_until: data?.away_until ?? null }) }
+                        }}><Icon name="clock" size={13} /> Set away</button>)}
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-semibold tabular-nums" style={{ color: wip >= 3 ? 'var(--tm-amber)' : 'var(--tm-text)' }}>

@@ -4,7 +4,9 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 1c turns My Tasks into a personal focus page and adds side-panel
+> **Latest:** Phase 2 adds roles (admin, team lead, member, viewer), a Team & roles page,
+> an audit trail and an away status: see [PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md).
+> Phase 1c turns My Tasks into a personal focus page and adds side-panel
 > quick views to Tasks and People: see [PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md).
 > Phase 1b rebuilds the Tasks and People pages (board and calendar
 > views, saved views, bulk actions, skills matrix): see

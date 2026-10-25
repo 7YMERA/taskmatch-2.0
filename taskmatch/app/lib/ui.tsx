@@ -24,7 +24,7 @@ export const toastSuccess = (m: string) => toast(m, 'success')
 export const toastError = (m: string) => toast(m, 'error')
 
 type ConfirmOpts = { message: string; title?: string; confirmLabel?: string; danger?: boolean }
-type PromptOpts = { label?: string; placeholder?: string; inputMode?: 'text' | 'decimal' }
+type PromptOpts = { label?: string; placeholder?: string; inputMode?: 'text' | 'decimal'; type?: 'text' | 'date'; defaultValue?: string; min?: string }
 type ConfirmState = (ConfirmOpts & { prompt?: PromptOpts; value?: string; resolve: (v: boolean) => void }) | null
 let confirmState: ConfirmState = null
 const confirmListeners = new Set<() => void>()
@@ -38,10 +38,10 @@ export function confirmDialog(opts: ConfirmOpts | string): Promise<boolean> {
 
 // Themed replacement for window.prompt — resolves to the typed text, or null if cancelled.
 export function promptDialog(opts: ConfirmOpts & PromptOpts): Promise<string | null> {
-  const { label, placeholder, inputMode, ...rest } = opts
+  const { label, placeholder, inputMode, type, defaultValue, min, ...rest } = opts
   return new Promise(resolve => {
     const state: NonNullable<ConfirmState> = {
-      ...rest, prompt: { label, placeholder, inputMode }, value: '',
+      ...rest, prompt: { label, placeholder, inputMode, type, defaultValue, min }, value: defaultValue ?? '',
       resolve: ok => resolve(ok ? (state.value ?? '') : null),
     }
     confirmState = state
@@ -92,7 +92,8 @@ export function UiHost() {
               <form onSubmit={e => { e.preventDefault(); close(true) }} style={{ marginTop: 16 }}>
                 {confirmState.prompt.label && <label className="tm-label" htmlFor="tm-prompt">{confirmState.prompt.label}</label>}
                 <input id="tm-prompt" className="tm-input" autoFocus inputMode={confirmState.prompt.inputMode}
-                  placeholder={confirmState.prompt.placeholder} defaultValue=""
+                  type={confirmState.prompt.type || 'text'} min={confirmState.prompt.min}
+                  placeholder={confirmState.prompt.placeholder} defaultValue={confirmState.prompt.defaultValue ?? ''}
                   onChange={e => { if (confirmState) confirmState.value = e.target.value }} />
               </form>
             )}

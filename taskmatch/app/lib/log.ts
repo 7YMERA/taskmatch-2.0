@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { effectiveRole } from './role'
+import { realRole } from './role'
 
 // activity_logs has RLS that allows INSERT + SELECT but denies UPDATE/DELETE,
 // so rows written here are append-only.
@@ -27,7 +27,7 @@ export async function logActivity(entry: LogEntry) {
       summary: entry.summary ?? null,
       details: entry.details ?? null,
       actor_email: session?.user?.email ?? null,
-      actor_role: session ? effectiveRole(session) : null,
+      actor_role: session ? realRole(session) : null,
     })
   } catch {
     /* swallow — auditing must not break the underlying action */

@@ -12,7 +12,7 @@ type IconName =
   | 'sun' | 'moon' | 'arrowRight' | 'arrowDown' | 'check' | 'menu'
   | 'grid' | 'list' | 'star' | 'user' | 'pause'
   | 'plus' | 'more' | 'chevronDown' | 'trash' | 'upload' | 'arrowLeft' | 'alert' | 'clock'
-  | 'search' | 'x' | 'logout' | 'mail' | 'sparkle' | 'target'
+  | 'search' | 'x' | 'logout' | 'mail' | 'sparkle' | 'target' | 'download' | 'history'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
@@ -46,6 +46,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3.5 6.5 8.5 6 8.5-6" /></>,
   sparkle: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />,
   target: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" /></>,
+  download: <><path d="M12 4v12" /><path d="m7 11 5 5 5-5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>,
+  history: <><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" /><path d="M3 4v4h4" /><path d="M12 7.5V12l3 2" /></>,
 }
 
 export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style }:
