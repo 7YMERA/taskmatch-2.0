@@ -159,6 +159,19 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) if SUPABASE_SERVICE_ROLE_KEY else None
 
+if admin is None:
+    logger.warning(
+        "SUPABASE_SERVICE_ROLE_KEY is not set: table queries use the publishable key "
+        "and will fail once row-level security is enabled (see supabase/rls.sql)."
+    )
+
+
+def db():
+    """Client for table queries. Uses the service-role key when configured so the API keeps
+    working under row-level security; every endpoint checks the caller's login first, so the
+    server, not the browser, is what holds the bypass."""
+    return admin or supabase
+
 
 # ─── Auth helpers — every endpoint except /health requires a login ───
 
@@ -256,7 +269,7 @@ def log_activity(action, entity_type, entity_id=None, summary=None,
     """Append one immutable row to activity_logs. Best-effort: never
     block the main operation if logging fails."""
     try:
-        supabase.table("activity_logs").insert({
+        db().table("activity_logs").insert({
             "action": action,
             "entity_type": entity_type,
             "entity_id": entity_id,
@@ -273,7 +286,7 @@ def compute_student_stats():
     """Return {student_id: {avg_score, completed_count, band}} for all students.
     avg_score is the mean of completed, scored assignments (None if unrated)."""
     assignments = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("student_id, score, status")
         .execute()
     ).data
@@ -283,7 +296,7 @@ def compute_student_stats():
         if a["status"] == "Completed" and a.get("score") is not None:
             scores_by_student[a["student_id"]].append(a["score"])
 
-    students = (supabase.table("students").select("id").execute()).data
+    students = (db().table("students").select("id").execute()).data
     stats = {}
     for s in students:
         scores = scores_by_student.get(s["id"], [])
@@ -301,7 +314,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Step 1: Get all required skills for this task
     task_skills = (
-        supabase.table("task_skills")
+        db().table("task_skills")
         .select("skill_id, min_proficiency")
         .eq("task_id", task_id)
         .execute()
@@ -314,7 +327,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Step 2: Get all student skills
     all_student_skills = (
-        supabase.table("student_skills")
+        db().table("student_skills")
         .select("student_id, skill_id, proficiency")
         .execute()
     ).data
@@ -326,7 +339,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Step 4: Get each student's current active WIP count
     active_assignments = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("student_id")
         .in_("status", ["Assigned", "In Progress"])
         .execute()
@@ -338,7 +351,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Names of required skills (for human-readable justifications).
     skill_rows = (
-        supabase.table("skills").select("id, skill_name")
+        db().table("skills").select("id, skill_name")
         .in_("id", list(required.keys())).execute()
     ).data
     skill_names = {r["id"]: r["skill_name"] for r in skill_rows}
@@ -349,7 +362,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
     # Step 5: Score EVERY student (flag, don't filter) so the leader sees all —
     #         qualified float to the top, the rest are ranked below with a reason.
     all_students = (
-        supabase.table("students")
+        db().table("students")
         .select("id, name, matric, programme")
         .execute()
     ).data
@@ -443,7 +456,7 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Min-2 helper: how many people are on this task (assigned or in progress).
     current = (
-        supabase.table("assignments").select("id")
+        db().table("assignments").select("id")
         .eq("task_id", task_id).in_("status", ["Assigned", "In Progress"]).execute()
     ).data
 
@@ -463,13 +476,13 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
         raise HTTPException(status_code=400, detail="task_id and student_id required")
 
     # A closed task (SLA window expired) is locked — no more assigning.
-    tcheck = supabase.table("tasks").select("status, due_date").eq("id", task_id).execute().data
+    tcheck = db().table("tasks").select("status, due_date").eq("id", task_id).execute().data
     if tcheck and is_task_closed(tcheck[0].get("due_date"), tcheck[0].get("status")):
         raise HTTPException(status_code=400, detail="This task is closed (SLA window expired) and can no longer be assigned.")
 
     # Guard against duplicate assignment (e.g. a double-click) — one assignment per (task, student).
     existing = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("id").eq("task_id", task_id).eq("student_id", student_id).execute()
     ).data
     if existing:
@@ -478,7 +491,7 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
 
     # WIP = everything on their plate that isn't done (assigned OR in progress).
     active = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("id").eq("student_id", student_id).in_("status", ["Assigned", "In Progress"]).execute()
     ).data
     if len(active) >= WIP_LIMIT:
@@ -490,7 +503,7 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
     # The assignee starts it themselves (/start), which is when timing begins.
     try:
         result = (
-            supabase.table("assignments")
+            db().table("assignments")
             .insert({"task_id": task_id, "student_id": student_id,
                      "assigned_date": str(date.today()), "status": "Assigned"})
             .execute()
@@ -502,8 +515,8 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
     # Task stays 'New' until an assignee actually starts work.
 
     # Look up names for a readable audit line.
-    student = (supabase.table("students").select("name").eq("id", student_id).execute()).data
-    task = (supabase.table("tasks").select("description").eq("id", task_id).execute()).data
+    student = (db().table("students").select("name").eq("id", student_id).execute()).data
+    task = (db().table("tasks").select("description").eq("id", task_id).execute()).data
     student_name = student[0]["name"] if student else student_id
     task_desc = task[0]["description"] if task else task_id
 
@@ -537,7 +550,7 @@ def self_assign(body: SelfAssignBody, authorization: str = Header(None)):
     role = (user.user_metadata or {}).get("role", "student")
     task_id = body.task_id
 
-    srows = supabase.table("students").select("id, name").eq("email", user.email).execute().data
+    srows = db().table("students").select("id, name").eq("email", user.email).execute().data
     if not srows:
         raise HTTPException(status_code=400,
                             detail="No student record is linked to your account. Ask your leader to add you on the Students page.")
@@ -551,7 +564,7 @@ def start(body: StartBody, authorization: str = Header(None)):
     assignment_id = body.assignment_id
 
     rows = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("id, task_id, student_id, status, in_progress_at")
         .eq("id", assignment_id)
         .execute()
@@ -563,17 +576,17 @@ def start(body: StartBody, authorization: str = Header(None)):
         raise HTTPException(status_code=400, detail="This task is already completed.")
 
     started_at = a.get("in_progress_at") or now_iso()
-    supabase.table("assignments").update({
+    db().table("assignments").update({
         "status": "In Progress",
         "in_progress_at": started_at,
     }).eq("id", assignment_id).execute()
 
     # First person to start moves the task itself into progress.
-    task = (supabase.table("tasks").select("description, status").eq("id", a["task_id"]).execute()).data
+    task = (db().table("tasks").select("description, status").eq("id", a["task_id"]).execute()).data
     if task and task[0].get("status") == "New":
-        supabase.table("tasks").update({"status": "In Progress"}).eq("id", a["task_id"]).execute()
+        db().table("tasks").update({"status": "In Progress"}).eq("id", a["task_id"]).execute()
 
-    student = (supabase.table("students").select("name").eq("id", a["student_id"]).execute()).data
+    student = (db().table("students").select("name").eq("id", a["student_id"]).execute()).data
     log_activity(
         action="assignment.started", entity_type="assignment", entity_id=assignment_id,
         summary=f"{student[0]['name'] if student else a['student_id']} started task '{task[0]['description'] if task else a['task_id']}'",
@@ -592,7 +605,7 @@ def unassign(body: UnassignBody, authorization: str = Header(None)):
     assignment_id = body.assignment_id
 
     rows = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("id, task_id, student_id, status")
         .eq("id", assignment_id)
         .execute()
@@ -605,17 +618,17 @@ def unassign(body: UnassignBody, authorization: str = Header(None)):
                             detail="Can't remove a completed assignment — it holds the student's performance record.")
 
     # Names first (for a readable audit line), then delete.
-    student = (supabase.table("students").select("name").eq("id", a["student_id"]).execute()).data
-    task = (supabase.table("tasks").select("description, status").eq("id", a["task_id"]).execute()).data
-    supabase.table("assignments").delete().eq("id", assignment_id).execute()
+    student = (db().table("students").select("name").eq("id", a["student_id"]).execute()).data
+    task = (db().table("tasks").select("description, status").eq("id", a["task_id"]).execute()).data
+    db().table("assignments").delete().eq("id", assignment_id).execute()
 
     # If nobody is actively on the task anymore, send it back to 'New'.
     remaining = (
-        supabase.table("assignments").select("status").eq("task_id", a["task_id"]).execute()
+        db().table("assignments").select("status").eq("task_id", a["task_id"]).execute()
     ).data
     any_active = any(r["status"] in ("Assigned", "In Progress") for r in remaining)
     if task and task[0].get("status") == "In Progress" and not any_active:
-        supabase.table("tasks").update({"status": "New"}).eq("id", a["task_id"]).execute()
+        db().table("tasks").update({"status": "New"}).eq("id", a["task_id"]).execute()
 
     log_activity(
         action="assignment.removed", entity_type="assignment", entity_id=assignment_id,
@@ -641,7 +654,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
     actual_hours = body.actual_hours  # optional manual override
 
     rows = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("id, task_id, student_id, in_progress_at")
         .eq("id", assignment_id)
         .execute()
@@ -674,7 +687,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
 
     # committed_hours from the task drives the score; due_date tells us if it's late.
     task = (
-        supabase.table("tasks")
+        db().table("tasks")
         .select("description, committed_hours, due_date, status")
         .eq("id", task_id)
         .execute()
@@ -693,7 +706,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
         if score is not None:
             score = max(0.0, min(1.0, score))
 
-    supabase.table("assignments").update({
+    db().table("assignments").update({
         "status": "Completed",
         "completed_at": completed_at.isoformat(),
         "actual_hours": elapsed_hours,   # self-declared (or timer if none given) — drives score
@@ -703,7 +716,7 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
 
     # If every assignment on the task is now Completed, complete the task.
     siblings = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("status")
         .eq("task_id", task_id)
         .execute()
@@ -712,12 +725,12 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
     # Was this completion past the deadline? (overdue = breached the set date, even if finished)
     late = bool(due_date and completed_at.date().isoformat() > due_date)
     if all_done:
-        supabase.table("tasks").update({
+        db().table("tasks").update({
             "status": "Completed",
             "completed_at": completed_at.isoformat(),
         }).eq("id", task_id).execute()
 
-    student = (supabase.table("students").select("name").eq("id", assignment["student_id"]).execute()).data
+    student = (db().table("students").select("name").eq("id", assignment["student_id"]).execute()).data
     student_name = student[0]["name"] if student else assignment["student_id"]
     task_desc = task[0]["description"] if task else task_id
 
@@ -745,7 +758,7 @@ def student_stats(authorization: str = Header(None)):
     assignments, plus a band (high/avg/low/unrated) used for matching + display."""
     require_user(authorization)
     stats = compute_student_stats()
-    students = (supabase.table("students").select("id, name").execute()).data
+    students = (db().table("students").select("id, name").execute()).data
     out = []
     for s in students:
         st = stats.get(s["id"], {"avg_score": None, "completed_count": 0, "band": "unrated"})
@@ -761,7 +774,7 @@ def wip_status(authorization: str = Header(None)):
     Students page, the task-assignment view, and the dashboard WIP panel."""
     require_user(authorization)
     active = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("student_id, task_id, status, tasks(description)")
         .in_("status", ["Assigned", "In Progress"])
         .execute()
@@ -775,7 +788,7 @@ def wip_status(authorization: str = Header(None)):
             "description": (a.get("tasks") or {}).get("description"),
         })
 
-    students = (supabase.table("students").select("id, name").execute()).data
+    students = (db().table("students").select("id, name").execute()).data
     out = []
     for s in students:
         tasks = by_student.get(s["id"], [])
@@ -807,7 +820,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
 
     # Step 1: This student's skill profile
     student_skills = (
-        supabase.table("student_skills")
+        db().table("student_skills")
         .select("skill_id, proficiency")
         .eq("student_id", student_id)
         .execute()
@@ -817,7 +830,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
 
     # Step 2: Tasks already linked to this student (any status) -> exclude
     my_assignments = (
-        supabase.table("assignments")
+        db().table("assignments")
         .select("task_id")
         .eq("student_id", student_id)
         .execute()
@@ -826,7 +839,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
 
     # Step 3: Tasks open for assignment or still gathering a team.
     open_tasks = (
-        supabase.table("tasks")
+        db().table("tasks")
         .select("id, description, estimated_days, committed_hours, severity, status, due_date")
         .in_("status", ["New", "In Progress"])
         .execute()
@@ -842,7 +855,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
 
     # Step 4: Required skills for those tasks (+ names for justifications)
     task_skill_rows = (
-        supabase.table("task_skills")
+        db().table("task_skills")
         .select("task_id, skill_id, min_proficiency")
         .in_("task_id", candidate_ids)
         .execute()
@@ -855,7 +868,7 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
         all_skill_ids.add(row["skill_id"])
 
     skill_rows = (
-        supabase.table("skills").select("id, skill_name")
+        db().table("skills").select("id, skill_name")
         .in_("id", list(all_skill_ids)).execute()
     ).data if all_skill_ids else []
     skill_names = {r["id"]: r["skill_name"] for r in skill_rows}
@@ -944,7 +957,7 @@ def list_accounts(authorization: str = Header(None)):
     admin_client = require_admin_client()
 
     users = _list_all_users(admin_client)
-    roster = supabase.table("students").select("email").execute().data or []
+    roster = db().table("students").select("email").execute().data or []
     roster_emails = {(s.get("email") or "").lower() for s in roster if s.get("email")}
 
     accounts = [_account_view(u, roster_emails) for u in users]
