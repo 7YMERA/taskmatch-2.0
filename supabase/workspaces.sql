@@ -213,7 +213,41 @@ begin
   return new;
 end $$;
 
--- 5. Check -------------------------------------------------------------------------------------
+-- 5. Names unique per workspace, not across all of them -----------------------------------------
+-- An older database may have a skill name, email or matric number unique across the whole table.
+-- With workspaces, two teams can both have "Python" (and one person can be on two rosters), so
+-- those become unique within a workspace instead.
+do $$
+declare r record;
+begin
+  for r in
+    select c.conname, c.conrelid::regclass as tbl, a.attname
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+    where c.contype = 'u' and array_length(c.conkey, 1) = 1
+      and ((c.conrelid = 'public.skills'::regclass and a.attname = 'skill_name')
+        or (c.conrelid = 'public.students'::regclass and a.attname in ('email', 'matric')))
+  loop
+    execute format('alter table %s drop constraint %I', r.tbl, r.conname);
+    execute format('alter table %s add constraint %I unique (workspace_id, %I)', r.tbl, r.conname, r.attname);
+  end loop;
+
+  for r in
+    select i.indexrelid::regclass as idx, ci.relname as idxname, i.indrelid::regclass as tbl, a.attname
+    from pg_index i
+    join pg_class ci on ci.oid = i.indexrelid
+    join pg_attribute a on a.attrelid = i.indrelid and a.attnum = i.indkey[0]
+    where i.indisunique and not i.indisprimary and i.indnatts = 1
+      and not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid)
+      and ((i.indrelid = 'public.skills'::regclass and a.attname = 'skill_name')
+        or (i.indrelid = 'public.students'::regclass and a.attname in ('email', 'matric')))
+  loop
+    execute format('drop index %s', r.idx);
+    execute format('create unique index %I on %s (workspace_id, %I)', r.idxname, r.tbl, r.attname);
+  end loop;
+end $$;
+
+-- 6. Check -------------------------------------------------------------------------------------
 select w.name as workspace, m.email, m.role
 from public.workspace_members m join public.workspaces w on w.id = m.workspace_id
 order by 1, 3, 2;
