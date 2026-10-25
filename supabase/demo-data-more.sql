@@ -40,6 +40,7 @@ begin
   -- What to add. state: done, late (finished after its due date), doing, assigned, open.
   -- age: for finished work, days ago it finished; for open work, days until it's due.
   -- hints: words to look for in the workspace's skill names.
+  -- Skill levels are 1 (beginner) to 3 (advanced).
   create temp table demo_more (
     ord int, wsp text, pkey text, descr text, sev text, hrs numeric, state text, age int, hints text[]
   ) on commit drop;
@@ -104,9 +105,9 @@ begin
   ) then
     insert into public.student_skills (workspace_id, student_id, skill_id, proficiency)
     select hack, s.id, k.id, v.p
-    from (values ('jordan@example.com', 'React', 4), ('jordan@example.com', 'API Development', 3),
-                 ('priya@example.com', 'UI/UX', 4), ('priya@example.com', 'Pitching', 4), ('priya@example.com', 'React', 2),
-                 ('sam@example.com', 'Python', 4), ('sam@example.com', 'API Development', 4), ('sam@example.com', 'Pitching', 2)) v(email, skill, p)
+    from (values ('jordan@example.com', 'React', 3), ('jordan@example.com', 'API Development', 2),
+                 ('priya@example.com', 'UI/UX', 3), ('priya@example.com', 'Pitching', 3), ('priya@example.com', 'React', 1),
+                 ('sam@example.com', 'Python', 3), ('sam@example.com', 'API Development', 3), ('sam@example.com', 'Pitching', 2)) v(email, skill, p)
     join public.students s on s.workspace_id = hack and s.email = v.email
     join public.skills k on k.workspace_id = hack and k.skill_name = v.skill;
   end if;
@@ -121,7 +122,7 @@ begin
     on conflict do nothing;
 
     insert into public.student_skills (workspace_id, student_id, skill_id, proficiency)
-    select ws, s.id, k.id, 3 + (abs(hashtext(k.id::text || s.email)) % 3)
+    select ws, s.id, k.id, 2 + (abs(hashtext(k.id::text || s.email)) % 2)  -- levels are 1 to 3
     from public.students s
     join (values ('aisha.demo@example.com', '{python,database,sql,api,security}'::text[]),
                  ('daniel.demo@example.com', '{react,ui,css,javascript,design,html}'::text[]),
