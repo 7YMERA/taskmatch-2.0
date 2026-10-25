@@ -235,13 +235,16 @@ in. Left: a detailed `/health` check, storage policies for avatars, and blocking
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Dashboards, analytics and assignment modes | ✅ done |
-| 1b | Tasks and People pages rebuilt (views, saved filters, skills matrix) | ◐ in progress |
-| 2 | Roles and permissions, audit trail, user management, "away" status | ☐ planned |
-| 3 | Task board, approvals, notifications, comments, AI-suggested skills and estimates (always confirmed by a person) | ☐ planned |
+| 1b, 1c | Tasks and People pages rebuilt (views, saved filters, skills matrix, quick views) | ✅ done |
+| 2 | Roles and permissions, audit trail, user management, "away" status | ✅ done |
+| 3, 3b | Suggested skills, hours and severity (always confirmed by a person); workspaces and projects | ✅ done |
+| 3d | People page and smarter matching: explainable fit score, proven skills, team insights | ◐ in review |
+| 3c | Notifications and approvals | ☐ planned |
 | 4 | Global search, Ctrl+K command palette, exports, settings, multiple teams | ☐ planned |
 
 **Level 2: smarter matching.** Skill evidence from completed tasks, skill decay over
-time, per-person capacity instead of a flat limit, and an explainable, tunable score.
+time, hours as well as a task limit, and an explainable, tunable score are in (see
+[docs/PEOPLE-MATCHING.md](docs/PEOPLE-MATCHING.md)). Per-person capacity is next.
 
 **Level 3: a product.** Multiple teams and organisations, integrations such as GitHub
 Issues and Jira, and a feedback loop so matching learns from outcomes.

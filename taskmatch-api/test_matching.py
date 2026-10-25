@@ -70,6 +70,11 @@ class TestFit:
         assert avail(fa)["points"] < avail(fb)["points"]
         assert "19h of 20h" in avail(fa)["detail"]
 
+    def test_missing_a_skill_caps_the_score(self):
+        p = profiles(PEOPLE, DECLARED, [done("a", [], completed="2026-10-01", due="2026-10-05")] * 4)["a"]
+        score, _ = matching.fit(p, {"k1": 2, "k2": 1}, NAMES)
+        assert score <= matching.MISSING_CAP
+
     def test_away_gets_no_availability(self):
         _, f = matching.fit(profiles(PEOPLE, DECLARED, [])["c"], {"k1": 2}, NAMES)
         assert next(x for x in f if x["key"] == "availability")["points"] == 0

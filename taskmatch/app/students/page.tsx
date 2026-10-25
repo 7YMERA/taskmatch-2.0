@@ -9,10 +9,12 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import PersonQuickView from '../components/PersonQuickView'
+import MatchFinder from '../components/MatchFinder'
+import PeopleInsights, { type Insights } from '../components/PeopleInsights'
 import { effectiveRole, can, roleLabel } from '../lib/role'
 import { isAway, fmtDay, setAway as saveAway, markAway as askAway } from '../lib/away'
 import { toast, confirmDialog } from '../lib/ui'
-import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, bandAccent } from '../components/ui'
+import { Card, Badge, Button, Input, Field, Icon, EmptyState, Skeleton, StatTile, bandAccent } from '../components/ui'
 
 const PROGRAMMES = ['CS', 'IT', 'IS']  // programmes: Computer Science, Information Technology, Information Systems
 // Bright palette that stays readable on the dark background
@@ -26,7 +28,7 @@ const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-
 const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Skills-matrix cell shades: one hue, light → dark by level.
 const LEVEL_FILL = ['', 'color-mix(in srgb, var(--tm-chart-1) 40%, var(--tm-surface-1))', 'color-mix(in srgb, var(--tm-chart-1) 62%, var(--tm-surface-1))', 'var(--tm-chart-1)']
-type PeopleView = 'roster' | 'cards' | 'matrix'
+type PeopleView = 'roster' | 'cards' | 'matrix' | 'insights' | 'find'
 type Avail = 'all' | 'free' | 'room' | 'limit' | 'away'
 type PeopleSort = 'group' | 'name' | 'available' | 'score'
 
@@ -60,6 +62,8 @@ export default function Students() {
   const [minLevel, setMinLevel] = useState(1)
   const [avail, setAvail] = useState<Avail>('all')
   const [sort, setSort] = useState<PeopleSort>('group')
+  const [insights, setInsights] = useState<Insights | null>(null)
+  const [findSkill, setFindSkill] = useState('')   // "Find people →" from Team insights preselects a skill
   const urlReady = useRef(false)
 
   // Search, filters and layout live in the URL so a slice like "React, Intermediate+, free" can be shared.
@@ -69,7 +73,7 @@ export default function Students() {
     if (q.get('skill')) setSkillFilter(q.get('skill')!)
     if (['1', '2', '3'].includes(q.get('level') || '')) setMinLevel(Number(q.get('level')))
     if (['free', 'room', 'limit', 'away'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
-    if (['matrix', 'cards'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
+    if (['matrix', 'cards', 'insights', 'find'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
     if (q.get('open')) setQuickId(q.get('open'))
     if (['name', 'available', 'score'].includes(q.get('sort') || '')) setSort(q.get('sort') as PeopleSort)
     if (q.get('group')) setGroupFilter(q.get('group')!)
@@ -98,6 +102,7 @@ export default function Students() {
     fetchStats()
     fetchGroups()
     fetchWip()
+    fetchInsights()
   }, [])
 
   const fetchWip = async () => {
@@ -108,6 +113,13 @@ export default function Students() {
       setWip(map)
       setWipLimit(res.data.wip_limit ?? 3)
     } catch { /* backend may be down; WIP just won't show */ }
+  }
+
+  const fetchInsights = async () => {
+    try {
+      const res = await axios.get(`${API}/people/insights`, { headers: await authHeaders() })
+      setInsights(res.data)
+    } catch { /* older API or backend asleep; the insights just won't show */ }
   }
 
   const fetchAccounts = async () => {
@@ -294,6 +306,11 @@ export default function Students() {
       ? <span className="text-[11px] flex items-center gap-1.5" style={FAINT}><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--tm-emerald)' }} /> Available · no active tasks</span>
       : <span className="text-[11px] truncate" style={MUTED}>On: {at.map((t: any) => t.description).filter(Boolean).join(', ')}</span>
   }
+  // Skills backed by finished work, per person (from /people/insights).
+  const proven: { [sid: string]: { [skill_id: string]: number } } = {}
+  insights?.people.forEach(p => { proven[p.student_id] = Object.fromEntries(p.proven.map(x => [x.skill_id, x.count])) })
+  const isProven = (sid: string, skillId: string) => !!proven[sid]?.[skillId]
+  const ProvenTick = () => <span className="inline-flex" style={{ color: 'var(--tm-emerald)' }} aria-label="proven"><Icon name="check" size={10} strokeWidth={3} /></span>
   const accountFor = (s: any) => accountByEmail[(s.email || '').toLowerCase()]
   // Accounts that exist but aren't on the roster yet — the pool for "assign existing account".
   const unassignedAccounts = accounts.filter(a => !a.on_roster)
@@ -382,7 +399,7 @@ export default function Students() {
           <div>
             <h1 className="tm-page-title">People</h1>
             <p className="text-xs mt-1" style={FAINT}>
-              {loading ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit${awayCount ? ` · ${awayCount} away` : ''}`}
+              {loading || insights ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit${awayCount ? ` · ${awayCount} away` : ''}`}
             </p>
           </div>
           {can(userRole, 'people.manage') && (
@@ -396,6 +413,21 @@ export default function Students() {
             </div>
           )}
         </div>
+
+        {/* Team at a glance */}
+        {insights && (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Free right now" accent="emerald" value={<>{freeCount}<span className="text-base text-faint font-normal"> / {students.length}</span></>}
+              sub={`${limitCount} at their limit${awayCount ? ` · ${awayCount} away` : ''}`} />
+            <StatTile label="Team load" accent={insights.summary.utilisation >= 0.85 ? 'rose' : insights.summary.utilisation >= 0.6 ? 'amber' : 'indigo'}
+              value={`${Math.round(insights.summary.utilisation * 100)}%`}
+              sub={`${insights.summary.active_hours}h of ${insights.summary.capacity_hours}h capacity in use`} />
+            <StatTile label="Skill gaps" accent={insights.summary.gaps ? 'rose' : 'emerald'} value={insights.summary.gaps}
+              sub={`${insights.summary.single_points} skill${insights.summary.single_points === 1 ? '' : 's'} rest on one person · ${insights.summary.hard_to_staff} task${insights.summary.hard_to_staff === 1 ? '' : 's'} hard to staff`} />
+            <StatTile label="Proven skills" accent="sky" value={`${Math.round(insights.summary.proven_share * 100)}%`}
+              sub="of declared skills backed by finished work" />
+          </div>
+        )}
 
         {/* Create group form — leader only */}
         {showGroupForm && can(userRole, 'people.manage') && (
@@ -584,17 +616,27 @@ export default function Students() {
 
         {/* Toolbar: search, layout */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="relative flex-1 min-w-[14rem] max-w-md">
+          <div className={`relative flex-1 min-w-[14rem] max-w-md ${view === 'insights' || view === 'find' ? 'hidden' : ''}`}>
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={FAINT}><Icon name="search" size={15} /></span>
             <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, matric, email or skill…" className="!pl-9" aria-label="Search people" />
           </div>
           <div className="tm-seg" aria-label="Layout">
-            {([['roster', 'Roster', 'list'], ['cards', 'Cards', 'users'], ['matrix', 'Skills matrix', 'grid']] as const).map(([k, label, icon]) => (
+            {([['roster', 'Roster', 'list'], ['cards', 'Cards', 'users'], ['matrix', 'Skills matrix', 'grid'], ['insights', 'Team insights', 'chart'], ['find', 'Find a match', 'target']] as const).map(([k, label, icon]) => (
               <button key={k} onClick={() => setView(k)} aria-pressed={view === k}><Icon name={icon} size={14} /> {label}</button>
             ))}
           </div>
         </div>
 
+        {view === 'insights' && (
+          <PeopleInsights data={insights} onOpenPerson={setQuickId}
+            onFindFor={id => { setFindSkill(id); setView('find') }} />
+        )}
+        {view === 'find' && (
+          <MatchFinder key={findSkill} skills={skills} canAssign={can(userRole, 'assign.others')} onOpenPerson={setQuickId}
+            initialNeed={findSkill ? [{ skill_id: findSkill, min_proficiency: 1 }] : []} />
+        )}
+
+        <div className={view === 'insights' || view === 'find' ? 'hidden' : ''}>
         {/* "Who knows X and is free?" — skill + level + availability */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="flex items-center gap-2">
@@ -655,7 +697,7 @@ export default function Students() {
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
                 <p className="text-sm font-medium" style={TEXT}>Skills matrix <span style={FAINT}>({shownStudents.length} {shownStudents.length === 1 ? 'person' : 'people'} × {heldSkills.length} skills)</span></p>
-                <p className="text-xs mt-0.5" style={FAINT}>Darker = higher level. Busiest people are marked so you can see who is actually free.</p>
+                <p className="text-xs mt-0.5" style={FAINT}>Darker = higher level. A green underline means proven on finished work. Busiest people are marked so you can see who is actually free.</p>
               </div>
               <div className="flex items-center gap-3 text-xs" style={MUTED}>
                 {[1, 2, 3].map(l => (
@@ -696,9 +738,10 @@ export default function Students() {
                           {heldSkills.map(sk => {
                             const l = levelOf(s, sk.id)
                             return (
-                              <td key={sk.id} title={`${s.name} · ${sk.skill_name}: ${l ? LEVELS[l] : 'none'}`}
+                              <td key={sk.id} title={`${s.name} · ${sk.skill_name}: ${l ? LEVELS[l] : 'none'}${isProven(s.id, sk.id) ? ` · proven on ${proven[s.id][sk.id]} finished task(s)` : ''}`}
                                 className="w-8 h-8 rounded-[4px] text-center text-[10px] font-medium"
-                                style={{ background: l ? LEVEL_FILL[l] : 'var(--tm-track)', color: l === 3 ? '#fff' : 'var(--tm-text-muted)', outline: sk.id === skillFilter ? '1px solid var(--tm-primary)' : undefined }}>
+                                style={{ background: l ? LEVEL_FILL[l] : 'var(--tm-track)', color: l === 3 ? '#fff' : 'var(--tm-text-muted)', outline: sk.id === skillFilter ? '1px solid var(--tm-primary)' : undefined,
+                                  boxShadow: isProven(s.id, sk.id) ? 'inset 0 -3px 0 var(--tm-emerald)' : undefined }}>
                                 {l ? LEVELS[l][0] : ''}
                               </td>
                             )
@@ -764,7 +807,7 @@ export default function Students() {
                     <div className="flex flex-col gap-1.5">
                       {top.length === 0 ? <span className="text-xs" style={FAINT}>No skills declared</span> : top.map((ss: any) => (
                         <div key={ss.skill_id} className="grid grid-cols-[1fr_3.5rem] items-center gap-3">
-                          <span className="text-xs truncate" style={ss.skill_id === skillFilter ? { color: 'var(--tm-primary-text)', fontWeight: 500 } : MUTED}>{ss.skills?.skill_name}</span>
+                          <span className="text-xs truncate inline-flex items-center gap-1" style={ss.skill_id === skillFilter ? { color: 'var(--tm-primary-text)', fontWeight: 500 } : MUTED}>{isProven(s.id, ss.skill_id) && <ProvenTick />}{ss.skills?.skill_name}</span>
                           <span className="flex gap-0.5" title={LEVELS[ss.proficiency]} aria-label={LEVELS[ss.proficiency]}>
                             {[1, 2, 3].map(l => <span key={l} className="h-1.5 flex-1 rounded-full" style={{ background: l <= ss.proficiency ? 'var(--tm-chart-1)' : 'var(--tm-track)' }} />)}
                           </span>
@@ -816,10 +859,10 @@ export default function Students() {
                           <span className="text-xs" style={FAINT}>No skills declared</span>
                         ) : [...(s.student_skills || [])]
                           // The skill being searched for goes first, highlighted with its level.
-                          .sort((a: any, b: any) => Number(b.skill_id === skillFilter) - Number(a.skill_id === skillFilter))
+                          .sort((a: any, b: any) => Number(b.skill_id === skillFilter) - Number(a.skill_id === skillFilter) || Number(isProven(s.id, b.skill_id)) - Number(isProven(s.id, a.skill_id)))
                           .slice(0, 5).map((ss: any) => ss.skill_id === skillFilter
-                            ? <span key={ss.skill_id} className="tm-chip" style={{ borderColor: 'var(--tm-primary)', background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{ss.skills?.skill_name} · {LEVELS[ss.proficiency]}</span>
-                            : <span key={ss.skill_id} className="tm-chip">{ss.skills?.skill_name}</span>)}
+                            ? <span key={ss.skill_id} className="tm-chip gap-1" style={{ borderColor: 'var(--tm-primary)', background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{isProven(s.id, ss.skill_id) && <ProvenTick />}{ss.skills?.skill_name} · {LEVELS[ss.proficiency]}</span>
+                            : <span key={ss.skill_id} className="tm-chip gap-1" title={isProven(s.id, ss.skill_id) ? `Proven: used on ${proven[s.id][ss.skill_id]} finished task(s)` : 'Declared'}>{isProven(s.id, ss.skill_id) && <ProvenTick />}{ss.skills?.skill_name}</span>)}
                         {(s.student_skills || []).length > 5 && <span className="text-[11px]" style={FAINT}>+{(s.student_skills || []).length - 5}</span>}
                       </div>
                       {(() => {
@@ -898,8 +941,9 @@ export default function Students() {
             </div>
           )}
         </Card>
+        </div>
         <PersonQuickView person={students.find(x => x.id === quickId) || null} wip={quickId ? wip[quickId] : undefined} wipLimit={wipLimit}
-          stat={quickId ? stats[quickId] : undefined} showScores={can(userRole, 'insights.view')} groupColor={groupColor} onClose={() => setQuickId(null)} />
+          stat={quickId ? stats[quickId] : undefined} insight={insights?.people.find(p => p.student_id === quickId)} capacity={insights?.capacity_hours} showScores={can(userRole, 'insights.view')} groupColor={groupColor} onClose={() => setQuickId(null)} />
       </main>
     </div>
   )

@@ -15,6 +15,9 @@ A score is the sum of four parts. Each part is worked out as 0..1 and multiplied
                     active tasks against CAPACITY_HOURS. Someone away scores 0 here.
   record        15  How they have done before: finished on time, and their average score.
                     Someone with no history gets a neutral half, so new people aren't buried.
+
+Someone below the level for any required skill is capped at MISSING_CAP, so being free and
+reliable can't make a person who lacks the skills look like a good fit.
 """
 import os
 from collections import defaultdict
@@ -27,6 +30,7 @@ LABELS = {"skills": "Skills", "experience": "Proven experience", "availability":
           "record": "Track record"}
 CAPACITY_HOURS = float(os.getenv("CAPACITY_HOURS", "20"))       # hours of active work one person can carry
 EVIDENCE_HALF_LIFE_DAYS = int(os.getenv("EVIDENCE_HALF_LIFE_DAYS", "180"))
+MISSING_CAP = 54   # the most someone below a required skill level can score (the app calls 55+ a good fit)
 LEVELS = ["", "Beginner", "Intermediate", "Advanced"]
 ACTIVE = ("Assigned", "In Progress")
 
@@ -191,6 +195,8 @@ def fit(p, required, skill_names, task_words=None, wip_limit=3, capacity=None):
     factors = [{"key": k, "label": LABELS[k], "points": round(WEIGHTS[k] * values[k], 1), "max": WEIGHTS[k],
                 "detail": details[k]} for k in WEIGHTS]
     total = round(sum(f["points"] for f in factors))
+    if missing:
+        total = min(total, MISSING_CAP)   # below a required level is never more than "possible"
     return total, factors
 
 
