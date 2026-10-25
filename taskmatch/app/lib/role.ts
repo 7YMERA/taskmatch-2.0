@@ -1,10 +1,13 @@
 import PERMS from './permissions.json'
 
 // Roles and permissions. The same table lives in taskmatch-api/main.py (ROLE_PERMISSIONS) and
-// in supabase/roles.sql; a backend test checks the API copy against permissions.json.
+// in supabase/roles.sql (tm_can); a backend test checks the API copy against permissions.json.
 //
-// The real role is stored in the account's app_metadata, which only the server (service-role
-// key) can change. user_metadata is NOT used: a signed-in user can edit their own user_metadata.
+// A role belongs to a workspace: you can be an admin in one and a member in another. The source
+// of truth is workspace_members, checked by the API and the database rules on every request.
+// The server copies your role in the open workspace into app_metadata (which only it can write),
+// and the app reads it from there for display. user_metadata is NOT used: a signed-in user can
+// edit their own user_metadata.
 
 export type Role = 'admin' | 'lead' | 'member' | 'viewer'
 export type Permission =
@@ -22,7 +25,7 @@ export function can(role: string | null | undefined, perm: Permission): boolean 
   return !!role && !!PERMISSIONS.find(p => p.key === perm)?.roles.includes(role as Role)
 }
 
-/** The account's real role, from app_metadata. New accounts are members. */
+/** Your real role in the open workspace, from app_metadata. */
 export function realRole(session: any): Role {
   const r = session?.user?.app_metadata?.role
   return isRole(r) ? r : 'member'

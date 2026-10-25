@@ -7,7 +7,8 @@ import axios from 'axios'
 import Link from 'next/link'
 import { effectiveRole, realRole, setRoleOverride, getRoleOverride, can, roleLabel, ROLES, type Role } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
-import { Icon, Logo } from './ui'
+import { Icon, Logo, type IconName } from './ui'
+import { cachedWorkspaces, fetchWorkspaces, switchWorkspace, type WorkspaceState } from '../lib/workspace'
 
 export default function Sidebar() {
   const router = useRouter()
@@ -18,6 +19,9 @@ export default function Sidebar() {
   const [name, setName] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [open, setOpen] = useState(false)   // mobile drawer
+  const [ws, setWs] = useState<WorkspaceState | null>(null)
+  const [wsMenu, setWsMenu] = useState(false)
+  const [switching, setSwitching] = useState(false)
 
   useEffect(() => { axios.get(`${API}/health`, { timeout: 60000 }).catch(() => {}) }, [])
 
@@ -33,6 +37,16 @@ export default function Sidebar() {
     })
   }, [])
 
+  // Which workspace we're in. A new account with no workspace is sent to set one up.
+  useEffect(() => {
+    const cached = cachedWorkspaces()
+    if (cached) Promise.resolve().then(() => setWs(w => w ?? cached))   // last known, until the fresh list arrives
+    fetchWorkspaces()
+      .then(w => { setWs(w); if (!w.workspaces.length) router.replace('/onboarding') })
+      .catch(e => { if (e?.response?.status === 409) router.replace('/onboarding') })
+  }, [])
+  const currentWs = ws?.workspaces.find(w => w.id === ws.current)
+
   // Close the drawer on route change (mobile).
   useEffect(() => { setOpen(false) }, [pathname])
 
@@ -41,16 +55,17 @@ export default function Sidebar() {
   const nav = [
     { label: 'Dashboard', href: '/dashboard', icon: 'grid' as const },
     { label: 'People', href: '/students', icon: 'users' as const },
+    { label: 'Projects', href: '/projects', icon: 'folder' as const },
     { label: 'Tasks', href: '/tasks', icon: 'check' as const },
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
   ]
   const adminNav = [
-    ...(can(role, 'team.manage') ? [{ label: 'Team & roles', href: '/team', icon: 'shield' as const }] : []),
+    ...(can(role, 'team.manage') ? [{ label: 'Members & roles', href: '/team', icon: 'shield' as const }] : []),
     ...(can(role, 'audit.view') ? [{ label: 'Audit trail', href: '/audit', icon: 'history' as const }] : []),
   ]
   const previewing = real === 'admin' && !!getRoleOverride() && role !== real
 
-  const navLink = (item: { label: string; href: string; icon: 'grid' | 'users' | 'check' | 'star' | 'shield' | 'history' }) => {
+  const navLink = (item: { label: string; href: string; icon: IconName }) => {
         const activeItem = pathname === item.href || pathname.startsWith(item.href + '/')
         return (
           <Link key={item.href} href={item.href}
@@ -71,11 +86,51 @@ export default function Sidebar() {
   const panel = (
     <aside className="w-60 px-3 py-4 flex flex-col gap-0.5 shrink-0 h-screen overflow-y-auto"
       style={{ background: 'var(--tm-bg-sidebar)', borderRight: '1px solid var(--tm-border)' }}>
-      <Link href="/dashboard" className="flex items-center px-2 pb-5 pt-1">
+      <Link href="/dashboard" className="flex items-center px-2 pb-4 pt-1">
         <Logo size={26} />
       </Link>
 
-      <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Workspace</p>
+      {/* Workspace switcher */}
+      <div className="relative mb-3">
+        <button onClick={() => setWsMenu(v => !v)} aria-expanded={wsMenu} aria-haspopup="menu"
+          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg border border-line transition-colors hover:bg-surface-2 text-left">
+          <span className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold shrink-0"
+            style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
+            {(currentWs?.name || '?').slice(0, 1).toUpperCase()}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium text-fg truncate">{currentWs?.name || (ws ? 'No workspace' : '…')}</span>
+            <span className="block text-[11px] text-faint truncate">{currentWs ? roleLabel(currentWs.role) : 'Workspace'}</span>
+          </span>
+          <span className="text-faint shrink-0"><Icon name="chevrons" size={14} /></span>
+        </button>
+        {wsMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setWsMenu(false)} />
+            <div role="menu" className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-line p-1 shadow-lg"
+              style={{ background: 'var(--tm-bg-elev)' }}>
+              <p className="px-2 pt-1.5 pb-1 text-[11px] text-faint">Your workspaces</p>
+              {(ws?.workspaces || []).map(w => (
+                <button key={w.id} role="menuitem" disabled={switching}
+                  onClick={async () => { if (w.id === ws?.current) { setWsMenu(false); return } setSwitching(true); try { await switchWorkspace(w.id) } catch { setSwitching(false) } }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] hover:bg-surface-2 disabled:opacity-60">
+                  <span className="min-w-0 flex-1 truncate text-fg">{w.name}</span>
+                  <span className="text-[11px] text-faint shrink-0">{roleLabel(w.role)}</span>
+                  <span className="w-3.5 shrink-0 text-primary-text">{w.id === ws?.current && <Icon name="check" size={14} />}</span>
+                </button>
+              ))}
+              <div className="my-1" style={{ borderTop: '1px solid var(--tm-border)' }} />
+              <Link href="/onboarding?mode=create" role="menuitem" className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-muted hover:bg-surface-2">
+                <Icon name="plus" size={14} /> Create a workspace
+              </Link>
+              <Link href="/onboarding?mode=join" role="menuitem" className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-muted hover:bg-surface-2">
+                <Icon name="link" size={14} /> Join with an invite
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+
       {nav.map(navLink)}
       {adminNav.length > 0 && <p className="px-2 pt-4 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Admin</p>}
       {adminNav.map(navLink)}
