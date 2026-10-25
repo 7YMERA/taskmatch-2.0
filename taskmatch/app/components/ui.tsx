@@ -3,7 +3,7 @@
 /* TaskMatch design-system primitives.
    Import these instead of copy-pasting Tailwind. One definition, used everywhere. */
 
-import React from 'react'
+import React, { useEffect } from 'react'
 
 /* ─── Outline icons (stroke-based line icons — professional, no emoji) ───
    Usage: <Icon name="bolt" />  ·  size + color inherit via currentColor. */
@@ -216,5 +216,37 @@ export function StatTile({ label, value, accent = 'indigo', sub }:
       <p className="text-3xl font-semibold tracking-tight mt-2 tabular-nums text-fg">{value}</p>
       {sub && <p className="text-xs mt-1 text-faint">{sub}</p>}
     </Card>
+  )
+}
+
+/* ─── Drawer: a panel that slides in from the right, keeping the page behind it in place ─── */
+export function Drawer({ open, onClose, title, sub, children, footer, width = 'max-w-lg' }: {
+  open: boolean; onClose: () => void; title: React.ReactNode; sub?: React.ReactNode
+  children: React.ReactNode; footer?: React.ReactNode; width?: string
+}) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(1px)' }} />
+      <aside role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}
+        className={`absolute right-0 top-0 h-full w-full ${width} flex flex-col tm-drawer`}
+        style={{ background: 'var(--tm-bg-elev)', borderLeft: '1px solid var(--tm-border)', boxShadow: 'var(--tm-shadow)' }}>
+        <div className="flex items-start gap-3 px-5 py-4" style={{ borderBottom: '1px solid var(--tm-border)' }}>
+          <div className="flex-1 min-w-0">
+            <div className="text-base font-semibold text-fg">{title}</div>
+            {sub && <div className="text-xs text-faint mt-0.5">{sub}</div>}
+          </div>
+          <button onClick={onClose} aria-label="Close panel" className="tm-btn tm-btn-quiet tm-btn-icon"><Icon name="x" size={16} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="px-5 py-3 flex items-center gap-2" style={{ borderTop: '1px solid var(--tm-border)' }}>{footer}</div>}
+      </aside>
+    </div>
   )
 }

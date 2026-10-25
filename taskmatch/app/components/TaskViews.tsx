@@ -36,13 +36,14 @@ const COLUMNS = [
   { status: 'Completed', label: 'Completed', dot: 'var(--tm-sky)' },
 ]
 
-export function TaskBoard({ tasks, assignees, canMove, isLocked, onMove, flags }: {
+export function TaskBoard({ tasks, assignees, canMove, isLocked, onMove, flags, onOpen }: {
   tasks: any[]
   assignees: Record<string, Assignee[]>
   canMove: boolean
   isLocked: (t: any) => boolean
   onMove: (id: string, status: string) => void
   flags: (t: any) => React.ReactNode
+  onOpen?: (id: string) => void
 }) {
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
@@ -83,7 +84,8 @@ export function TaskBoard({ tasks, assignees, canMove, isLocked, onMove, flags }
                     style={{ opacity: dragging === t.id ? 0.5 : 1, backdropFilter: 'none' }}>
                     <div className="flex items-start gap-2">
                       <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: severityDot(t.severity) }} title={`${t.severity || 'Low'} severity`} />
-                      <Link href={`/tasks/${t.id}`} className="text-sm text-fg hover:underline flex-1 min-w-0" draggable={false}>{t.description}</Link>
+                      <Link href={`/tasks/${t.id}`} className="text-sm text-fg hover:underline flex-1 min-w-0" draggable={false}
+                        onClick={e => { if (!onOpen || e.metaKey || e.ctrlKey) return; e.preventDefault(); onOpen(t.id) }}>{t.description}</Link>
                     </div>
                     {t.task_skills?.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2 pl-4">
@@ -119,7 +121,7 @@ export function TaskBoard({ tasks, assignees, canMove, isLocked, onMove, flags }
 }
 
 /* ─── Calendar: tasks placed on their due date, one month at a time. ─── */
-export function TaskCalendar({ tasks }: { tasks: any[] }) {
+export function TaskCalendar({ tasks, onOpen }: { tasks: any[]; onOpen?: (id: string) => void }) {
   const now = new Date()
   const [month, setMonth] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
   const first = new Date(month.getFullYear(), month.getMonth(), 1)
@@ -164,6 +166,7 @@ export function TaskCalendar({ tasks }: { tasks: any[] }) {
                 )}
                 {list.slice(0, 3).map(t => (
                   <Link key={t.id} href={`/tasks/${t.id}`} title={t.description}
+                    onClick={e => { if (!onOpen || e.metaKey || e.ctrlKey) return; e.preventDefault(); onOpen(t.id) }}
                     className="text-[11px] truncate rounded px-1.5 py-0.5 flex items-center gap-1 hover:opacity-80"
                     style={{ background: 'var(--tm-surface-2)', color: t.status === 'Completed' ? 'var(--tm-text-faint)' : 'var(--tm-text)', textDecoration: t.status === 'Completed' ? 'line-through' : undefined }}>
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: severityDot(t.severity) }} />
