@@ -34,6 +34,7 @@ const PRESETS = [
 // A saved view is just a named set of filters, kept in this browser.
 type SavedView = { name: string; q: string; status: string; severity: string; group: string; project?: string; preset: string; sort: Sort; view: View }
 const SAVED_KEY = 'tm-task-views'
+const LAYOUT_KEY = 'tm-task-layout'  // the layout you last picked (list, board or calendar)
 const SEV_RANK: Record<string, number> = { Critical: 0, Medium: 1, Low: 2 }
 const STATUS_RANK: Record<string, number> = { New: 0, 'In Progress': 1, Completed: 2 }
 
@@ -72,7 +73,7 @@ export default function Tasks() {
   const [assigning, setAssigning] = useState<string | null>(null)
   const [taskAssignees, setTaskAssignees] = useState<{ [task_id: string]: any[] }>({})
   const [taskMenuOpen, setTaskMenuOpen] = useState<string | null>(null)   // per-row "⋯" actions menu
-  const [view, setView] = useState<View>('list')
+  const [view, setView] = useState<View>('board')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('due')
   const [preset, setPreset] = useState('all')
@@ -91,7 +92,11 @@ export default function Tasks() {
     if (q.get('project')) setProjectFilter(q.get('project')!)
     if (q.get('q')) setQuery(q.get('q')!)
     if (PRESETS.some(p => p.key === q.get('preset'))) setPreset(q.get('preset')!)
-    if (['list', 'board', 'calendar'].includes(q.get('view') || '')) setView(q.get('view') as View)
+    // Layout: the link's, else the one you last picked, else the board.
+    let stored = ''
+    try { stored = localStorage.getItem(LAYOUT_KEY) || '' } catch { /* private mode */ }
+    const layout = q.get('view') || stored
+    if (['list', 'board', 'calendar'].includes(layout)) setView(layout as View)
     if (['due', 'severity', 'status', 'name'].includes(q.get('sort') || '')) setSort(q.get('sort') as Sort)
     if (q.get('open')) setQuickId(q.get('open'))
     if (q.get('new') === '1') setShowForm(true)
@@ -123,7 +128,7 @@ export default function Tasks() {
     const u = new URL(window.location.href)
     const set = (k: string, v: string, def: string) => { if (v && v !== def) u.searchParams.set(k, v); else u.searchParams.delete(k) }
     set('status', statusFilter, 'all'); set('severity', severityFilter, 'all'); set('group', groupFilter, 'all'); set('project', projectFilter, 'all')
-    set('q', query.trim(), ''); set('preset', preset, 'all'); set('view', view, 'list'); set('sort', sort, 'due')
+    set('q', query.trim(), ''); set('preset', preset, 'all'); set('view', view, 'board'); set('sort', sort, 'due')
     set('open', quickId || '', ''); u.searchParams.delete('new')
     window.history.replaceState(null, '', u)
   }, [statusFilter, severityFilter, groupFilter, projectFilter, query, preset, view, sort, quickId])
@@ -605,7 +610,7 @@ const updateTaskStatus = async (id: string, status: string) => {
           </div>
           <div className="tm-seg" aria-label="Layout">
             {([['list', 'List', 'list'], ['board', 'Board', 'grid'], ['calendar', 'Calendar', 'clock']] as const).map(([k, label, icon]) => (
-              <button key={k} onClick={() => { setView(k); setSelected([]) }} aria-pressed={view === k}>
+              <button key={k} onClick={() => { setView(k); setSelected([]); try { localStorage.setItem(LAYOUT_KEY, k) } catch { /* private mode */ } }} aria-pressed={view === k}>
                 <Icon name={icon} size={14} /> {label}
               </button>
             ))}
