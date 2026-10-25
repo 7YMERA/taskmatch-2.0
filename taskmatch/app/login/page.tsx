@@ -1,16 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AmbientBackground, Button, Icon } from '../components/ui'
 import { ThemeToggle } from '../lib/theme'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const SIGNIN_MSGS = ['Signing you in…', 'Loading your workspace…', 'Almost there…']
 

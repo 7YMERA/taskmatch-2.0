@@ -20,7 +20,7 @@ Same features. Real engineering. This is the current focus.
 | 3 | Lock CORS to known origins | any site could call the API | ☐ todo |
 | 4 | Validate request bodies with typed schemas (Pydantic) | reject bad data at the door | ☐ todo |
 | 5 | Handle DB/Supabase errors gracefully | no raw 500s | ☐ todo |
-| 6 | Rate limiting | protect the free tier from abuse | ☐ todo |
+| 6 | Rate limiting | protect the free tier from abuse | ✅ done |
 | 7 | Test suite for the matcher + core logic | change code safely | ☐ todo |
 | 8 | CI on every push (lint, type-check, tests) | catch breaks automatically | ☐ todo |
 | 9 | API README + setup guide | a marker/dev can run it | ☐ todo |
@@ -62,7 +62,7 @@ Biggest scope. "Startup", not "FYP".
   but rotate it in Supabase if you want it gone for good.
 - `role.ts` UI role-toggle is a testing aid; the server now ignores it (correct),
   but it should not reach production unchanged.
-- Supabase client is created separately in ~8 frontend files — one shared helper.
+- ~~Supabase client is created separately in ~8 frontend files — one shared helper.~~ Done: `app/lib/supabase.ts`.
 - `taskmatch-api/main.py` is a single large file; split into modules as it grows.
 - Frontend lint has legacy `any` types (`dashboard/page.tsx`, `SkillPicker.tsx`)
   and unused imports. CI runs lint as **advisory** until these are cleaned; make

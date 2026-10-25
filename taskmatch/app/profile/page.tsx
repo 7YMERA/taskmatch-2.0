@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../lib/log'
@@ -11,12 +11,6 @@ import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
 import { toast, confirmDialog } from '../lib/ui'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 
 export default function Profile() {
@@ -74,7 +68,7 @@ export default function Profile() {
     setAssignments(assignData || [])
 
     try {
-      const res = await axios.get(`${API}/recommend-tasks/${studentId}`)
+      const res = await axios.get(`${API}/recommend-tasks/${studentId}`, { headers: await authHeaders() })
       setRecommended({ qualified: res.data.qualified || [], growth: res.data.growth || [] })
     } catch {
       setRecommended({ qualified: [], growth: [] })
@@ -96,7 +90,7 @@ export default function Profile() {
       const res = await axios.post(`${API}/complete`, {
         assignment_id: assignmentId,
         actual_hours,
-      }, { headers: await authHeader() })
+      }, { headers: await authHeaders() })
       toast(res.data.score != null && res.data.committed_hours != null
         ? `Completed! Score ${res.data.score} (${res.data.committed_hours}h committed vs ${res.data.elapsed_hours}h actual)`
         : `Completed! Your score: ${res.data.score ?? 'n/a'}`, 'success')
@@ -106,19 +100,13 @@ export default function Profile() {
     }
   }
 
-  // Bearer header so the API can verify who's picking the task up.
-  const authHeader = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session ? { Authorization: `Bearer ${session.access_token}` } : {}
-  }
-
   // Self-assign: the API resolves the student from this token, so it can only ever add
   // the task to the caller's own account.
   const pickTask = async (taskId: string, desc: string) => {
     if (!(await confirmDialog({ title: 'Pick up this task?', message: `"${desc}" will be added to your tasks — start its timer from My Tasks when you begin.`, confirmLabel: 'Pick it up' }))) return
     setPicking(taskId)
     try {
-      const headers = await authHeader()
+      const headers = await authHeaders()
       await axios.post(`${API}/self-assign`, { task_id: taskId }, { headers })
       if (student) await loadTasks(student.id)
       toast(`"${desc}" added to your tasks.`, 'success')
@@ -147,7 +135,6 @@ export default function Profile() {
     setStudent(refreshed)
     setSaving(false)
   }
-
 
   const saveSkills = async () => {
     if (!student) return

@@ -1,11 +1,12 @@
 import os
+import time
 import logging
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from supabase import create_client
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import date, datetime, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -18,6 +19,70 @@ except Exception:
     pass
 
 app = FastAPI()
+
+
+# ─── Rate limiting — per-client sliding window, in memory ───
+# Caps how many requests one client (IP) can make per minute, so a script can't
+# hammer the matcher (each /recommend call scans several whole tables) or brute-force
+# tokens. In-memory is enough for a single server process; a multi-instance deploy
+# would need a shared store (e.g. Redis) instead.
+#
+# Behind a proxy (Render), run uvicorn with --proxy-headers --forwarded-allow-ips='*'
+# so request.client.host is the real visitor, not the proxy — otherwise every user
+# shares one bucket.
+
+class RateLimiter:
+    """Sliding-window log: remember each client's recent request times, refuse once
+    there are `limit` of them inside the last `window` seconds."""
+
+    def __init__(self, limit, window=60.0):
+        self.limit = limit
+        self.window = window
+        self._hits = defaultdict(deque)
+
+    def hit(self, key, now=None):
+        """Record one request for `key`. Returns None if allowed, otherwise the number
+        of seconds until the client may retry. A limit of 0 or less disables limiting."""
+        if self.limit <= 0:
+            return None
+        now = time.monotonic() if now is None else now
+        cutoff = now - self.window
+        hits = self._hits[key]
+        while hits and hits[0] <= cutoff:
+            hits.popleft()
+        if len(hits) >= self.limit:
+            return max(hits[0] + self.window - now, 0.0)
+        hits.append(now)
+        if len(self._hits) > 10_000:
+            self._sweep(cutoff)
+        return None
+
+    def _sweep(self, cutoff):
+        # Drop clients with no recent requests so memory can't grow without bound.
+        for k in [k for k, h in self._hits.items() if not h or h[-1] <= cutoff]:
+            del self._hits[k]
+
+
+RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "120"))  # 0 = off
+rate_limiter = RateLimiter(RATE_LIMIT_PER_MINUTE, 60.0)
+RATE_LIMIT_EXEMPT = {"/health"}  # the frontend's wake-up ping must always get through
+
+
+# Registered BEFORE the CORS middleware so CORS wraps it: the 429 still carries CORS
+# headers (the browser can read it) and preflight OPTIONS never counts against a client.
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    if request.url.path in RATE_LIMIT_EXEMPT:
+        return await call_next(request)
+    client = request.client.host if request.client else "unknown"
+    retry_after = rate_limiter.hit(client)
+    if retry_after is not None:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests — please slow down and try again shortly."},
+            headers={"Retry-After": str(int(retry_after) + 1)},
+        )
+    return await call_next(request)
 
 # CORS_ORIGINS = comma-separated allowed origins (your deployed frontend URL,
 # e.g. "https://taskmatch.vercel.app,http://localhost:3000").
@@ -95,7 +160,7 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) if SUPABASE_SERVICE_ROLE_KEY else None
 
 
-# ─── Auth helpers — only the admin endpoints below are gated ───
+# ─── Auth helpers — every endpoint except /health requires a login ───
 
 def _bearer(authorization):
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -231,7 +296,8 @@ def compute_student_stats():
 # ─── Core matching algorithm ───────────────────────────────────
 
 @app.get("/recommend/{task_id}")
-def recommend(task_id: str):
+def recommend(task_id: str, authorization: str = Header(None)):
+    require_user(authorization)
 
     # Step 1: Get all required skills for this task
     task_skills = (
@@ -674,9 +740,10 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
 
 
 @app.get("/student-stats")
-def student_stats():
+def student_stats(authorization: str = Header(None)):
     """Per-student performance summary: average score over completed, scored
     assignments, plus a band (high/avg/low/unrated) used for matching + display."""
+    require_user(authorization)
     stats = compute_student_stats()
     students = (supabase.table("students").select("id, name").execute()).data
     out = []
@@ -687,11 +754,12 @@ def student_stats():
 
 
 @app.get("/wip")
-def wip_status():
+def wip_status(authorization: str = Header(None)):
     """Per-student work-in-progress load: how many active (Assigned or In Progress)
     assignments each student holds, against the shared WIP limit. Same definition the
     matcher and /assign use, so the badges everywhere agree. Powers the WIP badges on the
     Students page, the task-assignment view, and the dashboard WIP panel."""
+    require_user(authorization)
     active = (
         supabase.table("assignments")
         .select("student_id, task_id, status, tasks(description)")
@@ -729,12 +797,13 @@ def wip_status():
 # ─── Reverse matching: recommend tasks for a student ───────────
 
 @app.get("/recommend-tasks/{student_id}")
-def recommend_tasks(student_id: str):
+def recommend_tasks(student_id: str, authorization: str = Header(None)):
     """Given a student, return open tasks whose skill requirements they meet.
 
     Mirror of /recommend but from the student's perspective — used by the
     student profile page to show 'tasks recommended for you'.
     """
+    require_user(authorization)
 
     # Step 1: This student's skill profile
     student_skills = (

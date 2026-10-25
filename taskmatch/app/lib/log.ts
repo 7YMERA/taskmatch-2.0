@@ -1,12 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from './supabase'
 import { effectiveRole } from './role'
 
-// Dedicated client for writing audit entries. activity_logs has RLS that
-// allows INSERT + SELECT but denies UPDATE/DELETE, so rows are append-only.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// activity_logs has RLS that allows INSERT + SELECT but denies UPDATE/DELETE,
+// so rows written here are append-only.
 
 export type LogEntry = {
   action: string          // e.g. 'task.created', 'student.skills_updated'

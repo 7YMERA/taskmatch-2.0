@@ -2,19 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { supabase, API } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import { effectiveRole, setRoleOverride } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
 import { Icon } from './ui'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function Sidebar() {
   const router = useRouter()
