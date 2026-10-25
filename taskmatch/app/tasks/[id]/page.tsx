@@ -7,10 +7,18 @@ import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../../lib/log'
 import Sidebar from '../../components/Sidebar'
-import { toast, confirmDialog } from '../../lib/ui'
+import { toast, confirmDialog, promptDialog } from '../../lib/ui'
 import { effectiveRole } from '../../lib/role'
+import { Card, Badge, Button, Input, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const MUTED = { color: 'var(--tm-text-muted)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
+const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function TaskDetail() {
   const router = useRouter()
@@ -114,7 +122,7 @@ export default function TaskDetail() {
   }
 
   const completeAssignment = async (assignmentId: string, name: string) => {
-    const input = prompt(`Mark ${name}'s work complete.\n\nActual hours spent (optional — blank uses tracked elapsed time):`)
+    const input = await promptDialog({ title: `Mark ${name}'s work complete`, message: 'How many hours were actually spent? Leave blank to use the tracked time.', label: 'Actual hours (optional)', placeholder: 'e.g. 4.5', inputMode: 'decimal', confirmLabel: 'Mark complete' })
     if (input === null) return
     const trimmed = input.trim()
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
@@ -144,16 +152,14 @@ export default function TaskDetail() {
     loadComments()
   }
 
-  const statusColor = (s: string) =>
-    s === 'New' ? 'bg-yellow-500/20 text-yellow-400'
-      : s === 'In Progress' ? 'bg-green-500/20 text-green-400'
-      : s === 'Completed' ? 'bg-blue-500/20 text-blue-400'
-      : 'bg-white/10 text-white/40'
-
-  const severityColor = (s: string) =>
-    s === 'Critical' ? 'bg-red-500/20 text-red-400'
-      : s === 'Medium' ? 'bg-amber-500/20 text-amber-400'
-      : 'bg-white/10 text-white/50'
+  // Status / severity → design-system accents (same colours as the Tasks list).
+  const statusAccent = (s: string) =>
+    s === 'New' ? 'amber' as const
+      : s === 'In Progress' || s === 'Assigned' ? 'emerald' as const
+        : s === 'Completed' ? 'sky' as const
+          : 'indigo' as const
+  const statusLabel = (s: string) => s === 'In Progress' ? 'Ongoing' : s
+  const severityDot = (s: string) => s === 'Critical' ? 'var(--tm-rose)' : s === 'Medium' ? 'var(--tm-amber)' : 'var(--tm-text-faint)'
 
   const GRACE_DAYS = 7
   const today = new Date().toISOString().slice(0, 10)
@@ -162,8 +168,8 @@ export default function TaskDetail() {
   const isLate = (t: any) => t && t.status === 'Completed' && t.completed_at && t.completed_at.slice(0, 10) > t.due_date
 
   const bandChip = (band: string, avg: number | null) => {
-    const map: any = { high: 'bg-emerald-500/20 text-emerald-400', avg: 'bg-amber-500/20 text-amber-400', low: 'bg-red-500/20 text-red-400', unrated: 'bg-white/10 text-white/40' }
-    return <span className={`text-xs px-2 py-0.5 rounded-full ${map[band] || map.unrated}`}>{band === 'unrated' ? '— unrated' : `${band} ${avg ?? ''}`.trim()}</span>
+    if (band === 'unrated') return <span className="tm-chip">unrated</span>
+    return <Badge accent={bandAccent(band)}>{`${band} ${avg ?? ''}`.trim()}</Badge>
   }
 
   const initials = (n: string) => n?.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
@@ -172,167 +178,195 @@ export default function TaskDetail() {
   // WIP badge: green with room, amber on the last slot, red when at/over the limit.
   const wipLimit = meta?.wip_limit ?? 3
   const wipChip = (wip: number) => {
-    const cls = wip >= wipLimit ? 'bg-red-500/20 text-red-400'
-      : wip >= wipLimit - 1 ? 'bg-amber-500/20 text-amber-400'
-        : 'bg-emerald-500/20 text-emerald-400'
-    return <span title={`${wip} active task${wip === 1 ? '' : 's'} out of a limit of ${wipLimit}`}
-      className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>WIP {wip}/{wipLimit}</span>
+    const accent = wip >= wipLimit ? 'rose' as const : wip >= wipLimit - 1 ? 'amber' as const : 'emerald' as const
+    return <span title={`${wip} active task${wip === 1 ? '' : 's'} out of a limit of ${wipLimit}`}>
+      <Badge accent={accent}>WIP {wip}/{wipLimit}</Badge>
+    </span>
   }
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <Link href="/tasks" className="text-xs text-white/40 hover:text-white">← Back to tasks</Link>
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
+        <Link href="/tasks" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
+          <Icon name="arrowLeft" size={13} /> Back to tasks
+        </Link>
 
         {loading ? (
-          <p className="text-white/40 text-sm mt-6">Loading...</p>
+          <div className="mt-4 flex flex-col gap-6">
+            <Skeleton style={{ height: 96 }} />
+            <div className="grid md:grid-cols-2 gap-6"><SkeletonCard /><SkeletonCard /></div>
+          </div>
         ) : !task ? (
-          <p className="text-white/40 text-sm mt-6">Task not found.</p>
+          <Card className="mt-4">
+            <EmptyState icon={<Icon name="list" size={28} />} title="Task not found" hint="It may have been deleted." />
+          </Card>
         ) : (
           <>
             {/* Header */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-4 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <h1 className="text-xl font-semibold text-white">{task.description}</h1>
-                  <div className="flex gap-2 mt-2 flex-wrap items-center">
-                    {task.severity && <span className={`text-xs px-2 py-0.5 rounded-full ${severityColor(task.severity)}`}>{task.severity}</span>}
-                    <span className={`text-xs px-2 py-1 rounded-full ${statusColor(task.status)}`}>{task.status}</span>
-                    {isLate(task) && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400" title={`Delivered after due ${task.due_date}`}>Late</span>
-                    )}
-                    {isDelayed(task) && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400" title={`SLA breached — past due ${task.due_date}`}>Delayed</span>
-                    )}
-                    {isClosed(task) && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/50" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>Closed </span>
-                    )}
-                    {task.task_skills?.map((ts: any) => (
-                      <span key={ts.skill_id} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                        {ts.skills?.skill_name} · {PROFICIENCY[ts.min_proficiency]}+
+            <Card className="p-5 mt-4 mb-6 tm-fade-up">
+              <div className="flex flex-wrap items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-semibold tracking-tight" style={TEXT}>{task.description}</h1>
+                  <div className="flex gap-2 mt-3 flex-wrap items-center">
+                    {task.severity && (
+                      <span className="tm-chip gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: severityDot(task.severity) }} />
+                        {task.severity}
                       </span>
-                    ))}
+                    )}
+                    <Badge accent={statusAccent(task.status)}>{statusLabel(task.status)}</Badge>
+                    {isLate(task) && <span title={`Delivered after due ${task.due_date}`}><Badge accent="amber">late</Badge></span>}
+                    {isDelayed(task) && <span title={`SLA breached — past due ${task.due_date}`}><Badge accent="rose">delayed</Badge></span>}
+                    {isClosed(task) && <span className="tm-chip" title={`Auto-closed — overdue more than ${GRACE_DAYS} days`}>closed</span>}
                   </div>
+                  {task.task_skills?.length > 0 && (
+                    <div className="flex gap-1.5 mt-3 flex-wrap">
+                      {task.task_skills.map((ts: any) => (
+                        <span key={ts.skill_id} className="tm-chip">
+                          {ts.skills?.skill_name}<span className="ml-1" style={FAINT}>· {PROFICIENCY[ts.min_proficiency]}+</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="text-right text-xs text-white/40">
-                  {task.committed_hours != null && <p>{task.committed_hours}h committed</p>}
+                <div className="text-xs flex flex-col items-end gap-1" style={FAINT}>
+                  {task.committed_hours != null && <p className="flex items-center gap-1"><Icon name="clock" size={12} /> {task.committed_hours}h committed</p>}
                   {(task.start_date || task.due_date) && <p>{task.start_date || '…'} → {task.due_date || '…'}</p>}
                 </div>
               </div>
-            </div>
+            </Card>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               {/* Assignees */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                <p className="text-sm font-medium text-white mb-1">Team ({assignees.length})</p>
+              <Card className="p-5">
+                <p className="text-sm font-medium mb-1" style={TEXT}>Team ({assignees.length})</p>
                 {assignees.length < 2 && (
-                  <p className="text-xs text-amber-400 mb-3">Tasks should have at least 2 people.</p>
+                  <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: 'var(--tm-amber)' }}>
+                    <Icon name="alert" size={13} /> Tasks should have at least 2 people.
+                  </p>
                 )}
                 {assignees.length === 0 ? (
-                  <p className="text-xs text-white/40">No one assigned yet.</p>
+                  <p className="text-xs" style={FAINT}>No one assigned yet.</p>
                 ) : (
                   <div className="flex flex-col gap-2 mt-2">
                     {assignees.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-semibold shrink-0">{initials(a.students?.name)}</div>
-                        <div className="flex-1">
+                      <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-lg p-3" style={ROW}>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style={AVATAR}>{initials(a.students?.name)}</div>
+                        <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-2 flex-wrap">
-                            <Link href={`/students/${a.student_id}`} className="text-sm text-white hover:underline">{a.students?.name}</Link>
+                            <Link href={`/students/${a.student_id}`} className="text-sm hover:underline" style={TEXT}>{a.students?.name}</Link>
                             {recs.length > 0 && wipChip(recs.find(r => r.student_id === a.student_id)?.wip ?? 0)}
                           </span>
-                          <p className="text-xs text-white/40">
-                            {a.status}
+                          <p className="text-xs mt-0.5" style={FAINT}>
+                            {statusLabel(a.status)}
                             {a.score != null ? ` · score ${a.score}` : ''}
                             {a.actual_hours != null ? ` · ${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
-                            {userRole === 'leader' && a.timed_hours != null ? ` · ⏱ ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
+                            {userRole === 'leader' && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
                           </p>
                         </div>
-                        {a.status === 'Assigned' && !isClosed(task) && (
-                          <button onClick={() => startAssignment(a.id)}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 transition">▶ Start</button>
-                        )}
-                        {a.status === 'In Progress' && !isClosed(task) && (
-                          <button onClick={() => completeAssignment(a.id, a.students?.name)}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-green-500/30 text-green-400 hover:bg-green-500/10 transition">Complete</button>
-                        )}
-                        {userRole === 'leader' && a.status !== 'Completed' && (
-                          <button onClick={() => removeAssignee(a.id, a.students?.name, a.status)} title="Remove from this task"
-                            className="text-xs px-2.5 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition">Remove</button>
-                        )}
+                        <div className="flex gap-2 shrink-0">
+                          {a.status === 'Assigned' && !isClosed(task) && (
+                            <Button variant="ghost" className="tm-btn-sm" onClick={() => startAssignment(a.id)}>
+                              <Icon name="arrowRight" size={13} /> Start
+                            </Button>
+                          )}
+                          {a.status === 'In Progress' && !isClosed(task) && (
+                            <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-emerald)' }} onClick={() => completeAssignment(a.id, a.students?.name)}>
+                              <Icon name="check" size={13} /> Complete
+                            </Button>
+                          )}
+                          {userRole === 'leader' && a.status !== 'Completed' && (
+                            <button onClick={() => removeAssignee(a.id, a.students?.name, a.status)} title="Remove from this task" aria-label="Remove from this task"
+                              className="tm-btn tm-btn-ghost tm-btn-icon" style={{ color: 'var(--tm-rose)' }}>
+                              <Icon name="trash" size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
 
               {/* Recommendations */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                <p className="text-sm font-medium text-white mb-1">Recommended</p>
-                <p className="text-[11px] text-white/35 mb-2">Ranked by: meets all required skills first → best skill match → least busy (WIP). The performance band is shown for context, but it doesn&apos;t set the order — a strong skill-match can rank above a higher performer.</p>
+              <Card className="p-5">
+                <p className="text-sm font-medium mb-1" style={TEXT}>Recommended</p>
+                <p className="text-[11px] mb-3" style={FAINT}>Ranked by: meets all required skills first → best skill match → least busy (WIP). The performance band is shown for context, but it doesn&apos;t set the order — a strong skill-match can rank above a higher performer.</p>
                 {isClosed(task) && (
-                  <div className="my-2 rounded-lg border border-white/15 bg-white/5 p-2.5">
-                    <p className="text-xs text-white/70">This task is closed (SLA window expired), so assignments are disabled. This is about the task&apos;s deadline — not any student&apos;s skill level.</p>
+                  <div className="mb-3 rounded-lg p-3" style={{ ...ROW, border: '1px solid var(--tm-border)' }}>
+                    <p className="text-xs flex items-start gap-1.5" style={MUTED}>
+                      <span className="mt-px"><Icon name="lock" size={13} /></span>
+                      This task is closed (SLA window expired), so assignments are disabled. This is about the task&apos;s deadline — not any student&apos;s skill level.
+                    </p>
                   </div>
                 )}
                 {meta?.suggested_pair && (
-                  <div className="my-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-2.5">
-                    <p className="text-xs font-medium text-indigo-300 mb-1">️ Suggested balanced pair</p>
-                    <p className="text-xs text-white/60">{meta.suggested_pair.reason}</p>
-                  </div>
+                  <Card tint="indigo" className="mb-3 p-3 !rounded-lg">
+                    <p className="text-xs font-medium mb-1 flex items-center gap-1.5" style={{ color: 'var(--tm-primary-text)' }}>
+                      <Icon name="scale" size={14} /> Suggested balanced pair
+                    </p>
+                    <p className="text-xs" style={MUTED}>{meta.suggested_pair.reason}</p>
+                  </Card>
                 )}
-                <div className="flex flex-col gap-2 mt-2 max-h-96 overflow-y-auto">
+                <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
                   {recs.filter(r => !assignedIds.has(r.student_id)).map(r => (
-                    <div key={r.student_id} className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5">
-                      <div className="flex-1">
-                        <p className="text-sm text-white flex items-center gap-2 flex-wrap">
+                    <div key={r.student_id} className="flex items-center gap-3 rounded-lg p-3" style={ROW}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                        style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
+                        {initials(r.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm flex items-center gap-2 flex-wrap" style={TEXT}>
                           {r.name}
                           {bandChip(r.band, r.avg_score)}
                           {wipChip(r.wip)}
-                          {!r.qualified && !r.over_wip && <span title="Below the required skill level — can still be assigned as a growth pairing" className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">below min</span>}
+                          {!r.qualified && !r.over_wip && <span title="Below the required skill level — can still be assigned as a growth pairing"><Badge accent="rose">below min</Badge></span>}
                         </p>
-                        <p className="text-xs text-white/30 italic mt-0.5">{r.justification}</p>
+                        <p className="text-xs italic mt-0.5" style={FAINT}>{r.justification}</p>
                       </div>
                       {userRole === 'leader' && (
-                        <button onClick={() => assignStudent(r.student_id, r.name)} disabled={r.over_wip || isClosed(task) || assigning === r.student_id}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/70 hover:bg-white/10 transition disabled:opacity-30 disabled:hover:bg-transparent">{assigning === r.student_id ? 'Assigning…' : 'Assign'}</button>
+                        <Button variant="ghost" className="tm-btn-sm shrink-0"
+                          onClick={() => assignStudent(r.student_id, r.name)}
+                          disabled={r.over_wip || isClosed(task) || assigning === r.student_id}>
+                          {assigning === r.student_id ? 'Assigning…' : <><Icon name="plus" size={14} /> Assign</>}
+                        </Button>
                       )}
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             </div>
 
             {/* Comments */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-6">
-              <p className="text-sm font-medium text-white mb-4">Comments ({comments.length})</p>
+            <Card className="p-5 mt-6">
+              <p className="text-sm font-medium mb-4" style={TEXT}>Comments ({comments.length})</p>
               <div className="flex flex-col gap-3 mb-4">
                 {comments.length === 0 ? (
-                  <p className="text-xs text-white/40">No comments yet. Share progress or notes below.</p>
+                  <p className="text-xs" style={FAINT}>No comments yet. Share progress or notes below.</p>
                 ) : comments.map(c => (
-                  <div key={c.id} className="bg-white/5 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-white/80">{c.author_email}</span>
-                      {c.author_role && <span className="text-xs text-white/30">· {c.author_role}</span>}
-                      <span className="text-xs text-white/30 ml-auto">{new Date(c.created_at).toLocaleString()}</span>
+                  <div key={c.id} className="rounded-lg p-3" style={ROW}>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-xs font-medium" style={MUTED}>{c.author_email}</span>
+                      {c.author_role && <span className="tm-chip !text-[11px] !py-0">{c.author_role}</span>}
+                      <span className="text-xs ml-auto" style={FAINT}>{new Date(c.created_at).toLocaleString()}</span>
                     </div>
-                    <p className="text-sm text-white/80 whitespace-pre-wrap">{c.body}</p>
+                    <p className="text-sm whitespace-pre-wrap" style={TEXT}>{c.body}</p>
                   </div>
                 ))}
               </div>
               <div className="flex gap-2">
-                <input
+                <Input
                   value={newComment}
                   onChange={e => setNewComment(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') addComment() }}
                   placeholder="Write a comment on progress…"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500 transition"
+                  className="flex-1"
                 />
-                <button onClick={addComment}
-                  className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">Post</button>
+                <Button onClick={addComment} disabled={!newComment.trim()}>Post</Button>
               </div>
-            </div>
+            </Card>
           </>
         )}
       </main>

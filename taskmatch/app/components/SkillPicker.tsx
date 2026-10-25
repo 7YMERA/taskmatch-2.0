@@ -34,7 +34,7 @@ export default function SkillPicker({
           <div key={sk.id}
             className="flex items-center rounded-lg border transition"
             style={selected
-              ? { borderColor: 'var(--tm-indigo)', background: 'color-mix(in srgb, #6366f1 14%, transparent)' }
+              ? { borderColor: 'var(--tm-primary)', background: 'var(--tm-primary-soft)' }
               : { borderColor: 'var(--tm-border)' }}>
             <button type="button" onClick={() => toggle(sk.id)}
               className="text-xs pl-3 pr-2 py-1.5 whitespace-nowrap transition hover:opacity-80"
@@ -48,7 +48,7 @@ export default function SkillPicker({
                     title={labels[n - 1]}
                     className="w-5 h-5 rounded text-[10px] font-semibold transition"
                     style={lvl >= n
-                      ? { background: 'var(--tm-indigo)', color: '#fff' }
+                      ? { background: 'var(--tm-primary)', color: '#fff' }
                       : { background: 'var(--tm-surface-2)', color: 'var(--tm-text-faint)' }}>
                     {['B', 'I', 'A'][n - 1]}
                   </button>

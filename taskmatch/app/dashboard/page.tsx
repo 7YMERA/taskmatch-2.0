@@ -8,7 +8,7 @@ import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import Donut from '../components/Donut'
 import { effectiveRole } from '../lib/role'
-import { Card, StatTile, Badge, Icon, bandAccent, Skeleton } from '../components/ui'
+import { Card, StatTile, Badge, Icon, bandAccent, Skeleton, PageHeader } from '../components/ui'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -54,19 +54,6 @@ export default function Dashboard() {
   const initials = (name: string) =>
     name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
 
-  const bandClass = (band: string) => ({
-    high: 'bg-emerald-500/20 text-emerald-400',
-    avg: 'bg-amber-500/20 text-amber-400',
-    low: 'bg-red-500/20 text-red-400',
-    unrated: 'bg-white/10 text-white/40',
-  }[band] || 'bg-white/10 text-white/40')
-
-  const statusColor = (status: string) => {
-    if (status === 'New') return 'bg-yellow-500/20 text-yellow-400'
-    if (status === 'In Progress') return 'bg-green-500/20 text-green-400'
-    if (status === 'Completed') return 'bg-blue-500/20 text-blue-400'
-    return 'bg-white/10 text-white/40'
-  }
 
   const scoreBand = (s: number) => s >= 0.6 ? 'high' : s >= 0.4 ? 'avg' : 'low'
 
@@ -130,11 +117,11 @@ export default function Dashboard() {
           : t.status === 'In Progress' ? 'Ongoing'
             : 'New'
   const LIFECYCLE = [
-    { label: 'New', color: '#eab308' },
-    { label: 'Ongoing', color: '#22c55e' },
-    { label: 'Completed', color: '#3b82f6' },
-    { label: 'Delayed', color: '#ef4444' },
-    { label: 'Closed', color: '#9ca3af' },
+    { label: 'New', color: 'var(--tm-chart-4)' },
+    { label: 'Ongoing', color: 'var(--tm-chart-1)' },
+    { label: 'Completed', color: 'var(--tm-chart-2)' },
+    { label: 'Delayed', color: 'var(--tm-chart-5)' },
+    { label: 'Closed', color: 'var(--tm-chart-6)' },
   ]
   const bucketTally = tasks.reduce((acc: any, t: any) => { const b = bucketOf(t); acc[b] = (acc[b] || 0) + 1; return acc }, {})
   const lifecycle = LIFECYCLE.map(s => ({ ...s, value: bucketTally[s.label] || 0 })).filter(s => s.value > 0)
@@ -142,10 +129,10 @@ export default function Dashboard() {
 
   // Team performance-band distribution (horizontal bars).
   const BANDS = [
-    { band: 'high', label: 'High', color: '#10b981' },
-    { band: 'avg', label: 'Average', color: '#f59e0b' },
-    { band: 'low', label: 'Low', color: '#ef4444' },
-    { band: 'unrated', label: 'Unrated', color: '#6b7280' },
+    { band: 'high', label: 'High', color: 'var(--tm-chart-2)' },
+    { band: 'avg', label: 'Average', color: 'var(--tm-chart-4)' },
+    { band: 'low', label: 'Low', color: 'var(--tm-chart-5)' },
+    { band: 'unrated', label: 'Unrated', color: 'var(--tm-chart-6)' },
   ]
   const bandCounts = BANDS.map(b => ({ ...b, count: statsList.filter(s => s.band === b.band).length }))
   const bandMax = Math.max(1, ...bandCounts.map(b => b.count))
@@ -153,13 +140,13 @@ export default function Dashboard() {
   // WIP load — slot bars per student, coloured by how close they are to the limit.
   const wipLimit = wipData.wip_limit ?? 3
   const wipLoaded = (wipData.students || []).filter((s: any) => s.wip > 0)
-  const wipColor = (w: number) => w >= wipLimit ? '#ef4444' : w >= wipLimit - 1 ? '#f59e0b' : '#10b981'
+  const wipColor = (w: number) => w >= wipLimit ? 'var(--tm-chart-5)' : w >= wipLimit - 1 ? 'var(--tm-chart-4)' : 'var(--tm-chart-2)'
 
   // Task severity mix (leader visual).
   const SEV = [
-    { label: 'Critical', color: '#ef4444' },
-    { label: 'Medium', color: '#f59e0b' },
-    { label: 'Low', color: '#6b7280' },
+    { label: 'Critical', color: 'var(--tm-chart-5)' },
+    { label: 'Medium', color: 'var(--tm-chart-4)' },
+    { label: 'Low', color: 'var(--tm-chart-6)' },
   ]
   const severityData = SEV.map(s => ({ ...s, value: tasks.filter(t => (t.severity || 'Medium') === s.label).length })).filter(s => s.value > 0)
 
@@ -175,17 +162,18 @@ export default function Dashboard() {
   const myOnTime = myDone.filter(a => { const t = taskMap[a.task_id]; return a.completed_at && t?.due_date && a.completed_at.slice(0, 10) <= t.due_date }).length
   const myOnTimeRate = myDone.length ? Math.round((myOnTime / myDone.length) * 100) : null
   const myStatusData = [
-    { label: 'To do', color: '#eab308', value: myAssignments.filter(a => a.status === 'Assigned').length },
-    { label: 'In progress', color: '#22c55e', value: myAssignments.filter(a => a.status === 'In Progress').length },
-    { label: 'Completed', color: '#3b82f6', value: myDone.length },
+    { label: 'To do', color: 'var(--tm-chart-4)', value: myAssignments.filter(a => a.status === 'Assigned').length },
+    { label: 'In progress', color: 'var(--tm-chart-1)', value: myAssignments.filter(a => a.status === 'In Progress').length },
+    { label: 'Completed', color: 'var(--tm-chart-2)', value: myDone.length },
   ].filter(x => x.value > 0)
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-5 sm:p-8 pt-20 md:pt-8 overflow-y-auto">
-        <h1 className="text-2xl font-semibold mb-6" style={{ color: 'var(--tm-text)' }}>{isLeader ? 'Dashboard' : 'My Dashboard'}</h1>
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10 overflow-y-auto">
+        <PageHeader title={isLeader ? 'Dashboard' : 'My dashboard'}
+          sub={isLeader ? 'How your team and tasks are doing right now.' : 'Your work, scores and what is coming up.'} />
 
         {!roleReady ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -194,16 +182,14 @@ export default function Dashboard() {
         ) : isLeader ? (
         <>
         {/* Section tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {([['overview', 'Overview'], ['workload', 'Workload'], ['performance', 'Performance']] as const).map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className="text-sm px-4 py-2 rounded-lg border transition whitespace-nowrap"
-              style={tab === k
-                ? { borderColor: 'var(--tm-indigo)', background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }
-                : { borderColor: 'var(--tm-border)', color: 'var(--tm-text-muted)' }}>
-              {label}
-            </button>
-          ))}
+        <div className="mb-6 overflow-x-auto pb-1">
+          <div className="tm-seg">
+            {([['overview', 'Overview'], ['workload', 'Workload'], ['performance', 'Performance']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className="whitespace-nowrap !px-3.5">
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {tab === 'overview' && (<>
@@ -238,30 +224,30 @@ export default function Dashboard() {
 
         {/* Visualizations — task lifecycle donut + team performance bars */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-            <p className="text-sm font-medium text-white mb-1">Task lifecycle</p>
-            <p className="text-xs text-white/40 mb-3">Where the {tasks.length} task{tasks.length === 1 ? '' : 's'} stand right now</p>
-            {loading ? <p className="text-white/40 text-sm">Loading…</p>
+          <div className="tm-card p-5">
+            <p className="text-sm font-semibold text-fg mb-1">Task lifecycle</p>
+            <p className="text-xs text-faint mb-3">Where the {tasks.length} task{tasks.length === 1 ? '' : 's'} stand right now</p>
+            {loading ? <p className="text-faint text-sm">Loading…</p>
               : <Donut data={lifecycle} centerLabel="tasks" />}
           </div>
 
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-            <p className="text-sm font-medium text-white mb-1">Performance spread</p>
-            <p className="text-xs text-white/40 mb-4">Students by efficiency band</p>
-            {loading ? <p className="text-white/40 text-sm">Loading…</p>
-              : statsList.length === 0 ? <p className="text-white/40 text-sm">No students yet.</p>
+          <div className="tm-card p-5">
+            <p className="text-sm font-semibold text-fg mb-1">Performance spread</p>
+            <p className="text-xs text-faint mb-4">Students by efficiency band</p>
+            {loading ? <p className="text-faint text-sm">Loading…</p>
+              : statsList.length === 0 ? <p className="text-faint text-sm">No students yet.</p>
               : (
                 <div className="flex flex-col gap-3 mt-2">
                   {bandCounts.map(b => (
                     <div key={b.band} className="flex items-center gap-3">
-                      <span className="text-xs text-white/50 w-16 shrink-0">{b.label}</span>
-                      <div className="flex-1 h-5 rounded bg-white/5 overflow-hidden">
-                        <div className="h-full rounded transition-all" style={{ width: `${(b.count / bandMax) * 100}%`, backgroundColor: b.color, minWidth: b.count ? '0.5rem' : 0 }} />
+                      <span className="text-xs text-muted w-16 shrink-0">{b.label}</span>
+                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--tm-track)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${(b.count / bandMax) * 100}%`, backgroundColor: b.color, minWidth: b.count ? '0.5rem' : 0 }} />
                       </div>
-                      <span className="text-xs text-white/60 tabular-nums w-6 text-right">{b.count}</span>
+                      <span className="text-xs text-muted tabular-nums w-6 text-right">{b.count}</span>
                     </div>
                   ))}
-                  <p className="text-[10px] text-white/30 mt-1">Unrated = no completed scored tasks yet.</p>
+                  <p className="text-[10px] text-faint mt-1">Unrated = no completed scored tasks yet.</p>
                 </div>
               )}
           </div>
@@ -270,35 +256,35 @@ export default function Dashboard() {
 
         {tab === 'workload' && (<>
         {/* Task severity mix */}
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mb-6">
-          <p className="text-sm font-medium text-white mb-1">Task severity</p>
-          <p className="text-xs text-white/40 mb-3">How the {tasks.length} task{tasks.length === 1 ? '' : 's'} break down by priority</p>
-          {loading ? <p className="text-white/40 text-sm">Loading…</p>
-            : severityData.length === 0 ? <p className="text-white/40 text-sm">No tasks yet.</p>
+        <div className="tm-card p-5 mb-6">
+          <p className="text-sm font-semibold text-fg mb-1">Task severity</p>
+          <p className="text-xs text-faint mb-3">How the {tasks.length} task{tasks.length === 1 ? '' : 's'} break down by priority</p>
+          {loading ? <p className="text-faint text-sm">Loading…</p>
+            : severityData.length === 0 ? <p className="text-faint text-sm">No tasks yet.</p>
             : <Donut data={severityData} centerLabel="tasks" />}
         </div>
 
         {/* Work in progress (WIP) tracker */}
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mb-6">
+        <div className="tm-card p-5 mb-6">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-medium text-white">Work in progress (WIP)</p>
-            <span className="text-xs text-white/40">Limit {wipLimit} active tasks / student</span>
+            <p className="text-sm font-semibold text-fg">Work in progress (WIP)</p>
+            <span className="text-xs text-faint">Limit {wipLimit} active tasks / student</span>
           </div>
-          <p className="text-xs text-white/40 mb-4">
+          <p className="text-xs text-faint mb-4">
             {loading ? 'Loading…' : `${wipData.at_limit} at limit · ${wipData.working} working · ${Math.max(0, totalStudents - wipData.working)} idle`}
           </p>
-          {loading ? <p className="text-white/40 text-sm">Loading…</p>
-            : wipLoaded.length === 0 ? <p className="text-white/40 text-sm">No one has an active task right now.</p>
+          {loading ? <p className="text-faint text-sm">Loading…</p>
+            : wipLoaded.length === 0 ? <p className="text-faint text-sm">No one has an active task right now.</p>
             : (
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2.5">
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2.5">
                 {wipLoaded.map((s: any) => (
                   <Link key={s.student_id} href={`/students/${s.student_id}`}
-                    className="flex items-center gap-3 hover:bg-white/5 -mx-2 px-2 py-1 rounded transition"
+                    className="flex items-center gap-3 hover:bg-surface-2 -mx-2 px-2 py-1 rounded transition"
                     title={s.active_tasks?.map((t: any) => t.description).filter(Boolean).join(' · ')}>
-                    <span className="text-xs text-white/70 w-32 truncate shrink-0">{s.name}</span>
+                    <span className="text-xs text-muted w-32 truncate shrink-0">{s.name}</span>
                     <div className="flex-1 flex gap-1">
                       {Array.from({ length: wipLimit }).map((_, i) => (
-                        <div key={i} className="h-3 flex-1 rounded-sm" style={{ backgroundColor: i < s.wip ? wipColor(s.wip) : 'rgba(255,255,255,0.06)' }} />
+                        <div key={i} className="h-3 flex-1 rounded-sm" style={{ backgroundColor: i < s.wip ? wipColor(s.wip) : 'var(--tm-track)' }} />
                       ))}
                     </div>
                     <span className="text-xs tabular-nums w-9 text-right" style={{ color: wipColor(s.wip) }}>{s.wip}/{wipLimit}</span>
@@ -307,7 +293,7 @@ export default function Dashboard() {
               </div>
             )}
           {!loading && wipData.at_limit > 0 && (
-            <p className="text-[11px] text-red-400/70 mt-3">{wipData.at_limit} student{wipData.at_limit === 1 ? '' : 's'} at the WIP limit — they can&apos;t take new tasks until they finish something.</p>
+            <p className="text-[11px] text-[color:var(--tm-rose)] mt-3">{wipData.at_limit} student{wipData.at_limit === 1 ? '' : 's'} at the WIP limit — they can&apos;t take new tasks until they finish something.</p>
           )}
         </div>
         </>)}
@@ -319,18 +305,18 @@ export default function Dashboard() {
             { title: 'Fastest task', icon: '', t: fastest },
             { title: 'Slowest task', icon: '', t: slowest },
           ].map(card => (
-            <div key={card.title} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-              <p className="text-sm font-medium text-white mb-1">{card.title}</p>
-              <p className="text-xs text-white/40 mb-3">By efficiency score (committed vs actual hours)</p>
-              {loading ? <p className="text-white/40 text-sm">Loading…</p>
-                : !card.t ? <p className="text-white/40 text-sm">Not enough completed tasks yet.</p>
+            <div key={card.title} className="tm-card p-5">
+              <p className="text-sm font-semibold text-fg mb-1">{card.title}</p>
+              <p className="text-xs text-faint mb-3">By efficiency score (committed vs actual hours)</p>
+              {loading ? <p className="text-faint text-sm">Loading…</p>
+                : !card.t ? <p className="text-faint text-sm">Not enough completed tasks yet.</p>
                 : (
-                  <Link href={`/tasks/${card.t.task_id}`} className="block hover:bg-white/5 -mx-2 px-2 py-1 rounded transition">
-                    <p className="text-sm text-white truncate">{card.t.description}</p>
+                  <Link href={`/tasks/${card.t.task_id}`} className="block hover:bg-surface-2 -mx-2 px-2 py-1 rounded transition">
+                    <p className="text-sm text-fg truncate">{card.t.description}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${bandClass(scoreBand(card.t.avgScore))}`}>score {card.t.avgScore.toFixed(2)}</span>
-                      {card.t.avgHours != null && <span className="text-xs text-white/40">avg {Math.round(card.t.avgHours * 10) / 10}h</span>}
-                      <span className="text-xs text-white/30">· {card.t.count} contributor{card.t.count === 1 ? '' : 's'}</span>
+                      <Badge accent={bandAccent(scoreBand(card.t.avgScore))}>score {card.t.avgScore.toFixed(2)}</Badge>
+                      {card.t.avgHours != null && <span className="text-xs text-faint">avg {Math.round(card.t.avgHours * 10) / 10}h</span>}
+                      <span className="text-xs text-faint">· {card.t.count} contributor{card.t.count === 1 ? '' : 's'}</span>
                     </div>
                   </Link>
                 )}
@@ -339,46 +325,46 @@ export default function Dashboard() {
         </div>
 
         {/* Performance by task + Team performance */}
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-            <p className="text-sm font-medium text-white mb-1">Performance by task</p>
-            <p className="text-xs text-white/40 mb-4">Completed tasks — avg time &amp; efficiency, best first</p>
-            {loading ? <p className="text-white/40 text-sm">Loading…</p>
-              : perTask.length === 0 ? <p className="text-white/40 text-sm">No completed tasks yet.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="tm-card p-5">
+            <p className="text-sm font-semibold text-fg mb-1">Performance by task</p>
+            <p className="text-xs text-faint mb-4">Completed tasks — avg time &amp; efficiency, best first</p>
+            {loading ? <p className="text-faint text-sm">Loading…</p>
+              : perTask.length === 0 ? <p className="text-faint text-sm">No completed tasks yet.</p>
               : (
                 <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
                   {byScoreDesc.map(t => (
                     <Link key={t.task_id} href={`/tasks/${t.task_id}`}
-                      className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5 hover:bg-white/10 transition">
-                      <span className="flex-1 text-sm text-white truncate">{t.description}</span>
-                      {t.avgHours != null && <span className="text-xs text-white/40">{Math.round(t.avgHours * 10) / 10}h</span>}
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${bandClass(scoreBand(t.avgScore))}`}>{t.avgScore.toFixed(2)}</span>
+                      className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-surface-2 transition-colors">
+                      <span className="flex-1 text-sm text-fg truncate">{t.description}</span>
+                      {t.avgHours != null && <span className="text-xs text-faint">{Math.round(t.avgHours * 10) / 10}h</span>}
+                      <Badge accent={bandAccent(scoreBand(t.avgScore))}>{t.avgScore.toFixed(2)}</Badge>
                     </Link>
                   ))}
                 </div>
               )}
           </div>
 
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-            <p className="text-sm font-medium text-white mb-1">Individual performance</p>
-            <p className="text-xs text-white/40 mb-4">Each student's average score (efficiency vs committed hours)</p>
+          <div className="tm-card p-5">
+            <p className="text-sm font-semibold text-fg mb-1">Individual performance</p>
+            <p className="text-xs text-faint mb-4">Each student's average score (efficiency vs committed hours)</p>
             {loading ? (
-              <p className="text-white/40 text-sm">Loading...</p>
+              <p className="text-faint text-sm">Loading...</p>
             ) : statsList.length === 0 ? (
-              <p className="text-white/40 text-sm">No students yet.</p>
+              <p className="text-faint text-sm">No students yet.</p>
             ) : (
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
                 {[...statsList].sort((a, b) => (b.avg_score ?? -1) - (a.avg_score ?? -1)).map(s => (
                   <Link key={s.student_id} href={`/students/${s.student_id}`}
-                    className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5 hover:bg-white/10 transition">
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-semibold shrink-0">
+                    className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-surface-2 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-primary-soft text-primary-text flex items-center justify-center text-xs font-semibold shrink-0">
                       {initials(s.name)}
                     </div>
-                    <span className="flex-1 text-sm text-white truncate">{s.name}</span>
-                    <span className="text-xs text-white/30">{s.completed_count} done</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${bandClass(s.band)}`}>
-                      {s.band === 'unrated' ? '— unrated' : `${s.avg_score} · ${s.band}`}
-                    </span>
+                    <span className="flex-1 text-sm text-fg truncate">{s.name}</span>
+                    <span className="text-xs text-faint">{s.completed_count} done</span>
+                    <Badge accent={bandAccent(s.band)}>
+                      {s.band === 'unrated' ? 'Unrated' : `${s.avg_score} · ${s.band}`}
+                    </Badge>
                   </Link>
                 ))}
               </div>
@@ -402,32 +388,32 @@ export default function Dashboard() {
             </div>
 
             {!me && !loading ? (
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 mb-6 max-w-lg">
-                <p className="text-sm text-white mb-1">No student record linked to your account.</p>
-                <p className="text-xs text-white/40">Ask your leader to add you on the Students page using {userEmail}, then refresh.</p>
+              <div className="tm-card p-6 mb-6 max-w-lg">
+                <p className="text-sm text-fg mb-1">No student record linked to your account.</p>
+                <p className="text-xs text-faint">Ask your leader to add you on the Students page using {userEmail}, then refresh.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                  <p className="text-sm font-medium text-white mb-1">My tasks</p>
-                  <p className="text-xs text-white/40 mb-3">Your work across all states</p>
-                  {loading ? <p className="text-white/40 text-sm">Loading…</p>
-                    : myStatusData.length === 0 ? <p className="text-white/40 text-sm">Nothing assigned yet — see “Suggested for you” on your profile.</p>
+                <div className="tm-card p-5">
+                  <p className="text-sm font-semibold text-fg mb-1">My tasks</p>
+                  <p className="text-xs text-faint mb-3">Your work across all states</p>
+                  {loading ? <p className="text-faint text-sm">Loading…</p>
+                    : myStatusData.length === 0 ? <p className="text-faint text-sm">Nothing assigned yet — see “Suggested for you” on your profile.</p>
                     : <Donut data={myStatusData} centerLabel="my tasks" />}
                 </div>
-                <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                  <p className="text-sm font-medium text-white mb-1">Project progress</p>
-                  <p className="text-xs text-white/40 mb-3">Where all {tasks.length} tasks stand</p>
-                  {loading ? <p className="text-white/40 text-sm">Loading…</p>
-                    : lifecycleTotal === 0 ? <p className="text-white/40 text-sm">No tasks yet.</p>
+                <div className="tm-card p-5">
+                  <p className="text-sm font-semibold text-fg mb-1">Project progress</p>
+                  <p className="text-xs text-faint mb-3">Where all {tasks.length} tasks stand</p>
+                  {loading ? <p className="text-faint text-sm">Loading…</p>
+                    : lifecycleTotal === 0 ? <p className="text-faint text-sm">No tasks yet.</p>
                     : <Donut data={lifecycle} centerLabel="tasks" />}
                 </div>
               </div>
             )}
 
             <div className="flex gap-3">
-              <Link href="/my-tasks" className="text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">Go to My Tasks →</Link>
-              <Link href="/profile" className="text-sm px-4 py-2 border border-white/15 text-white/70 hover:text-white rounded-lg transition">See suggested tasks</Link>
+              <Link href="/my-tasks" className="tm-btn tm-btn-primary">Go to My Tasks <Icon name="arrowRight" size={16} /></Link>
+              <Link href="/profile" className="tm-btn tm-btn-ghost">See suggested tasks</Link>
             </div>
           </>
         )}

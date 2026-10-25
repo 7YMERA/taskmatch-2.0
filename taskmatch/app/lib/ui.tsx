@@ -1,6 +1,6 @@
 'use client'
 
-// Lightweight app-wide toast + confirm system that blends with the dark theme.
+// Lightweight app-wide toast + confirm system built on the tm-* theme tokens (dark + light).
 // Imperative API (toast/confirmDialog) so it works from any event handler, not just render.
 // Mount <UiHost /> once in the root layout.
 
@@ -24,7 +24,8 @@ export const toastSuccess = (m: string) => toast(m, 'success')
 export const toastError = (m: string) => toast(m, 'error')
 
 type ConfirmOpts = { message: string; title?: string; confirmLabel?: string; danger?: boolean }
-type ConfirmState = (ConfirmOpts & { resolve: (v: boolean) => void }) | null
+type PromptOpts = { label?: string; placeholder?: string; inputMode?: 'text' | 'decimal' }
+type ConfirmState = (ConfirmOpts & { prompt?: PromptOpts; value?: string; resolve: (v: boolean) => void }) | null
 let confirmState: ConfirmState = null
 const confirmListeners = new Set<() => void>()
 const emitConfirm = () => confirmListeners.forEach(l => l())
@@ -35,10 +36,24 @@ export function confirmDialog(opts: ConfirmOpts | string): Promise<boolean> {
   return new Promise(resolve => { confirmState = { ...o, resolve }; emitConfirm() })
 }
 
-const TOAST_STYLE: Record<ToastType, { bg: string; border: string; icon: string; iconColor: string }> = {
-  success: { bg: '#16241c', border: 'rgba(52,211,153,0.35)', icon: '✓', iconColor: '#34d399' },
-  error: { bg: '#2a1a1a', border: 'rgba(248,113,113,0.35)', icon: '!', iconColor: '#f87171' },
-  info: { bg: '#1c1c22', border: 'rgba(129,140,248,0.35)', icon: 'i', iconColor: '#a5b4fc' },
+// Themed replacement for window.prompt — resolves to the typed text, or null if cancelled.
+export function promptDialog(opts: ConfirmOpts & PromptOpts): Promise<string | null> {
+  const { label, placeholder, inputMode, ...rest } = opts
+  return new Promise(resolve => {
+    const state: NonNullable<ConfirmState> = {
+      ...rest, prompt: { label, placeholder, inputMode }, value: '',
+      resolve: ok => resolve(ok ? (state.value ?? '') : null),
+    }
+    confirmState = state
+    emitConfirm()
+  })
+}
+
+// Neutral card with a coloured status dot: reads cleanly in either theme.
+const TOAST_STYLE: Record<ToastType, { icon: string; iconColor: string }> = {
+  success: { icon: '✓', iconColor: 'var(--tm-chart-2)' },
+  error: { icon: '!', iconColor: 'var(--tm-danger)' },
+  info: { icon: 'i', iconColor: 'var(--tm-primary)' },
 }
 
 export function UiHost() {
@@ -60,22 +75,30 @@ export function UiHost() {
         {toasts.map(t => {
           const st = TOAST_STYLE[t.type]
           return (
-            <div key={t.id} style={{ pointerEvents: 'auto', maxWidth: 460, display: 'flex', alignItems: 'center', gap: 10, background: st.bg, border: `1px solid ${st.border}`, borderRadius: 12, padding: '10px 14px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)', animation: 'tm-toast-in 0.18s ease-out' }}>
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: st.iconColor, color: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{st.icon}</span>
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>{t.message}</span>
+            <div key={t.id} style={{ pointerEvents: 'auto', maxWidth: 460, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--tm-bg-elev)', borderRadius: 10, padding: '10px 14px', boxShadow: 'var(--tm-shadow)', animation: 'tm-toast-in 0.18s ease-out' }}>
+              <span style={{ width: 18, height: 18, borderRadius: '50%', background: st.iconColor, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{st.icon}</span>
+              <span style={{ fontSize: 14, color: 'var(--tm-text)', lineHeight: 1.4 }}>{t.message}</span>
             </div>
           )
         })}
       </div>
 
       {confirmState && (
-        <div onClick={() => close(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 22, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', animation: 'tm-modal-in 0.16s ease-out' }}>
-            {confirmState.title && <p style={{ fontSize: 15, fontWeight: 600, color: 'white', margin: '0 0 8px' }}>{confirmState.title}</p>}
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>{confirmState.message}</p>
+        <div onClick={() => close(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: 'var(--tm-bg-elev)', borderRadius: 14, padding: 24, boxShadow: 'var(--tm-shadow)', animation: 'tm-modal-in 0.16s ease-out' }}>
+            {confirmState.title && <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--tm-text)', margin: '0 0 8px' }}>{confirmState.title}</p>}
+            <p style={{ fontSize: 14, color: 'var(--tm-text-muted)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>{confirmState.message}</p>
+            {confirmState.prompt && (
+              <form onSubmit={e => { e.preventDefault(); close(true) }} style={{ marginTop: 16 }}>
+                {confirmState.prompt.label && <label className="tm-label" htmlFor="tm-prompt">{confirmState.prompt.label}</label>}
+                <input id="tm-prompt" className="tm-input" autoFocus inputMode={confirmState.prompt.inputMode}
+                  placeholder={confirmState.prompt.placeholder} defaultValue=""
+                  onChange={e => { if (confirmState) confirmState.value = e.target.value }} />
+              </form>
+            )}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button onClick={() => close(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => close(true)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: 'none', background: confirmState.danger ? '#dc2626' : '#4f46e5', color: 'white', cursor: 'pointer', fontWeight: 500 }}>{confirmState.confirmLabel || 'Confirm'}</button>
+              <button onClick={() => close(false)} className="tm-btn tm-btn-ghost tm-btn-sm">Cancel</button>
+              <button onClick={() => close(true)} autoFocus={!confirmState.prompt} className={`tm-btn tm-btn-sm ${confirmState.danger ? 'tm-btn-danger' : 'tm-btn-primary'}`}>{confirmState.confirmLabel || 'Confirm'}</button>
             </div>
           </div>
         </div>

@@ -9,9 +9,17 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import { effectiveRole } from '../lib/role'
-import { toast, confirmDialog } from '../lib/ui'
+import { toast, confirmDialog, promptDialog } from '../lib/ui'
+import { Card, Badge, Button, Icon, Skeleton, SkeletonCard, bandAccent } from '../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const MUTED = { color: 'var(--tm-text-muted)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
+const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function Profile() {
   const router = useRouter()
@@ -76,9 +84,7 @@ export default function Profile() {
   }
 
   const completeAssignment = async (assignmentId: string, taskDesc: string) => {
-    const input = prompt(
-      `Mark "${taskDesc}" complete.\n\nHours you actually spent on it (optional — leave blank to use the tracked elapsed time):`
-    )
+    const input = await promptDialog({ title: 'Mark task complete', message: `"${taskDesc}"\nHow many hours did you actually spend? Leave blank to use the tracked time.`, label: 'Actual hours (optional)', placeholder: 'e.g. 4.5', inputMode: 'decimal', confirmLabel: 'Mark complete' })
     if (input === null) return // cancelled
     const trimmed = input.trim()
     const actual_hours = trimmed === '' ? undefined : parseFloat(trimmed)
@@ -165,12 +171,12 @@ export default function Profile() {
   const initials = (name: string) =>
     name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
 
-  const statusColor = (status: string) => {
-    if (status === 'New') return 'bg-yellow-500/20 text-yellow-400'
-    if (status === 'In Progress') return 'bg-green-500/20 text-green-400'
-    if (status === 'Completed') return 'bg-blue-500/20 text-blue-400'
-    return 'bg-white/10 text-white/40'
-  }
+  const statusAccent = (s: string) =>
+    s === 'New' ? 'amber' as const
+      : s === 'In Progress' || s === 'Assigned' ? 'emerald' as const
+        : s === 'Completed' ? 'sky' as const
+          : 'indigo' as const
+  const statusLabel = (s: string) => s === 'In Progress' ? 'Ongoing' : s
 
   // WIP = the student's own active assignments (Assigned or In Progress) — same definition the
   // matcher, /assign, /wip and the roster use. (Previously counted the TASK's status, which wrongly
@@ -187,120 +193,128 @@ export default function Profile() {
   const myAvgTime = myTimed.length ? (myTimed.reduce((s, a) => s + a.actual_hours, 0) / myTimed.length).toFixed(1) : '—'
   const myOnTime = myDone.filter(a => a.completed_at && a.tasks?.due_date && a.completed_at.slice(0, 10) <= a.tasks.due_date).length
   const myLate = myDone.length - myOnTime
-  const bandClass = (b: string) => ({ high: 'text-emerald-400', avg: 'text-amber-400', low: 'text-red-400', unrated: 'text-white/50' }[b] || 'text-white/50')
+  const bandColor = myBand === 'unrated' ? 'var(--tm-text-muted)' : `var(--tm-${bandAccent(myBand)})`
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-2xl font-semibold text-white mb-6">My Profile</h1>
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
+        <div className="mb-6">
+          <h1 className="tm-page-title">My Profile</h1>
+          <p className="text-xs mt-1" style={FAINT}>Your skills, workload and tasks picked for you</p>
+        </div>
 
         {loading ? (
-          <p className="text-white/40 text-sm">Loading...</p>
+          <div className="flex flex-col gap-6">
+            <Skeleton style={{ height: 96 }} />
+            <div className="grid md:grid-cols-2 gap-6"><SkeletonCard /><SkeletonCard /></div>
+          </div>
         ) : notFound ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-lg">
-            <p className="text-sm text-white mb-1">No student record linked to your account.</p>
-            <p className="text-xs text-white/40">
-              Your login email (<span className="text-white/70">{userEmail}</span>) doesn&apos;t match any
+          <Card tint="amber" className="p-5 max-w-lg">
+            <p className="text-sm font-medium mb-1 flex items-center gap-2" style={TEXT}>
+              <span style={{ color: 'var(--tm-amber)' }}><Icon name="alert" size={16} /></span>
+              No student record linked to your account
+            </p>
+            <p className="text-xs" style={MUTED}>
+              Your login email (<span className="font-medium" style={TEXT}>{userEmail}</span>) doesn&apos;t match any
               student in the roster. Ask your team leader to add you on the Students page using this email,
               then refresh.
             </p>
-          </div>
+          </Card>
         ) : (
           <>
             {/* Profile header */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mb-6">
-              <div className="flex items-center gap-4">
+            <Card className="p-5 mb-6 tm-fade-up">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="relative shrink-0">
                   {student.avatar_url ? (
                     <img src={student.avatar_url} alt="" className="w-16 h-16 rounded-full object-cover" />
                   ) : (
-                    <div className="w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl font-semibold">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-semibold" style={AVATAR}>
                       {initials(student.name)}
                     </div>
                   )}
                   <label title="Change photo"
-                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-indigo-600 hover:bg-indigo-700 flex items-center justify-center cursor-pointer border-2 border-[#1a1a1a]">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 text-white"><path d="M12 5v14M5 12h14" /></svg>
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer text-white transition hover:brightness-110"
+                    style={{ background: 'var(--tm-gradient-btn)', border: '2px solid var(--tm-bg-elev)' }}>
+                    <Icon name={saving ? 'clock' : 'upload'} size={13} strokeWidth={2.2} />
                     <input type="file" accept="image/*" className="hidden"
                       onChange={e => uploadAvatar(e.target.files && e.target.files[0] ? e.target.files[0] : undefined)} />
                   </label>
                 </div>
-                <div className="flex-1">
-                  <p className="text-lg font-semibold text-white">{student.name}</p>
-                  <p className="text-xs text-white/40">
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-semibold" style={TEXT}>{student.name}</p>
+                  <p className="text-xs mt-0.5" style={FAINT}>
                     {student.matric} · {student.programme} · Year {student.year}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-semibold text-white">{wip}<span className="text-sm text-white/40">/3</span></p>
-                  <p className="text-xs text-white/40">active tasks (WIP)</p>
+                  <p className="text-2xl font-semibold tabular-nums" style={{ color: wip >= 3 ? 'var(--tm-amber)' : 'var(--tm-text)' }}>
+                    {wip}<span className="text-sm" style={FAINT}>/3</span>
+                  </p>
+                  <p className="text-xs" style={FAINT}>active tasks (WIP)</p>
                 </div>
               </div>
-            </div>
+            </Card>
 
             {/* My stats — mini dashboard */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
               {[
-                { label: 'Avg score', value: myAvg == null ? '—' : myAvg.toFixed(2), sub: myBand, color: bandClass(myBand) },
-                { label: 'Assigned', value: assignments.length, sub: 'total tasks', color: 'text-white' },
-                { label: 'Completed', value: myDone.length, sub: 'finished', color: 'text-blue-400' },
-                { label: 'Active', value: myActive.length, sub: 'in progress', color: 'text-green-400' },
-                { label: 'Avg time', value: myAvgTime === '—' ? '—' : `${myAvgTime}h`, sub: 'per task', color: 'text-white' },
-                { label: 'Late', value: myLate, sub: `${myOnTime} on time`, color: myLate > 0 ? 'text-amber-400' : 'text-white/60' },
+                { label: 'Avg score', value: myAvg == null ? '—' : myAvg.toFixed(2), sub: myBand, color: bandColor },
+                { label: 'Assigned', value: assignments.length, sub: 'total tasks', color: 'var(--tm-text)' },
+                { label: 'Completed', value: myDone.length, sub: 'finished', color: 'var(--tm-sky)' },
+                { label: 'Active', value: myActive.length, sub: 'in progress', color: 'var(--tm-emerald)' },
+                { label: 'Avg time', value: myAvgTime === '—' ? '—' : `${myAvgTime}h`, sub: 'per task', color: 'var(--tm-text)' },
+                { label: 'Late', value: myLate, sub: `${myOnTime} on time`, color: myLate > 0 ? 'var(--tm-amber)' : 'var(--tm-text-muted)' },
               ].map(m => (
-                <div key={m.label} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3">
-                  <p className="text-[11px] text-white/40 mb-1">{m.label}</p>
-                  <p className={`text-xl font-semibold ${m.color}`}>{m.value}</p>
-                  <p className="text-[10px] text-white/30 mt-0.5 capitalize">{m.sub}</p>
-                </div>
+                <Card key={m.label} className="p-3.5">
+                  <p className="text-[11px] mb-1" style={FAINT}>{m.label}</p>
+                  <p className="text-xl font-semibold tabular-nums" style={{ color: m.color }}>{m.value}</p>
+                  <p className="text-[10px] mt-0.5 capitalize" style={FAINT}>{m.sub}</p>
+                </Card>
               ))}
             </div>
 
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 mb-6 flex items-start gap-2">
-              <span className="text-white/30 text-xs mt-0.5">ⓘ</span>
-              <p className="text-xs text-white/40">
-                <span className="text-white/60">How your score works:</span> score = committed hours ÷ (committed + actual hours), between 0 and 1.
-                Finishing in less time than budgeted scores higher. Bands: <span className="text-emerald-400">High ≥ 0.6</span> · <span className="text-amber-400">Avg ≥ 0.4</span> · <span className="text-red-400">Low &lt; 0.4</span>.
+            <Card className="px-4 py-3 mb-6 flex items-start gap-2.5">
+              <span className="mt-px shrink-0" style={FAINT}><Icon name="chart" size={15} /></span>
+              <p className="text-xs" style={FAINT}>
+                <span className="font-medium" style={MUTED}>How your score works:</span> score = committed hours ÷ (committed + actual hours), between 0 and 1.
+                Finishing in less time than budgeted scores higher. Bands:{' '}
+                <span style={{ color: 'var(--tm-emerald)' }}>High ≥ 0.6</span> · <span style={{ color: 'var(--tm-amber)' }}>Avg ≥ 0.4</span> · <span style={{ color: 'var(--tm-rose)' }}>Low &lt; 0.4</span>.
               </p>
-            </div>
+            </Card>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               {/* My skills */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
+              <Card className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm font-medium text-white">My skills</p>
+                  <p className="text-sm font-medium" style={TEXT}>My skills</p>
                   {!editing ? (
-                    <button onClick={() => setEditing(true)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-white/20 text-white/60 hover:text-white transition">
-                      Edit skills
-                    </button>
+                    <Button variant="ghost" className="tm-btn-sm" onClick={() => setEditing(true)}>Edit skills</Button>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={saveSkills} disabled={saving}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition disabled:opacity-50">
-                        {saving ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => {
+                      <Button className="tm-btn-sm" onClick={saveSkills} disabled={saving}>
+                        {saving ? 'Saving…' : <><Icon name="check" size={13} /> Save</>}
+                      </Button>
+                      <Button variant="ghost" className="tm-btn-sm" onClick={() => {
                         setEditing(false)
                         setMySkills((student.student_skills || []).map((ss: any) => ({ skill_id: ss.skill_id, proficiency: ss.proficiency })))
-                      }}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-white/10 text-white/60 hover:text-white transition">
+                      }}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
 
                 {!editing ? (
                   (student.student_skills || []).length === 0 ? (
-                    <p className="text-xs text-white/40">No skills declared yet. Click &ldquo;Edit skills&rdquo; to add some.</p>
+                    <p className="text-xs" style={FAINT}>No skills declared yet. Click &ldquo;Edit skills&rdquo; to add some.</p>
                   ) : (
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-1.5 flex-wrap">
                       {student.student_skills.map((ss: any) => (
-                        <span key={ss.skill_id} className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-400">
-                          {ss.skills?.skill_name} · {PROFICIENCY[ss.proficiency]}
+                        <span key={ss.skill_id} className="tm-chip">
+                          {ss.skills?.skill_name}<span className="ml-1" style={FAINT}>· {PROFICIENCY[ss.proficiency]}</span>
                         </span>
                       ))}
                     </div>
@@ -308,82 +322,83 @@ export default function Profile() {
                 ) : (
                   <SkillPicker skills={skills} value={mySkills} onChange={setMySkills} />
                 )}
-              </div>
+              </Card>
 
               {/* My assigned tasks */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                <p className="text-sm font-medium text-white mb-4">My assigned tasks</p>
+              <Card className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-medium" style={TEXT}>My assigned tasks</p>
+                  <Link href="/my-tasks" className="text-xs inline-flex items-center gap-1 hover:underline" style={FAINT}>
+                    Open My Tasks <Icon name="arrowRight" size={12} />
+                  </Link>
+                </div>
                 {assignments.length === 0 ? (
-                  <p className="text-xs text-white/40">No tasks assigned to you yet.</p>
+                  <p className="text-xs" style={FAINT}>No tasks assigned to you yet.</p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {assignments.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                        <div className="flex-1">
-                          <p className="text-sm text-white">{a.tasks?.description || '(task removed)'}</p>
-                          <p className="text-xs text-white/40">
+                      <div key={a.id} className="flex flex-wrap items-center gap-3 rounded-lg p-3" style={ROW}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm" style={TEXT}>{a.tasks?.description || '(task removed)'}</p>
+                          <p className="text-xs mt-0.5" style={FAINT}>
                             Assigned {a.assigned_date}
                             {a.completed_at ? ` · Completed ${new Date(a.completed_at).toLocaleDateString()}` : ''}
                             {a.score != null ? ` · Score ${a.score}` : ''}
                           </p>
                         </div>
                         {a.status === 'In Progress' && (
-                          <button
-                            onClick={() => completeAssignment(a.id, a.tasks?.description || 'this task')}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-green-500/30 text-green-400 hover:bg-green-500/10 transition">
-                            Complete
-                          </button>
+                          <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-emerald)' }}
+                            onClick={() => completeAssignment(a.id, a.tasks?.description || 'this task')}>
+                            <Icon name="check" size={13} /> Complete
+                          </Button>
                         )}
-                        <span className={`text-xs px-2 py-1 rounded-full ${statusColor(a.status)}`}>
-                          {a.status}
-                        </span>
+                        <Badge accent={statusAccent(a.status)}>{statusLabel(a.status)}</Badge>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
 
             {/* Recommended tasks for me */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-6">
+            <Card className="p-5 mt-6">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-medium text-white">Suggested for you</p>
-                {wip >= 3 && <span className="text-[11px] text-amber-400">At workload limit ({wip}/3)</span>}
+                <p className="text-sm font-medium flex items-center gap-2" style={TEXT}>
+                  <span style={{ color: 'var(--tm-primary-text)' }}><Icon name="star" size={16} /></span> Suggested for you
+                </p>
+                {wip >= 3 && <Badge accent="amber">At workload limit ({wip}/3)</Badge>}
               </div>
-              <p className="text-xs text-white/40 mb-4">Tasks the matcher considered you for — by skill fit or as a growth opportunity. Pick one up to add it to your own list{wip >= 3 ? ', once you finish an active task' : ''}, or your leader can assign you.</p>
+              <p className="text-xs mb-4" style={FAINT}>Tasks the matcher considered you for — by skill fit or as a growth opportunity. Pick one up to add it to your own list{wip >= 3 ? ', once you finish an active task' : ''}, or your leader can assign you.</p>
               {recommended.qualified.length === 0 && recommended.growth.length === 0 ? (
-                <p className="text-xs text-white/40">No suggested tasks right now.</p>
+                <p className="text-xs" style={FAINT}>No suggested tasks right now.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {[...recommended.qualified.map((r: any) => ({ ...r, _group: 'fit' })),
                     ...recommended.growth.map((r: any) => ({ ...r, _group: 'growth' }))].map(r => (
-                    <div key={r.task_id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                      <div className="flex-1">
-                        <p className="text-sm text-white flex items-center gap-2 flex-wrap">
+                    <div key={r.task_id} className="flex flex-wrap items-center gap-3 rounded-lg p-3" style={ROW}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm flex items-center gap-2 flex-wrap" style={TEXT}>
                           {r.description}
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${r._group === 'fit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                            Suggested{r._group === 'growth' ? ' · growth' : ''}
-                          </span>
+                          <Badge accent={r._group === 'fit' ? 'emerald' : 'amber'}>{r._group === 'fit' ? 'skill fit' : 'growth'}</Badge>
                         </p>
-                        <p className="text-xs text-white/40">{r.reason}</p>
-                        <p className="text-xs text-white/30 mt-0.5">
+                        <p className="text-xs mt-0.5" style={MUTED}>{r.reason}</p>
+                        <p className="text-xs mt-0.5" style={FAINT}>
                           {r.committed_hours != null ? `${r.committed_hours}h` : (r.estimated_days ? `~${r.estimated_days}d` : '')}
                           {r.severity ? ` · ${r.severity}` : ''}
                         </p>
                       </div>
-                      <button
+                      <Badge accent={statusAccent(r.status)}>{statusLabel(r.status)}</Badge>
+                      <Button variant="ghost" className="tm-btn-sm shrink-0"
                         onClick={() => pickTask(r.task_id, r.description)}
                         disabled={picking === r.task_id || wip >= 3}
-                        title={wip >= 3 ? 'You are at your workload limit (3 active tasks)' : 'Add this task to your own list'}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 transition disabled:opacity-30 disabled:hover:bg-transparent shrink-0">
-                        {picking === r.task_id ? 'Adding…' : 'Pick this task'}
-                      </button>
-                      <span className={`text-xs px-2 py-1 rounded-full ${statusColor(r.status)}`}>{r.status}</span>
+                        title={wip >= 3 ? 'You are at your workload limit (3 active tasks)' : 'Add this task to your own list'}>
+                        {picking === r.task_id ? 'Adding…' : <><Icon name="plus" size={13} /> Pick this task</>}
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           </>
         )}
       </main>

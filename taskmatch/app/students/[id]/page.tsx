@@ -7,8 +7,15 @@ import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
 import { effectiveRole } from '../../lib/role'
+import { Card, Badge, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }
+const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function StudentDetail() {
   const router = useRouter()
@@ -50,18 +57,12 @@ export default function StudentDetail() {
     setLoading(false)
   }
 
-  const bandClass = (band: string) => ({
-    high: 'bg-emerald-500/20 text-emerald-400',
-    avg: 'bg-amber-500/20 text-amber-400',
-    low: 'bg-red-500/20 text-red-400',
-    unrated: 'bg-white/10 text-white/40',
-  }[band] || 'bg-white/10 text-white/40')
-
-  const statusColor = (s: string) =>
-    s === 'New' ? 'bg-yellow-500/20 text-yellow-400'
-      : s === 'In Progress' ? 'bg-green-500/20 text-green-400'
-      : s === 'Completed' ? 'bg-blue-500/20 text-blue-400'
-      : 'bg-white/10 text-white/40'
+  const statusAccent = (s: string) =>
+    s === 'New' ? 'amber' as const
+      : s === 'In Progress' || s === 'Assigned' ? 'emerald' as const
+        : s === 'Completed' ? 'sky' as const
+          : 'indigo' as const
+  const scoreAccent = (score: number) => score >= 0.6 ? 'emerald' as const : score >= 0.4 ? 'amber' as const : 'rose' as const
 
   const initials = (n: string) => n?.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
 
@@ -73,123 +74,130 @@ export default function StudentDetail() {
   const avgTime = timed.length ? (timed.reduce((s, a) => s + a.actual_hours, 0) / timed.length).toFixed(1) : '—'
   const onTime = done.filter(a => a.completed_at && a.tasks?.due_date && a.completed_at.slice(0, 10) <= a.tasks.due_date).length
   const lateDeliveries = done.length - onTime
-  const totalHours = timed.reduce((s, a) => s + a.actual_hours, 0)
   const avgScoreDisplay = stat && stat.avg_score != null ? stat.avg_score : '—'
   const band = stat?.band || 'unrated'
+  const bandColor = band === 'unrated' ? 'var(--tm-text)' : `var(--tm-${bandAccent(band)})`
 
   return (
     <div className="flex min-h-screen">
       <Sidebar />
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        <Link href="/students" className="text-xs text-white/40 hover:text-white">← Back to students</Link>
+      <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
+        <Link href="/students" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
+          <Icon name="arrowLeft" size={13} /> Back to students
+        </Link>
 
         {loading ? (
-          <p className="text-white/40 text-sm mt-6">Loading...</p>
+          <div className="mt-4 flex flex-col gap-4">
+            <Skeleton style={{ height: 88 }} />
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} style={{ height: 76 }} />)}
+            </div>
+            <div className="grid md:grid-cols-2 gap-6"><SkeletonCard /><SkeletonCard /></div>
+          </div>
         ) : !student ? (
-          <p className="text-white/40 text-sm mt-6">Student not found.</p>
+          <Card className="mt-4">
+            <EmptyState icon={<Icon name="user" size={28} />} title="Student not found" hint="They may have been removed from the roster." />
+          </Card>
         ) : (
           <>
             {/* Header */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-4 mb-6">
-              <div className="flex items-center gap-4">
+            <Card className="p-5 mt-4 mb-6 tm-fade-up">
+              <div className="flex flex-wrap items-center gap-4">
                 {student.avatar_url
                   ? <img src={student.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover shrink-0" />
-                  : <div className="w-14 h-14 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-lg font-semibold shrink-0">{initials(student.name)}</div>}
-                <div className="flex-1">
-                  <p className="text-lg font-semibold text-white">{student.name}</p>
-                  <p className="text-xs text-white/40">{student.matric} · {student.programme} · Year {student.year}</p>
+                  : <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold shrink-0" style={AVATAR}>{initials(student.name)}</div>}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-semibold tracking-tight" style={TEXT}>{student.name}</h1>
+                  <p className="text-xs mt-0.5" style={FAINT}>{student.matric} · {student.programme} · Year {student.year}</p>
                 </div>
-                <div className="text-right">
-                  {stat && (
-                    <>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${bandClass(stat.band)}`}>
-                        {stat.band === 'unrated' ? '— unrated' : `${stat.avg_score} · ${stat.band}`}
-                      </span>
-                      <p className="text-xs text-white/30 mt-1">{stat.completed_count} completed · {active.length} active</p>
-                    </>
-                  )}
-                </div>
+                {stat && (
+                  <div className="text-right">
+                    {stat.band === 'unrated'
+                      ? <span className="tm-chip">unrated</span>
+                      : <Badge accent={bandAccent(stat.band)}>{`${stat.avg_score} · ${stat.band}`}</Badge>}
+                    <p className="text-xs mt-1.5" style={FAINT}>{stat.completed_count} completed · {active.length} active</p>
+                  </div>
+                )}
               </div>
-            </div>
+            </Card>
 
             {/* Stat cards — mini dashboard for this student */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
               {[
-                { label: 'Avg score', value: avgScoreDisplay, sub: band === 'unrated' ? 'no data yet' : band, color: bandClass(band).split(' ')[1] || 'text-white' },
-                { label: 'Assigned', value: assignments.length, sub: 'total tasks', color: 'text-white' },
-                { label: 'Completed', value: done.length, sub: 'finished', color: 'text-blue-400' },
-                { label: 'Active', value: active.length, sub: 'in progress', color: 'text-green-400' },
-                { label: 'Avg time', value: avgTime === '—' ? '—' : `${avgTime}h`, sub: 'per task', color: 'text-white' },
-                { label: 'Late', value: lateDeliveries, sub: `${onTime} on time`, color: lateDeliveries > 0 ? 'text-amber-400' : 'text-white/60' },
+                { label: 'Avg score', value: avgScoreDisplay, sub: band === 'unrated' ? 'no data yet' : band, color: bandColor },
+                { label: 'Assigned', value: assignments.length, sub: 'total tasks', color: 'var(--tm-text)' },
+                { label: 'Completed', value: done.length, sub: 'finished', color: 'var(--tm-sky)' },
+                { label: 'Active', value: active.length, sub: 'in progress', color: 'var(--tm-emerald)' },
+                { label: 'Avg time', value: avgTime === '—' ? '—' : `${avgTime}h`, sub: 'per task', color: 'var(--tm-text)' },
+                { label: 'Late', value: lateDeliveries, sub: `${onTime} on time`, color: lateDeliveries > 0 ? 'var(--tm-amber)' : 'var(--tm-text-muted)' },
               ].map(m => (
-                <div key={m.label} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3">
-                  <p className="text-[11px] text-white/40 mb-1">{m.label}</p>
-                  <p className={`text-xl font-semibold ${m.color}`}>{m.value}</p>
-                  <p className="text-[10px] text-white/30 mt-0.5 capitalize">{m.sub}</p>
-                </div>
+                <Card key={m.label} className="p-3.5">
+                  <p className="text-[11px] mb-1" style={FAINT}>{m.label}</p>
+                  <p className="text-xl font-semibold tabular-nums" style={{ color: m.color }}>{m.value}</p>
+                  <p className="text-[10px] mt-0.5 capitalize" style={FAINT}>{m.sub}</p>
+                </Card>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               {/* Skills */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                <p className="text-sm font-medium text-white mb-4">Declared skills</p>
+              <Card className="p-5">
+                <p className="text-sm font-medium mb-4" style={TEXT}>Declared skills</p>
                 {(student.student_skills || []).length === 0 ? (
-                  <p className="text-xs text-white/40">No skills declared.</p>
+                  <p className="text-xs" style={FAINT}>No skills declared.</p>
                 ) : (
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 flex-wrap">
                     {student.student_skills.map((ss: any) => (
-                      <span key={ss.skill_id} className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-400">
-                        {ss.skills?.skill_name} · {PROFICIENCY[ss.proficiency]}
+                      <span key={ss.skill_id} className="tm-chip">
+                        {ss.skills?.skill_name}<span className="ml-1" style={FAINT}>· {PROFICIENCY[ss.proficiency]}</span>
                       </span>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
 
               {/* Active tasks */}
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
-                <p className="text-sm font-medium text-white mb-4">Active tasks ({active.length})</p>
+              <Card className="p-5">
+                <p className="text-sm font-medium mb-4" style={TEXT}>Active tasks ({active.length})</p>
                 {active.length === 0 ? (
-                  <p className="text-xs text-white/40">No active tasks.</p>
+                  <p className="text-xs" style={FAINT}>No active tasks.</p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {active.map(a => (
-                      <Link key={a.id} href={`/tasks/${a.tasks?.id}`} className="flex items-center gap-3 bg-white/5 rounded-lg p-3 hover:bg-white/10 transition">
-                        <span className="flex-1 text-sm text-white">{a.tasks?.description || '(removed)'}</span>
-                        <span className={`text-xs px-2 py-1 rounded-full ${statusColor(a.status)}`}>{a.status}</span>
+                      <Link key={a.id} href={`/tasks/${a.tasks?.id}`} className="flex items-center gap-3 rounded-lg p-3 transition hover:brightness-110" style={ROW}>
+                        <span className="flex-1 min-w-0 text-sm truncate" style={TEXT}>{a.tasks?.description || '(removed)'}</span>
+                        <Badge accent={statusAccent(a.status)}>{a.status === 'In Progress' ? 'Ongoing' : a.status}</Badge>
                       </Link>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
 
             {/* Completion history */}
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-6">
-              <p className="text-sm font-medium text-white mb-4">Completion history ({done.length})</p>
+            <Card className="p-5 mt-6">
+              <p className="text-sm font-medium mb-4" style={TEXT}>Completion history ({done.length})</p>
               {done.length === 0 ? (
-                <p className="text-xs text-white/40">No completed tasks yet.</p>
+                <p className="text-xs" style={FAINT}>No completed tasks yet.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {done.map(a => (
-                    <div key={a.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
-                      <Link href={`/tasks/${a.tasks?.id}`} className="flex-1 text-sm text-white hover:underline">{a.tasks?.description || '(removed)'}</Link>
-                      <span className="text-xs text-white/40">
-                        {a.actual_hours != null ? `${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
-                        {userRole === 'leader' && a.timed_hours != null ? ` · ⏱ ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
+                    <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg p-3" style={ROW}>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'color-mix(in srgb, var(--tm-sky) 14%, transparent)', color: 'var(--tm-sky)' }}>
+                        <Icon name="check" size={13} strokeWidth={2.4} />
                       </span>
-                      {a.score != null && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${a.score >= 0.6 ? 'bg-emerald-500/20 text-emerald-400' : a.score >= 0.4 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                          score {a.score}
-                        </span>
-                      )}
+                      <Link href={`/tasks/${a.tasks?.id}`} className="flex-1 min-w-0 text-sm hover:underline truncate" style={TEXT}>{a.tasks?.description || '(removed)'}</Link>
+                      <span className="text-xs flex items-center gap-1" style={FAINT}>
+                        {a.actual_hours != null ? `${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
+                        {userRole === 'leader' && a.timed_hours != null && <><span>·</span><Icon name="clock" size={12} />{`${Math.round(a.timed_hours * 10) / 10}h timed`}</>}
+                      </span>
+                      {a.score != null && <Badge accent={scoreAccent(a.score)}>score {a.score}</Badge>}
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           </>
         )}
       </main>
