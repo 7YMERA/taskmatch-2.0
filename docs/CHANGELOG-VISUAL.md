@@ -4,7 +4,11 @@ A before / after record of the big UI revamps between the original project
 (`taskmatch-git`) and TaskMatch 2.0. "Before" shots are the original app running
 unchanged; "after" are the current 2.0 UI. Both captured against the same data.
 
-> **Latest:** Phase 3b makes TaskMatch multi-team, like Jira: workspaces with their own people,
+> **Latest:** the People page and matching got smarter: a fit score out of 100 that shows its
+> reasons, proven skills, a Team insights tab (skill gaps, single points of failure, mentors,
+> workload in hours), Find a match, and "Who could take this?" in New task. No AI needed: see
+> [PEOPLE-MATCHING.md](PEOPLE-MATCHING.md).
+> Phase 3b makes TaskMatch multi-team, like Jira: workspaces with their own people,
 > tasks and roles, invite links, a workspace switcher, and projects that group tasks: see
 > [PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md).
 > Phase 3 adds suggestions to the New task panel: skills, hours and severity,

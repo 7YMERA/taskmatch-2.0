@@ -654,7 +654,7 @@ def pick_assignee(candidates, mode, last_assigned=None, total_assigned=None, act
 
     Only qualified candidates (meet every required skill, under the WIP limit) are ever
     picked; the modes differ in how they break the tie between them:
-      best_match   — the top of the ranked list (highest skill match, then least busy)
+      best_match   — the top of the ranked list (highest fit score, see matching.py)
       round_robin  — whoever has gone longest without a new assignment, so routine work
                      rotates evenly (never assigned counts as longest; then fewest
                      assignments overall, then name)
@@ -670,7 +670,8 @@ def pick_assignee(candidates, mode, last_assigned=None, total_assigned=None, act
 
     if mode == "best_match":
         chosen = pool[0]  # candidates arrive already ranked
-        reason = (f"Best match: {chosen['met_count']}/{chosen['total_required']} required skills, "
+        fit = f"fit score {chosen['fit_score']}/100, " if chosen.get("fit_score") is not None else ""
+        reason = (f"Best match: {fit}{chosen['met_count']}/{chosen['total_required']} required skills, "
                   f"skill level {chosen['match_score']}, {chosen['wip']} of {WIP_LIMIT} slots used")
     elif mode == "round_robin":
         def rr_key(c):
