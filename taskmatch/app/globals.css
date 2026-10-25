@@ -161,12 +161,58 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 .tm-input:focus { border-color: var(--tm-indigo); background: var(--tm-surface-2); }
 .tm-label { font-size: 12px; color: var(--tm-text-faint); margin-bottom: 4px; display: block; }
 
+/* Small button + compact select (toolbars, row actions) */
+.tm-btn-sm { font-size: 12px; padding: 7px 12px; border-radius: var(--tm-r-sm); gap: 6px; }
+.tm-btn-icon { padding: 0; width: 32px; height: 32px; border-radius: var(--tm-r-sm); }
+.tm-select-sm {
+  background: var(--tm-surface-1); border: 1px solid var(--tm-border);
+  border-radius: var(--tm-r-sm); padding: 6px 10px; font-size: 12px;
+  color: var(--tm-text); outline: none; transition: border-color .18s;
+}
+.tm-select-sm:focus { border-color: var(--tm-indigo); }
+
+/* Quiet chip — skills and other neutral tags */
+.tm-chip {
+  display: inline-flex; align-items: center; font-size: 12px; line-height: 1.4;
+  padding: 2px 8px; border-radius: 6px;
+  border: 1px solid var(--tm-border); color: var(--tm-text-muted);
+}
+
+/* Selectable row (checkbox-style pickers in forms) */
+.tm-pick {
+  display: flex; align-items: center; gap: 8px; text-align: left;
+  font-size: 12px; padding: 8px 12px; border-radius: var(--tm-r-sm);
+  border: 1px solid var(--tm-border); color: var(--tm-text-muted);
+  transition: border-color .15s, background .15s, color .15s;
+}
+.tm-pick:hover { color: var(--tm-text); border-color: var(--tm-border-strong); }
+.tm-pick[aria-pressed="true"] {
+  border-color: var(--tm-indigo); color: var(--tm-text);
+  background: color-mix(in srgb, #6366f1 14%, transparent);
+}
+
+/* Popover menu (row "more" actions) */
+.tm-menu {
+  background: var(--tm-bg-elev); border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-r-md); box-shadow: var(--tm-shadow); padding: 4px;
+}
+.tm-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  font-size: 12px; padding: 7px 10px; border-radius: 6px; color: var(--tm-text-muted);
+  transition: background .15s, color .15s;
+}
+.tm-menu-item:hover:not(:disabled) { background: var(--tm-surface-2); color: var(--tm-text); }
+.tm-menu-item:disabled { opacity: .35; cursor: not-allowed; }
+
 /* Badges */
 .tm-badge {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 12px; padding: 3px 10px; border-radius: 999px;
   border: 1px solid transparent;
 }
+/* Accent text is tuned for the dark canvas — deepen it on light so pills stay readable. */
+.tm-badge { color: var(--tm-badge-c, var(--tm-text-muted)); }
+[data-theme="light"] .tm-badge { color: color-mix(in srgb, var(--tm-badge-c, #6b7280) 62%, #000); }
 
 /* ─── Motion ─── */
 @keyframes tm-toast-in { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }

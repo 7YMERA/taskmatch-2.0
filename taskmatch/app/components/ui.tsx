@@ -11,6 +11,7 @@ type IconName =
   | 'bolt' | 'chart' | 'shield' | 'users' | 'scale' | 'lock'
   | 'sun' | 'moon' | 'arrowRight' | 'arrowDown' | 'check' | 'menu'
   | 'grid' | 'list' | 'star' | 'user' | 'pause'
+  | 'plus' | 'more' | 'chevronDown' | 'trash' | 'upload' | 'arrowLeft' | 'alert' | 'clock'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
@@ -30,6 +31,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
   star: <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z" />,
   user: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
   pause: <><rect x="7" y="5" width="3.5" height="14" rx="1" /><rect x="13.5" y="5" width="3.5" height="14" rx="1" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  trash: <><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6 7l1 13h10l1-13" /><path d="M10 11v5M14 11v5" /></>,
+  upload: <><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>,
+  arrowLeft: <path d="M20 12H4M10 6l-6 6 6 6" />,
+  alert: <><path d="M12 3 2 20h20L12 3Z" /><path d="M12 10v4M12 17h.01" /></>,
+  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
 }
 
 export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style }:
@@ -93,7 +102,7 @@ export function Badge({ accent = 'indigo', children, className = '' }:
   { accent?: Accent; children: React.ReactNode; className?: string }) {
   const c = ACCENT[accent]
   return (
-    <span className={`tm-badge ${className}`} style={{ background: c + '22', color: c, borderColor: c + '40' }}>
+    <span className={`tm-badge ${className}`} style={{ background: c + '22', borderColor: c + '40', '--tm-badge-c': c } as React.CSSProperties}>
       {children}
     </span>
   )
