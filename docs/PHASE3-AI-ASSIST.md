@@ -100,7 +100,7 @@ No database changes are needed.
 | `taskmatch-api/requirements.txt` | `anthropic` SDK |
 | `taskmatch/app/components/AISuggest.tsx` (new) | The AI assist panel and the confidence badge |
 | `taskmatch/app/tasks/page.tsx` | AI assist in the New task panel; the review is logged when the task is created |
-| `taskmatch/app/audit/page.tsx` | "AI suggestions" category |
+| `taskmatch/app/audit/page.tsx` | "Suggestions" category |
 
 ## Tests
 
