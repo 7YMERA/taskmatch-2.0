@@ -55,8 +55,8 @@ ships as its own pull request with before/after screenshots.
 |---|---|---|
 | 1 | Dashboards and analytics (trends, needs attention, matching health, workload heatmap, skills coverage) + assignment modes (best match, round robin, least loaded) | ✅ done ([PHASE1-DASHBOARD.md](PHASE1-DASHBOARD.md)) |
 | 1b | Tasks and People pages rebuilt (list/board/calendar, search, saved views, bulk actions, people filters, skills matrix) | ✅ done ([PHASE1B-TASKS-PEOPLE.md](PHASE1B-TASKS-PEOPLE.md)) |
-| 1c | My Tasks focus page, task and person quick views, create task in a side panel, People cards | ◐ in review ([PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md)) |
-| 2 | Roles and permissions, audit trail, user management, "away" status | ☐ todo |
+| 1c | My Tasks focus page, task and person quick views, create task in a side panel, People cards | ✅ done ([PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md)) |
+| 2 | Roles and permissions, audit trail, user management, "away" status | ◐ in review ([PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md)) |
 | 3 | Task board, approvals, notifications, comments, AI-suggested skills and estimates | ☐ todo |
 | 4 | Search, Ctrl+K, exports, settings, multiple teams | ☐ todo |
 

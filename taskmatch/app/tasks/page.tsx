@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
-import { effectiveRole } from '../lib/role'
+import { effectiveRole, can } from '../lib/role'
 import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { TaskBoard, TaskCalendar } from '../components/TaskViews'
 import TaskQuickView from '../components/TaskQuickView'
@@ -384,7 +384,7 @@ const updateTaskStatus = async (id: string, status: string) => {
               {loading ? 'Loading…' : `${counts.open} open · ${counts.overdue} overdue · ${counts.unassigned} need people`}
             </p>
           </div>
-          {userRole === 'leader' && (
+          {can(userRole, 'tasks.manage') && (
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
                 <Icon name="users" size={16} /> Create group
@@ -397,7 +397,7 @@ const updateTaskStatus = async (id: string, status: string) => {
         </div>
 
         {/* Create group form — leader only */}
-        {showGroupForm && userRole === 'leader' && (
+        {showGroupForm && can(userRole, 'tasks.manage') && (
           <Card tint="violet" className="p-5 mb-6 tm-fade-up">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
@@ -466,7 +466,7 @@ const updateTaskStatus = async (id: string, status: string) => {
         )}
 
         {/* Create task — side panel */}
-        <Drawer open={showForm && userRole === 'leader'} onClose={() => setShowForm(false)} title="New task"
+        <Drawer open={showForm && can(userRole, 'tasks.manage')} onClose={() => setShowForm(false)} title="New task"
           sub="Describe the work and the skills it needs. The matcher uses these to suggest people."
           footer={<>
             <Button onClick={createTask}>Create task</Button>
@@ -634,13 +634,13 @@ const updateTaskStatus = async (id: string, status: string) => {
         </div>
 
         {view === 'board' && !loading && (
-          <TaskBoard onOpen={setQuickId} tasks={shownTasks} assignees={allAssignees} canMove={userRole === 'leader'} isLocked={isClosed}
+          <TaskBoard onOpen={setQuickId} tasks={shownTasks} assignees={allAssignees} canMove={can(userRole, 'tasks.manage')} isLocked={isClosed}
             onMove={(id, st) => updateTaskStatus(id, st)}
             flags={t => isDelayed(t) ? <Badge accent="rose" className="!text-[10px] !py-0">delayed</Badge> : isClosed(t) ? <span className="tm-chip !text-[10px] !py-0">closed</span> : null} />
         )}
         {view === 'calendar' && !loading && <TaskCalendar tasks={shownTasks} onOpen={setQuickId} />}
 
-        {view === 'list' && userRole === 'leader' && !loading && shownTasks.length > 0 && (
+        {view === 'list' && can(userRole, 'tasks.manage') && !loading && shownTasks.length > 0 && (
           <label className="flex items-center gap-2 text-xs mb-2 pl-1 w-fit cursor-pointer" style={FAINT}>
             <input type="checkbox" checked={allShownSelected} className="accent-[var(--tm-primary)]"
               onChange={() => setSelected(allShownSelected ? [] : shownTasks.map(t => t.id))} />
@@ -656,7 +656,7 @@ const updateTaskStatus = async (id: string, status: string) => {
             <Card>
               <EmptyState icon={<Icon name="list" size={28} />}
                 title={tasks.length === 0 ? 'No tasks yet' : 'No tasks match these filters'}
-                hint={tasks.length === 0 ? (userRole === 'leader' ? 'Create the first task to start matching students.' : 'Your leader hasn’t created any tasks yet.') : 'Try a different status, severity or group.'} />
+                hint={tasks.length === 0 ? (can(userRole, 'tasks.manage') ? 'Create the first task to start matching students.' : 'Your leader hasn’t created any tasks yet.') : 'Try a different status, severity or group.'} />
             </Card>
           ) : (
             shownTasks.map(task => (
@@ -666,7 +666,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                 <div
                   className="flex flex-wrap md:flex-nowrap items-center gap-x-3.5 gap-y-2 p-4 cursor-pointer"
                   onClick={() => loadRecommendations(task.id)}>
-                  {userRole === 'leader' && (
+                  {can(userRole, 'tasks.manage') && (
                     <input type="checkbox" checked={selected.includes(task.id)} aria-label={`Select ${task.description}`}
                       className="shrink-0 accent-[var(--tm-primary)]"
                       onClick={e => e.stopPropagation()} onChange={() => toggleSelected(task.id)} />
@@ -708,7 +708,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                     {isUnstaffed(task) && <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--tm-sky)' }} title="Nobody is assigned"><Icon name="user" size={12} /> needs people</span>}
                   </div>
 
-                  {userRole === 'leader' && (
+                  {can(userRole, 'tasks.manage') && (
                     <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
                       <button onClick={() => setTaskMenuOpen(taskMenuOpen === task.id ? null : task.id)}
                         aria-label="Task actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
@@ -820,7 +820,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                                   </p>
                                   <p className="text-xs mt-0.5 italic" style={FAINT}>{r.justification}</p>
                                 </div>
-                                {userRole === 'leader' && (
+                                {can(userRole, 'tasks.manage') && (
                                   <Button variant="ghost" className="tm-btn-sm shrink-0"
                                     onClick={() => assignStudent(task.id, r.student_id, r.name)}
                                     disabled={r.over_wip || isClosed(task) || assigning === r.student_id}>
@@ -862,7 +862,7 @@ const updateTaskStatus = async (id: string, status: string) => {
           )}
         </div>
         {/* Bulk actions — appears once tasks are ticked */}
-        {userRole === 'leader' && view === 'list' && selected.length > 0 && (
+        {can(userRole, 'tasks.manage') && view === 'list' && selected.length > 0 && (
           <div className="sticky bottom-4 z-40 mt-4 flex justify-center pointer-events-none">
             <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl px-3 py-2"
               style={{ background: 'var(--tm-surface-1)', border: '1px solid var(--tm-border)', boxShadow: 'var(--tm-shadow)' }}>
@@ -887,7 +887,7 @@ const updateTaskStatus = async (id: string, status: string) => {
           </div>
         )}
         <TaskQuickView task={tasks.find(t => t.id === quickId) || null} assignees={(quickId && allAssignees[quickId]) || []}
-          groups={existingGroups} canEdit={userRole === 'leader'} locked={!!quickId && isClosed(tasks.find(t => t.id === quickId) || {})}
+          groups={existingGroups} canEdit={can(userRole, 'tasks.manage')} locked={!!quickId && isClosed(tasks.find(t => t.id === quickId) || {})}
           onClose={() => setQuickId(null)} onChanged={fetchTasks} />
       </main>
     </div>

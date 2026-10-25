@@ -6,7 +6,7 @@ import { supabase, API, authHeaders } from '../../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
-import { effectiveRole } from '../../lib/role'
+import { effectiveRole, can } from '../../lib/role'
 import { Card, Badge, Icon, Skeleton, SkeletonCard, EmptyState, bandAccent } from '../../components/ui'
 
 const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
@@ -190,7 +190,7 @@ export default function StudentDetail() {
                       <Link href={`/tasks/${a.tasks?.id}`} className="flex-1 min-w-0 text-sm hover:underline truncate" style={TEXT}>{a.tasks?.description || '(removed)'}</Link>
                       <span className="text-xs flex items-center gap-1" style={FAINT}>
                         {a.actual_hours != null ? `${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
-                        {userRole === 'leader' && a.timed_hours != null && <><span>·</span><Icon name="clock" size={12} />{`${Math.round(a.timed_hours * 10) / 10}h timed`}</>}
+                        {can(userRole, 'insights.view') && a.timed_hours != null && <><span>·</span><Icon name="clock" size={12} />{`${Math.round(a.timed_hours * 10) / 10}h timed`}</>}
                       </span>
                       {a.score != null && <Badge accent={scoreAccent(a.score)}>score {a.score}</Badge>}
                     </div>

@@ -143,7 +143,7 @@ past its due date is closed and locked automatically.
 ```
 taskmatch/        Next.js frontend (pages in app/, design system in app/components/ui.tsx)
 taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
-supabase/         Database security policies (rls.sql)
+supabase/         Database security policies (rls.sql, then roles.sql)
 docs/             Roadmap, redesign and Phase 1 write-ups, screenshots
 .github/          CI workflow
 ```
@@ -173,6 +173,10 @@ endpoint is explained in [taskmatch-api/README.md](taskmatch-api/README.md).
 In the Supabase SQL Editor, run [`supabase/rls.sql`](supabase/rls.sql) once to switch on
 row-level security. Set `SUPABASE_SERVICE_ROLE_KEY` for the API first, because the API's
 queries rely on it.
+
+Then run [`supabase/roles.sql`](supabase/roles.sql) once. It moves every account's role to a place
+only the server can change (existing leaders become admins, everyone else members), adds the
+"away" date, and sets the database rules for each role. Admins change roles on the **Team & roles** page.
 
 ### 3. The frontend
 

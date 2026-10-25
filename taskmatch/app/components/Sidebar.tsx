@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase, API } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
-import { effectiveRole, setRoleOverride } from '../lib/role'
+import { effectiveRole, realRole, setRoleOverride, getRoleOverride, can, roleLabel, ROLES, type Role } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
 import { Icon, Logo } from './ui'
 
@@ -14,6 +14,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('')
+  const [real, setReal] = useState<Role>('member')
   const [name, setName] = useState('')
   const [avatar, setAvatar] = useState<string | null>(null)
   const [open, setOpen] = useState(false)   // mobile drawer
@@ -26,6 +27,7 @@ export default function Sidebar() {
       const e = session.user.email || ''
       setEmail(e)
       setRole(effectiveRole(session))
+      setReal(realRole(session))
       const { data } = await supabase.from('students').select('name, avatar_url').eq('email', e).maybeSingle()
       if (data) { setName(data.name || ''); setAvatar(data.avatar_url || null) }
     })
@@ -38,21 +40,17 @@ export default function Sidebar() {
 
   const nav = [
     { label: 'Dashboard', href: '/dashboard', icon: 'grid' as const },
-    { label: 'Students', href: '/students', icon: 'users' as const },
+    { label: 'People', href: '/students', icon: 'users' as const },
     { label: 'Tasks', href: '/tasks', icon: 'check' as const },
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
-    ...(role === 'leader' ? [{ label: 'Logs', href: '/logs', icon: 'list' as const }] : []),
   ]
+  const adminNav = [
+    ...(can(role, 'team.manage') ? [{ label: 'Team & roles', href: '/team', icon: 'shield' as const }] : []),
+    ...(can(role, 'audit.view') ? [{ label: 'Audit trail', href: '/audit', icon: 'history' as const }] : []),
+  ]
+  const previewing = real === 'admin' && !!getRoleOverride() && role !== real
 
-  const panel = (
-    <aside className="w-60 px-3 py-4 flex flex-col gap-0.5 shrink-0 h-screen overflow-y-auto"
-      style={{ background: 'var(--tm-bg-sidebar)', borderRight: '1px solid var(--tm-border)' }}>
-      <Link href="/dashboard" className="flex items-center px-2 pb-5 pt-1">
-        <Logo size={26} />
-      </Link>
-
-      <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Workspace</p>
-      {nav.map(item => {
+  const navLink = (item: { label: string; href: string; icon: 'grid' | 'users' | 'check' | 'star' | 'shield' | 'history' }) => {
         const activeItem = pathname === item.href || pathname.startsWith(item.href + '/')
         return (
           <Link key={item.href} href={item.href}
@@ -68,18 +66,31 @@ export default function Sidebar() {
             {item.label}
           </Link>
         )
-      })}
+        }
+
+  const panel = (
+    <aside className="w-60 px-3 py-4 flex flex-col gap-0.5 shrink-0 h-screen overflow-y-auto"
+      style={{ background: 'var(--tm-bg-sidebar)', borderRight: '1px solid var(--tm-border)' }}>
+      <Link href="/dashboard" className="flex items-center px-2 pb-5 pt-1">
+        <Logo size={26} />
+      </Link>
+
+      <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Workspace</p>
+      {nav.map(navLink)}
+      {adminNav.length > 0 && <p className="px-2 pt-4 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Admin</p>}
+      {adminNav.map(navLink)}
 
       <div className="mt-auto pt-3 flex flex-col gap-2">
-        <div className="rounded-lg p-2.5 border border-line bg-subtle">
-          <p className="text-[11px] mb-1.5 text-faint">Preview as</p>
-          <div className="tm-seg w-full">
-            {['leader', 'student'].map(r => (
-              <button key={r} aria-pressed={role === r} className="flex-1 justify-center capitalize"
-                onClick={() => { setRoleOverride(r); window.location.reload() }}>{r}</button>
-            ))}
+        {real === 'admin' && (
+          <div className="rounded-lg p-2.5 border border-line bg-subtle">
+            <label htmlFor="tm-preview" className="text-[11px] mb-1.5 text-faint block">Preview the app as</label>
+            <select id="tm-preview" className="tm-select-sm w-full" value={role}
+              onChange={e => { setRoleOverride(e.target.value === 'admin' ? null : e.target.value as Role); window.location.reload() }}>
+              {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}{r.key === 'admin' ? ' (you)' : ''}</option>)}
+            </select>
+            {previewing && <p className="text-[10px] mt-1.5 text-faint">Only changes what you see. Your real access is unchanged.</p>}
           </div>
-        </div>
+        )}
 
         <div className="flex items-center gap-1 pt-2" style={{ borderTop: '1px solid var(--tm-border)' }}>
           <Link href="/profile" className="flex flex-1 min-w-0 items-center gap-2.5 px-1.5 py-1.5 rounded-md transition-colors hover:bg-surface-2">
@@ -89,7 +100,7 @@ export default function Sidebar() {
                   style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{initials(name || email)}</div>}
             <div className="min-w-0">
               <p className="text-[13px] font-medium truncate text-fg">{name || 'My profile'}</p>
-              <p className="text-[11px] truncate capitalize text-faint">{role || 'student'}</p>
+              <p className="text-[11px] truncate text-faint">{roleLabel(role)}{previewing ? ' (preview)' : ''}</p>
             </div>
           </Link>
           <ThemeToggle />
