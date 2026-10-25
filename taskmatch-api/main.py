@@ -122,6 +122,11 @@ class CompleteBody(BaseModel):
     assignment_id: str = Field(..., min_length=1)
     actual_hours: float | None = Field(default=None, ge=0)
 
+class AutoAssignBody(BaseModel):
+    task_id: str = Field(..., min_length=1)
+    mode: str = Field(..., pattern="^(best_match|round_robin|least_loaded)$")
+    dry_run: bool = False  # true = preview the pick without assigning anyone
+
 class SetRoleBody(BaseModel):
     user_id: str = Field(..., min_length=1)
     role: str = Field(..., pattern="^(student|leader)$")
@@ -308,10 +313,10 @@ def compute_student_stats():
 
 # ─── Core matching algorithm ───────────────────────────────────
 
-@app.get("/recommend/{task_id}")
-def recommend(task_id: str, authorization: str = Header(None)):
-    require_user(authorization)
-
+def score_candidates(task_id):
+    """Score every student against one task (flag, don't filter). Shared by /recommend
+    and /auto-assign so the ranked list and the automatic pick can never disagree.
+    Returns the candidates sorted qualified-first, then skill match, then least busy."""
     # Step 1: Get all required skills for this task
     task_skills = (
         db().table("task_skills")
@@ -427,6 +432,13 @@ def recommend(task_id: str, authorization: str = Header(None)):
 
     # Step 6: Qualified first, then skill-match desc, then less busy first.
     candidates.sort(key=lambda x: (not x["qualified"], -x["match_score"], x["wip"]))
+    return candidates
+
+
+@app.get("/recommend/{task_id}")
+def recommend(task_id: str, authorization: str = Header(None)):
+    require_user(authorization)
+    candidates = score_candidates(task_id)
 
     # Step 7: Balanced-pair suggestion — a strong performer + a learner, so the
     #         workload isn't dumped on top performers (per the FYP balance goal).
@@ -468,6 +480,111 @@ def recommend(task_id: str, authorization: str = Header(None)):
         "min_team_size": 2,
         "wip_limit": WIP_LIMIT,
     }
+
+# ─── Assignment modes: pick one person automatically ───────────
+
+ASSIGNMENT_MODES = {
+    "best_match":   "Best match",
+    "round_robin":  "Round robin",
+    "least_loaded": "Least loaded",
+}
+
+
+def pick_assignee(candidates, mode, last_assigned=None, total_assigned=None, active_hours=None):
+    """Choose one candidate for a task. Pure function (no DB) so it is easy to test.
+
+    Only qualified candidates (meet every required skill, under the WIP limit) are ever
+    picked; the modes differ in how they break the tie between them:
+      best_match   — the top of the ranked list (highest skill match, then least busy)
+      round_robin  — whoever has gone longest without a new assignment, so routine work
+                     rotates evenly (never assigned counts as longest; then fewest
+                     assignments overall, then name)
+      least_loaded — fewest committed hours on active tasks (then fewest active tasks)
+    Returns (candidate, reason), or (None, reason) when nobody qualifies."""
+    last_assigned = last_assigned or {}
+    total_assigned = total_assigned or {}
+    active_hours = active_hours or {}
+
+    pool = [c for c in candidates if c["qualified"]]
+    if not pool:
+        return None, "Nobody qualifies yet — no one meets every required skill with a free slot."
+
+    if mode == "best_match":
+        chosen = pool[0]  # candidates arrive already ranked
+        reason = (f"Best match: {chosen['met_count']}/{chosen['total_required']} required skills, "
+                  f"skill level {chosen['match_score']}, {chosen['wip']} of {WIP_LIMIT} slots used")
+    elif mode == "round_robin":
+        def rr_key(c):
+            last = last_assigned.get(c["student_id"])
+            # "" sorts before any ISO date, so never-assigned people go first.
+            return (last or "", total_assigned.get(c["student_id"], 0), (c["name"] or "").lower())
+        chosen = sorted(pool, key=rr_key)[0]
+        last = last_assigned.get(chosen["student_id"])
+        when = f"last given a task on {last}" if last else "has not been given a task yet"
+        reason = (f"Round robin: next in rotation ({when}), meets all required skills, "
+                  f"{chosen['wip']} of {WIP_LIMIT} slots used")
+    elif mode == "least_loaded":
+        def ll_key(c):
+            return (active_hours.get(c["student_id"], 0), c["wip"], -c["match_score"])
+        chosen = sorted(pool, key=ll_key)[0]
+        hours = active_hours.get(chosen["student_id"], 0)
+        reason = (f"Least loaded: {round(hours, 1)}h committed on active tasks, "
+                  f"{chosen['wip']} of {WIP_LIMIT} slots used, meets all required skills")
+    else:
+        raise ValueError(f"unknown assignment mode: {mode}")
+    return chosen, reason
+
+
+@app.post("/auto-assign")
+def auto_assign(body: AutoAssignBody, authorization: str = Header(None)):
+    """Leader picks an assignment mode and the server chooses who gets the task.
+    With dry_run the pick is only previewed, so the leader can confirm or override."""
+    require_leader(authorization)
+    actor_email, actor_role = actor_from_token(authorization)
+
+    rows = (
+        db().table("assignments")
+        .select("task_id, student_id, status, assigned_date, tasks(committed_hours)")
+        .execute()
+    ).data
+
+    already_on_task = set()
+    last_assigned, total_assigned = {}, defaultdict(int)
+    active_hours = defaultdict(float)
+    for r in rows:
+        sid = r["student_id"]
+        if r["task_id"] == body.task_id:
+            already_on_task.add(sid)
+        total_assigned[sid] += 1
+        d = r.get("assigned_date")
+        if d and (sid not in last_assigned or d > last_assigned[sid]):
+            last_assigned[sid] = d
+        if r["status"] in ("Assigned", "In Progress"):
+            active_hours[sid] += (r.get("tasks") or {}).get("committed_hours") or 0
+
+    candidates = [c for c in score_candidates(body.task_id) if c["student_id"] not in already_on_task]
+    chosen, reason = pick_assignee(candidates, body.mode, last_assigned, total_assigned, active_hours)
+
+    result = {
+        "mode": body.mode,
+        "mode_label": ASSIGNMENT_MODES[body.mode],
+        "dry_run": body.dry_run,
+        "student_id": chosen["student_id"] if chosen else None,
+        "name": chosen["name"] if chosen else None,
+        "reason": reason,
+    }
+    if chosen is None or body.dry_run:
+        return result
+
+    created = _create_assignment(body.task_id, chosen["student_id"], actor_email, actor_role)
+    log_activity(
+        action="assignment.auto_assigned", entity_type="task", entity_id=body.task_id,
+        summary=f"{chosen['name']} auto-assigned ({ASSIGNMENT_MODES[body.mode]})",
+        actor_email=actor_email, actor_role=actor_role,
+        details={"mode": body.mode, "student_id": chosen["student_id"], "reason": reason},
+    )
+    return {**result, "assignment": created["assignment"]}
+
 
 def _create_assignment(task_id, student_id, actor_email, actor_role, self_assigned=False):
     """Shared assignment logic used by both leader-assign and student self-assign.
