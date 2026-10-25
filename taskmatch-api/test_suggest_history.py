@@ -78,4 +78,37 @@ def test_one_loose_match_is_not_enough_for_a_skill():
 def test_same_shape_as_the_ai():
     out = sh.suggest("Settings page form", "", SKILLS, TASKS)
     assert set(out) >= {"skills", "hours", "severity", "question", "model", "examples_considered"}
-    assert set(out["hours"]) == {"estimate", "low", "high", "confidence", "reason", "based_on"}
+    assert set(out["hours"]) >= {"estimate", "low", "high", "confidence", "reason", "based_on"}
+
+
+# ─── Smarter matching: rare words, short forms, learned hints, estimate bias ───
+
+def test_short_forms_read_as_the_full_word():
+    assert sh.words("Fix the JS bundle and the db index") >= {"javascript", "database"}
+    out = sh.suggest("Speed up the JS bundle", "", SKILLS + [{"id": "k5", "skill_name": "JavaScript"}], [])
+    assert [s["skill_name"] for s in out["skills"]] == ["JavaScript"]
+
+
+def test_rare_shared_words_count_for_more():
+    docs = [sh.words(t["description"]) for t in TASKS]
+    idf = sh.rarity(docs)
+    form = sh.similarity({"form", "x"}, {"form", "y"}, idf)        # "form" is in 3 of 5 tasks
+    webhook = sh.similarity({"webhook", "x"}, {"webhook", "y"}, idf)  # "webhook" is in 1
+    assert webhook > form
+
+
+def test_history_ties_a_word_to_a_skill():
+    hist = [task(i, f"{d} login", [("Python", 2)], 4) for i, d in enumerate(["Audit", "Throttle", "Lock out", "Reset"])]
+    hist += [task(9, "Billing export", [("SQL", 2)], 4), task(10, "Invoice table", [("SQL", 2)], 4),
+             task(11, "Chart colours", [("UI/UX", 1)], 2), task(12, "Footer links", [("React", 1)], 2)]
+    out = sh.suggest("Login rate limits", "", SKILLS, hist)
+    py = next(s for s in out["skills"] if s["skill_name"] == "Python")
+    assert "mention \u201clogin\u201d" in py["reason"] and py["confidence"] in ("high", "medium")
+
+
+def test_note_when_the_team_runs_over_its_estimates():
+    over = [dict(task(i, f"Thing {i}", [], 15), committed_hours=10) for i in range(4)]
+    assert "longer than planned" in sh.estimate_bias(over)
+    on = [dict(task(i, f"Thing {i}", [], 10), committed_hours=10) for i in range(4)]
+    assert sh.estimate_bias(on) == ""
+    assert sh.estimate_bias(over[:2]) == ""   # too few to say

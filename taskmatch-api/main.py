@@ -24,6 +24,8 @@ try:
 except Exception:
     pass
 
+import matching  # after load_dotenv: reads CAPACITY_HOURS / EVIDENCE_HALF_LIFE_DAYS
+
 app = FastAPI()
 
 
@@ -136,6 +138,14 @@ class AutoAssignBody(BaseModel):
 class SetRoleBody(BaseModel):
     user_id: str = Field(..., min_length=1)
     role: str = Field(..., pattern="^(admin|lead|member|viewer)$")
+
+class MatchSkill(BaseModel):
+    skill_id: str = Field(..., min_length=1)
+    min_level: int = Field(default=1, ge=1, le=3)
+
+class MatchPeopleBody(BaseModel):
+    skills: list[MatchSkill] = Field(..., min_length=1, max_length=20)
+    description: str = Field(default="", max_length=500)
 
 class SuggestTaskBody(BaseModel):
     description: str = Field(..., min_length=3, max_length=500)
@@ -452,74 +462,45 @@ def compute_student_stats():
 
 # ─── Core matching algorithm ───────────────────────────────────
 
-def score_candidates(task_id):
-    """Score every student against one task (flag, don't filter). Shared by /recommend
-    and /auto-assign so the ranked list and the automatic pick can never disagree.
-    Returns the candidates sorted qualified-first, then skill match, then least busy."""
-    # Step 1: Get all required skills for this task
-    task_skills = (
-        db().table("task_skills")
-        .select("skill_id, min_proficiency")
-        .eq("task_id", task_id)
-        .execute()
-    ).data
-
-    if not task_skills:
-        raise HTTPException(status_code=404, detail="Task not found or has no skill requirements")
-
-    required = {ts["skill_id"]: ts["min_proficiency"] for ts in task_skills}
-
-    # Step 2: Get all student skills
-    all_student_skills = (
-        db().table("student_skills")
-        .select("student_id, skill_id, proficiency")
-        .execute()
-    ).data
-
-    # Step 3: Group skills by student
-    student_skill_map = defaultdict(dict)
-    for row in all_student_skills:
-        student_skill_map[row["student_id"]][row["skill_id"]] = row["proficiency"]
-
-    # Step 4: Get each student's current active WIP count
-    active_assignments = (
-        db().table("assignments")
-        .select("student_id")
-        .in_("status", ["Assigned", "In Progress"])
-        .execute()
-    ).data
-
-    wip_count = defaultdict(int)
-    for row in active_assignments:
-        wip_count[row["student_id"]] += 1
-
-    # Names of required skills (for human-readable justifications).
-    skill_rows = (
-        db().table("skills").select("id, skill_name")
-        .in_("id", list(required.keys())).execute()
-    ).data
-    skill_names = {r["id"]: r["skill_name"] for r in skill_rows}
-
-    # Performance stats feed the band + the balanced pairing.
-    stats = compute_student_stats()
-
-    # Step 5: Score EVERY student (flag, don't filter) so the leader sees all —
-    #         qualified float to the top, the rest are ranked below with a reason.
-    all_students = (
+def load_people():
+    """Everything the fit score needs: people, declared skills, and every assignment with its
+    task's hours, due date and skills (for proven experience and track record)."""
+    students = (
         db().table("students")
         .select("*")   # "*" so this still works before roles.sql adds away_until
         .execute()
     ).data
-    today = str(date.today())
+    student_skills = (db().table("student_skills").select("student_id, skill_id, proficiency").execute()).data
+    assignments = (
+        db().table("assignments")
+        .select("student_id, task_id, status, score, completed_at, assigned_date, "
+                "tasks(description, committed_hours, due_date, task_skills(skill_id, min_proficiency))")
+        .execute()
+    ).data
+    return students, student_skills, assignments
 
+
+def skill_name_map():
+    return {r["id"]: r["skill_name"] for r in (db().table("skills").select("id, skill_name").execute()).data}
+
+
+def rank_people(required, description=""):
+    """Score every person against required {skill_id: min_level} (flag, don't filter), so the
+    leader sees everyone: qualified people first, then by fit score, then least busy.
+    Shared by /recommend, /auto-assign and /match/people so they can never disagree."""
+    students, student_skills, assignments = load_people()
+    profiles = matching.build_profiles(students, student_skills, assignments)
+    skill_names = skill_name_map()
+    task_words = suggest_history.words(description) if description else None
     total_required = len(required)
+
     candidates = []
-    for student in all_students:
+    for student in students:
         student_id = student["id"]
-        skills = student_skill_map.get(student_id, {})
-        over_wip = wip_count[student_id] >= WIP_LIMIT
-        away_until = student.get("away_until")
-        away = bool(away_until) and away_until >= today
+        p = profiles[student_id]
+        skills = p["declared"]
+        over_wip = p["active_count"] >= WIP_LIMIT
+        away = p["away"]
 
         proficiency_scores = []
         met_count = 0
@@ -530,18 +511,25 @@ def score_candidates(task_id):
             if student_prof >= min_prof:
                 met_count += 1
             else:
-                missing.append(skill_names.get(skill_id, "a required skill"))
+                missing.append(skill_id)
 
         meets_skills = met_count == total_required
         avg = sum(proficiency_scores) / len(proficiency_scores) if proficiency_scores else 0
 
-        st = stats.get(student_id, {"avg_score": None, "completed_count": 0, "band": "unrated"})
-        band = st["band"]
+        avg_score = matching.avg_score(p)
+        band = score_band(avg_score, len(p["scores"]))
         unrated = band == "unrated"
+        fit_score, factors = matching.fit(p, required, skill_names, task_words, WIP_LIMIT)
+        mentor = None
+        if missing:
+            m = matching.mentor_for(missing[0], profiles, exclude={student_id})
+            if m:
+                mentor = {"student_id": m["student_id"], "name": m["name"],
+                          "skill_name": skill_names.get(missing[0])}
 
         # Why this student appears — fit and/or growth reason.
         if away:
-            justification = f"Away until {away_until} — not available for new work"
+            justification = f"Away until {p['away_until']} — not available for new work"
         elif over_wip:
             justification = "At WIP limit — finish current tasks first"
         elif meets_skills and band == "high":
@@ -553,32 +541,55 @@ def score_candidates(task_id):
         elif meets_skills:  # low band
             justification = "Meets all required skills — pairing with a strong member helps them improve"
         else:
-            grow = f" to build {missing[0]}" if missing else ""
+            grow = f" to build {skill_names.get(missing[0], 'a required skill')}" if missing else ""
+            with_whom = f" with {mentor['name']} as a mentor" if mentor else " alongside a strong member"
             justification = (f"Suggested for growth — meets {met_count}/{total_required} required skills; "
-                             f"a chance{grow} alongside a strong member")
+                             f"a chance{grow}{with_whom}")
 
         candidates.append({
             "student_id":  student_id,
             "name":        student.get("name"),
             "matric":      student.get("matric"),
             "programme":   student.get("programme"),
+            "avatar_url":  student.get("avatar_url"),
             "match_score": round(avg, 2),
+            "fit_score":   fit_score,
+            "fit_factors": factors,
+            "proven":      [skill_names.get(k) for k in required if k in p["evidence"]],
             "met_count":   met_count,
             "total_required": total_required,
-            "wip":         wip_count[student_id],
+            "wip":         p["active_count"],
+            "active_hours": p["active_hours"],
             "qualified":   meets_skills and not over_wip and not away,
             "over_wip":    over_wip,
             "away":        away,
-            "away_until":  away_until if away else None,
-            "avg_score":   st["avg_score"],
+            "away_until":  p["away_until"] if away else None,
+            "avg_score":   avg_score,
             "band":        band,
             "unrated":     unrated,
+            "mentor":      mentor,
             "justification": justification,
         })
 
-    # Step 6: Qualified first, then skill-match desc, then less busy first.
-    candidates.sort(key=lambda x: (not x["qualified"], -x["match_score"], x["wip"]))
+    candidates.sort(key=lambda x: (not x["qualified"], -x["fit_score"], x["wip"]))
     return candidates
+
+
+def score_candidates(task_id):
+    """Rank everyone for one task, using its required skills and its wording."""
+    task_skills = (
+        db().table("task_skills")
+        .select("skill_id, min_proficiency")
+        .eq("task_id", task_id)
+        .execute()
+    ).data
+
+    if not task_skills:
+        raise HTTPException(status_code=404, detail="Task not found or has no skill requirements")
+
+    required = {ts["skill_id"]: ts["min_proficiency"] for ts in task_skills}
+    task = (db().table("tasks").select("description").eq("id", task_id).execute()).data
+    return rank_people(required, (task[0].get("description") if task else "") or "")
 
 
 @app.get("/recommend/{task_id}")
@@ -625,6 +636,8 @@ def recommend(task_id: str, authorization: str = Header(None)):
         "assigned_count": len(current),
         "min_team_size": 2,
         "wip_limit": WIP_LIMIT,
+        "capacity_hours": matching.CAPACITY_HOURS,
+        "weights": matching.WEIGHTS,
     }
 
 # ─── Assignment modes: pick one person automatically ───────────
@@ -1178,10 +1191,115 @@ def recommend_tasks(student_id: str, authorization: str = Header(None)):
             growth_list.append(base)
         # met == 0 -> not relevant enough to suggest
 
-    qualified_list.sort(key=lambda x: -x["match_score"])
-    growth_list.sort(key=lambda x: -x["match_score"])
+    # Fit score from this person's side: same rules as /recommend, so both views agree.
+    me = (db().table("students").select("*").eq("id", student_id).execute()).data
+    if me:
+        history = (
+            db().table("assignments")
+            .select("student_id, task_id, status, score, completed_at, assigned_date, "
+                    "tasks(description, committed_hours, due_date, task_skills(skill_id, min_proficiency))")
+            .eq("student_id", student_id)
+            .execute()
+        ).data
+        p = matching.build_profiles(me, [{"student_id": student_id, **r} for r in student_skills], history)[student_id]
+        for item in qualified_list + growth_list:
+            item["fit_score"], _ = matching.fit(p, required_by_task[item["task_id"]], skill_names,
+                                                suggest_history.words(item["description"]), WIP_LIMIT)
+
+    qualified_list.sort(key=lambda x: (-x.get("fit_score", 0), -x["match_score"]))
+    growth_list.sort(key=lambda x: (-x.get("fit_score", 0), -x["match_score"]))
 
     return {"student_id": student_id, "qualified": qualified_list, "growth": growth_list}
+
+
+# ─── People: match for any set of skills, and team insights ───
+
+@app.post("/match/people")
+def match_people(body: MatchPeopleBody, authorization: str = Header(None)):
+    """Rank everyone for a need that isn't a task yet: some skills at a level, and optionally a
+    description. Powers "Find a match" on the People page and "Who could take this" in New task."""
+    require_user(authorization)
+    required = {s.skill_id: s.min_level for s in body.skills}
+    return {
+        "recommendations": rank_people(required, body.description),
+        "wip_limit": WIP_LIMIT,
+        "capacity_hours": matching.CAPACITY_HOURS,
+        "weights": matching.WEIGHTS,
+    }
+
+
+@app.get("/people/insights")
+def people_insights(authorization: str = Header(None)):
+    """The team at a glance: each person's load in hours and proven skills, each skill's
+    coverage and risk, and open tasks nobody available can take."""
+    require_user(authorization)
+    students, student_skills, assignments = load_people()
+    profiles = matching.build_profiles(students, student_skills, assignments)
+    skills = (db().table("skills").select("id, skill_name").execute()).data
+    names = {k["id"]: k["skill_name"] for k in skills}
+
+    open_tasks = (
+        db().table("tasks")
+        .select("id, description, status, due_date, task_skills(skill_id, min_proficiency)")
+        .in_("status", ["New", "In Progress"])
+        .execute()
+    ).data
+    open_tasks = [t for t in open_tasks if not is_task_closed(t.get("due_date"), t["status"])]
+    open_rows = [{"task_id": t["id"], **ts} for t in open_tasks for ts in (t.get("task_skills") or [])]
+    health = matching.skill_health(skills, profiles, open_rows, WIP_LIMIT)
+
+    # Open, unstarted tasks that nobody available meets every skill for.
+    free = [p for p in profiles.values() if not p["away"] and p["active_count"] < WIP_LIMIT]
+    hard_to_staff = []
+    for t in open_tasks:
+        req = {ts["skill_id"]: ts.get("min_proficiency") or 1 for ts in (t.get("task_skills") or [])}
+        if t["status"] != "New" or not req:
+            continue
+        if any(all(p["declared"].get(k, 0) >= lvl for k, lvl in req.items()) for p in free):
+            continue
+        short = [names.get(k) for k, lvl in req.items()
+                 if not any(p["declared"].get(k, 0) >= lvl for p in free)]
+        hard_to_staff.append({"task_id": t["id"], "description": t.get("description"),
+                              "due_date": t.get("due_date"), "missing": [n for n in short if n]})
+
+    cap = matching.CAPACITY_HOURS
+    people = []
+    for p in profiles.values():
+        people.append({
+            "student_id": p["student_id"], "name": p["name"],
+            "active_count": p["active_count"], "active_hours": p["active_hours"],
+            "load": round(min(max(p["active_count"] / WIP_LIMIT, p["active_hours"] / cap), 1.5), 2),
+            "away": p["away"],
+            "completed": p["completed"], "on_time": p["on_time"], "dated": p["dated"],
+            "avg_score": matching.avg_score(p),
+            "last_assigned": p["last_assigned"],
+            "proven": matching.proven_skills(p, names),
+        })
+    people.sort(key=lambda x: (-x["load"], x["name"] or ""))
+
+    present = [p for p in profiles.values() if not p["away"]]
+    declared = sum(len(p["declared"]) for p in profiles.values())
+    backed = sum(1 for p in profiles.values() for k in p["declared"] if k in p["evidence"])
+    active_hours = round(sum(p["active_hours"] for p in present), 1)
+    capacity = cap * len(present)
+    return {
+        "wip_limit": WIP_LIMIT,
+        "capacity_hours": cap,
+        "summary": {
+            "people": len(profiles),
+            "available": len(present),
+            "active_hours": active_hours,
+            "capacity_hours": capacity,
+            "utilisation": round(active_hours / capacity, 2) if capacity else 0,
+            "gaps": sum(1 for h in health if h["risk"] == "gap"),
+            "single_points": sum(1 for h in health if h["risk"] == "single"),
+            "proven_share": round(backed / declared, 2) if declared else 0,
+            "hard_to_staff": len(hard_to_staff),
+        },
+        "people": people,
+        "skills": health,
+        "hard_to_staff": hard_to_staff,
+    }
 
 
 # ─── Workspace members & roles (service-role) ──────
