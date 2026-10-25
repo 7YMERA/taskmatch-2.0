@@ -8,6 +8,13 @@ import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import { toast } from '../lib/ui'
 import { effectiveRole } from '../lib/role'
+import { Card, Badge, Button, Icon, Skeleton, EmptyState } from '../components/ui'
+
+// Theme-token text colours, so copy flips correctly between dark and light.
+const TEXT = { color: 'var(--tm-text)' }
+const MUTED = { color: 'var(--tm-text-muted)' }
+const FAINT = { color: 'var(--tm-text-faint)' }
+const ROW = { background: 'var(--tm-surface-1)' }
 
 export default function MyTasks() {
   const router = useRouter()
@@ -118,8 +125,7 @@ export default function MyTasks() {
     finally { setBusy(null) }
   }
 
-  const severityColor = (s: string) =>
-    s === 'Critical' ? 'bg-red-500/20 text-red-400' : s === 'Medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 text-white/50'
+  const severityDot = (s: string) => s === 'Critical' ? 'var(--tm-rose)' : s === 'Medium' ? 'var(--tm-amber)' : 'var(--tm-text-faint)'
 
   const elapsed = (startIso: string) => {
     if (!startIso) return '0h 0m 0s'
@@ -131,130 +137,143 @@ export default function MyTasks() {
   const active = assignments.filter(a => a.status === 'Assigned' || a.status === 'In Progress')
   const completed = assignments.filter(a => a.status === 'Completed')
 
+  const tabBtn = (key: 'active' | 'completed', label: string) => (
+    <button onClick={() => setTab(key)} aria-pressed={tab === key} className="tm-pick !py-2 !px-4">
+      {label}
+    </button>
+  )
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 p-8 overflow-y-auto">
-        <h1 className="text-2xl font-semibold text-white mb-1">My Tasks</h1>
-        <p className="text-xs text-white/40 mb-6">Start a task to run its timer, then mark it complete when you&apos;re done.</p>
+      <main className="flex-1 min-w-0 p-5 sm:p-8 pt-20 md:pt-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold" style={TEXT}>My Tasks</h1>
+          <p className="text-xs mt-1" style={FAINT}>Start a task to run its timer, then mark it complete when you&apos;re done.</p>
+        </div>
 
         {loading ? (
-          <p className="text-white/40 text-sm">Loading...</p>
-        ) : notFound ? (
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 max-w-lg">
-            <p className="text-sm text-white mb-1">No student record linked to your account.</p>
-            <p className="text-xs text-white/40">Ask your leader to add you on the Students page using <span className="text-white/70">{userEmail}</span>, then refresh.</p>
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 76 }} />)}
           </div>
+        ) : notFound ? (
+          <Card tint="amber" className="p-5 max-w-lg">
+            <p className="text-sm font-medium mb-1 flex items-center gap-2" style={TEXT}>
+              <span style={{ color: 'var(--tm-amber)' }}><Icon name="alert" size={16} /></span>
+              No student record linked to your account
+            </p>
+            <p className="text-xs" style={MUTED}>Ask your leader to add you on the Students page using <span className="font-medium" style={TEXT}>{userEmail}</span>, then refresh.</p>
+          </Card>
         ) : (
           <>
             {/* Tabs */}
             <div className="flex gap-2 mb-4 items-center">
-              <button onClick={() => setTab('active')}
-                className={`text-xs px-4 py-2 rounded-lg border transition ${tab === 'active' ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/40 hover:text-white'}`}>
-                To do ({active.length})
-              </button>
-              <button onClick={() => setTab('completed')}
-                className={`text-xs px-4 py-2 rounded-lg border transition ${tab === 'completed' ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300' : 'border-white/10 text-white/40 hover:text-white'}`}>
-                Completed ({completed.length})
-              </button>
+              {tabBtn('active', `To do (${active.length})`)}
+              {tabBtn('completed', `Completed (${completed.length})`)}
               {tab === 'active' && active.some(a => a.status === 'In Progress') && (
-                <button onClick={toggleTimers}
-                  className="ml-auto text-xs px-3 py-2 rounded-lg border border-white/10 text-white/50 hover:text-white hover:border-white/25 transition">
-                  {showTimers ? '⏱ Hide timers' : '⏱ Show timers'}
-                </button>
+                <Button variant="ghost" className="tm-btn-sm ml-auto" onClick={toggleTimers}>
+                  <Icon name="clock" size={13} /> {showTimers ? 'Hide timers' : 'Show timers'}
+                </Button>
               )}
             </div>
 
             {tab === 'active' ? (
               active.length === 0 ? (
-                <p className="text-white/40 text-sm">Nothing assigned to you right now.</p>
+                <Card>
+                  <EmptyState icon={<Icon name="check" size={28} />} title="Nothing assigned to you right now"
+                    hint="Pick up a suggested task from your Profile, or wait for your leader to assign one." />
+                </Card>
               ) : (
                 <div className="flex flex-col gap-3">
                   {active.map(a => (
-                    <div key={a.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4 flex items-center gap-4">
-                      <div className="flex-1">
-                        <Link href={`/tasks/${a.tasks?.id}`} className="text-sm font-medium text-white hover:underline">{a.tasks?.description || '(task removed)'}</Link>
-                        <div className="flex gap-2 mt-1.5 flex-wrap items-center">
-                          {a.tasks?.severity && <span className={`text-xs px-2 py-0.5 rounded-full ${severityColor(a.tasks.severity)}`}>{a.tasks.severity}</span>}
-                          {a.tasks?.committed_hours != null && <span className="text-xs text-white/40">{a.tasks.committed_hours}h budget</span>}
-                          {a.tasks?.due_date && <span className="text-xs text-white/40">due {a.tasks.due_date}</span>}
-                        </div>
+                    <Card key={a.id} className="p-4 flex flex-wrap items-center gap-4">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: severityDot(a.tasks?.severity) }} title={`${a.tasks?.severity || 'Low'} severity`} />
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/tasks/${a.tasks?.id}`} className="text-sm font-medium hover:underline" style={TEXT}>{a.tasks?.description || '(task removed)'}</Link>
+                        <p className="text-xs mt-1 flex flex-wrap items-center gap-x-1.5" style={FAINT}>
+                          {a.tasks?.severity && <span>{a.tasks.severity}</span>}
+                          {a.tasks?.committed_hours != null && <span>· {a.tasks.committed_hours}h budget</span>}
+                          {a.tasks?.due_date && <span>· due {a.tasks.due_date}</span>}
+                        </p>
                       </div>
 
                       {a.status === 'Assigned' ? (
-                        <div className="text-right">
-                          <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400">Ready to start</span>
-                          <button onClick={() => startTask(a.id)} disabled={busy === a.id}
-                            className="block mt-2 text-xs px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition disabled:opacity-50">
-                            {busy === a.id ? '…' : '▶ Start'}
-                          </button>
+                        <div className="flex items-center gap-3">
+                          <Badge accent="amber">Ready to start</Badge>
+                          <Button className="tm-btn-sm" onClick={() => startTask(a.id)} disabled={busy === a.id}>
+                            {busy === a.id ? '…' : <><Icon name="arrowRight" size={13} /> Start</>}
+                          </Button>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-3">
                           {showTimers ? (
-                            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-right min-w-[7.5rem]">
-                              <p className="text-lg font-mono font-semibold text-emerald-400 tabular-nums leading-none">{elapsed(a.in_progress_at)}</p>
-                              <p className="text-[10px] text-emerald-400/60 mt-1">⏱ elapsed · running</p>
-                            </div>
+                            <Card tint="emerald" className="px-3 py-1.5 !rounded-lg text-right min-w-[7.5rem]">
+                              <p className="text-lg font-mono font-semibold tabular-nums leading-none" style={{ color: 'var(--tm-emerald)' }}>{elapsed(a.in_progress_at)}</p>
+                              <p className="text-[10px] mt-1" style={FAINT}>elapsed · running</p>
+                            </Card>
                           ) : (
-                            <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400">running</span>
+                            <Badge accent="emerald">running</Badge>
                           )}
-                          <button onClick={() => completeTask(a.id, a.tasks?.description || 'this task')} disabled={busy === a.id}
-                            className="text-xs px-4 py-2 rounded-lg border border-green-500/30 text-green-400 hover:bg-green-500/10 transition disabled:opacity-50">
-                            {busy === a.id ? '…' : '✓ Complete'}
-                          </button>
+                          <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-emerald)' }}
+                            onClick={() => completeTask(a.id, a.tasks?.description || 'this task')} disabled={busy === a.id}>
+                            {busy === a.id ? '…' : <><Icon name="check" size={13} /> Complete</>}
+                          </Button>
                         </div>
                       )}
-                    </div>
+                    </Card>
                   ))}
                 </div>
               )
             ) : (
               completed.length === 0 ? (
-                <p className="text-white/40 text-sm">No completed tasks yet.</p>
+                <Card>
+                  <EmptyState icon={<Icon name="check" size={28} />} title="No completed tasks yet" />
+                </Card>
               ) : (
                 <div className="flex flex-col gap-2">
                   {completed.map(a => (
-                    <div key={a.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3.5 flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs shrink-0">✓</span>
-                      <div className="flex-1">
-                        <Link href={`/tasks/${a.tasks?.id}`} className="text-sm text-white hover:underline">{a.tasks?.description || '(task removed)'}</Link>
-                        <p className="text-xs text-white/40">
+                    <Card key={a.id} className="p-3.5 flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(56,189,248,0.16)', color: 'var(--tm-sky)' }}>
+                        <Icon name="check" size={13} strokeWidth={2.4} />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/tasks/${a.tasks?.id}`} className="text-sm hover:underline" style={TEXT}>{a.tasks?.description || '(task removed)'}</Link>
+                        <p className="text-xs" style={FAINT}>
                           {a.completed_at ? `Completed ${new Date(a.completed_at).toLocaleDateString()}` : 'Completed'}
                           {a.actual_hours != null ? ` · ${Math.round(a.actual_hours * 10) / 10}h declared` : ''}
-                          {userRole === 'leader' && a.timed_hours != null ? ` · ⏱ ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
+                          {userRole === 'leader' && a.timed_hours != null ? ` · ${Math.round(a.timed_hours * 10) / 10}h timed` : ''}
                         </p>
                       </div>
                       {/* scores hidden from students */}
-                      {userRole === 'leader' && a.score != null && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60">score {a.score}</span>
-                      )}
-                    </div>
+                      {userRole === 'leader' && a.score != null && <span className="tm-chip">score {a.score}</span>}
+                    </Card>
                   ))}
                 </div>
               )
             )}
 
             {student?.group_label && teamTasks.length > 0 && (
-              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5 mt-6">
-                <p className="text-sm font-medium text-white mb-1">Team deadlines</p>
-                <p className="text-xs text-white/40 mb-4">Active tasks across your group ({student.group_label}), soonest first — plan around them.</p>
+              <Card className="p-5 mt-6">
+                <p className="text-sm font-medium mb-1 flex items-center gap-2" style={TEXT}>
+                  <Icon name="users" size={16} /> Team deadlines
+                </p>
+                <p className="text-xs mb-4" style={FAINT}>Active tasks across your group ({student.group_label}), soonest first — plan around them.</p>
                 <div className="flex flex-col gap-2">
                   {teamTasks.map((t, i) => {
                     const overdue = t.due_date && t.due_date < new Date().toISOString().slice(0, 10)
                     return (
-                      <div key={i} className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5">
-                        <span className="text-xs text-white/70 w-28 truncate shrink-0">{t.name}</span>
-                        <span className="flex-1 text-sm text-white/80 truncate min-w-0">{t.description}</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/45 shrink-0">{t.status === 'In Progress' ? 'Ongoing' : t.status}</span>
-                        <span className={`text-xs tabular-nums w-28 text-right shrink-0 ${overdue ? 'text-red-400' : 'text-white/50'}`}>
+                      <div key={i} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 rounded-lg p-2.5" style={ROW}>
+                        <span className="text-xs w-28 truncate shrink-0" style={MUTED}>{t.name}</span>
+                        <span className="flex-1 text-sm truncate min-w-0" style={TEXT}>{t.description}</span>
+                        <span className="tm-chip !text-[11px] shrink-0">{t.status === 'In Progress' ? 'Ongoing' : t.status}</span>
+                        <span className="text-xs tabular-nums whitespace-nowrap sm:w-40 sm:text-right shrink-0" style={{ color: overdue ? 'var(--tm-rose)' : 'var(--tm-text-faint)' }}>
                           {t.due_date ? `${overdue ? 'overdue · ' : 'due '}${t.due_date}` : 'no due date'}
                         </span>
                       </div>
                     )
                   })}
                 </div>
-              </div>
+              </Card>
             )}
           </>
         )}
