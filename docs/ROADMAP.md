@@ -53,8 +53,8 @@ ships as its own pull request with before/after screenshots.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Dashboards and analytics (trends, needs attention, matching health, workload heatmap, skills coverage) + assignment modes (best match, round robin, least loaded) | ◐ in review ([PHASE1-DASHBOARD.md](PHASE1-DASHBOARD.md)) |
-| 1b | Tasks and People pages rebuilt (views, saved filters, skills matrix) | ☐ todo |
+| 1 | Dashboards and analytics (trends, needs attention, matching health, workload heatmap, skills coverage) + assignment modes (best match, round robin, least loaded) | ✅ done ([PHASE1-DASHBOARD.md](PHASE1-DASHBOARD.md)) |
+| 1b | Tasks and People pages rebuilt (list/board/calendar, search, saved views, bulk actions, people filters, skills matrix) | ◐ in review ([PHASE1B-TASKS-PEOPLE.md](PHASE1B-TASKS-PEOPLE.md)) |
 | 2 | Roles and permissions, audit trail, user management, "away" status | ☐ todo |
 | 3 | Task board, approvals, notifications, comments, AI-suggested skills and estimates | ☐ todo |
 | 4 | Search, Ctrl+K, exports, settings, multiple teams | ☐ todo |
