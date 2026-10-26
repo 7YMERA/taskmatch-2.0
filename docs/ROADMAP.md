@@ -85,8 +85,8 @@ Biggest scope. "Startup", not "FYP".
 | Task | Why |
 |---|---|
 | Multi-team / multi-org | beyond one UTP class (✅ workspaces, Phase 3b) |
-| Integrations (GitHub Issues, Jira) | real workflows |
-| Outcome feedback loop retrains the matcher | learns from results |
+| Integrations (GitHub Issues, Jira) | ✅ GitHub Issues import (preview → pick → import, dedup by issue URL); Jira still todo |
+| Outcome feedback loop retrains the matcher | ✅ matcher calibration report (predicted skill level vs real completion score, per skill + overall, with a verdict); auto-retrain of weights still todo |
 
 ---
 
