@@ -9,7 +9,7 @@ import { effectiveRole, realRole, setRoleOverride, getRoleOverride, can, roleLab
 import { ThemeToggle } from '../lib/theme'
 import { Icon, Logo, type IconName } from './ui'
 import NotificationBell from './NotificationBell'
-import CommandPalette from './CommandPalette'
+import CommandPalette, { OPEN_PALETTE, useModKey } from './CommandPalette'
 import { cachedWorkspaces, fetchWorkspaces, switchWorkspace, type WorkspaceState } from '../lib/workspace'
 
 export default function Sidebar() {
@@ -24,6 +24,8 @@ export default function Sidebar() {
   const [ws, setWs] = useState<WorkspaceState | null>(null)
   const [wsMenu, setWsMenu] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const mod = useModKey()
+  const openPalette = () => window.dispatchEvent(new Event(OPEN_PALETTE))
 
   useEffect(() => { axios.get(`${API}/health`, { timeout: 60000 }).catch(() => {}) }, [])
 
@@ -91,9 +93,10 @@ export default function Sidebar() {
   const panel = (
     <aside className="w-60 px-3 py-4 flex flex-col gap-0.5 shrink-0 h-screen overflow-y-auto"
       style={{ background: 'var(--tm-bg-sidebar)', borderRight: '1px solid var(--tm-border)' }}>
-      <Link href="/dashboard" className="flex items-center px-2 pb-4 pt-1">
-        <Logo size={26} />
-      </Link>
+      <div className="flex items-center gap-1 px-2 pb-4 pt-1">
+        <Link href="/dashboard" className="flex items-center"><Logo size={26} /></Link>
+        <span className="ml-auto"><NotificationBell /></span>
+      </div>
 
       {/* Workspace switcher */}
       <div className="relative mb-3">
@@ -137,12 +140,12 @@ export default function Sidebar() {
       </div>
 
       {/* Global search launcher — the palette also opens on Ctrl/⌘+K from anywhere. */}
-      <button onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+      <button onClick={openPalette}
         className="w-full flex items-center gap-2.5 px-2.5 py-2 mb-2 rounded-lg border border-line transition-colors hover:bg-surface-2 text-left"
         aria-label="Open search (Ctrl or Command + K)">
         <span className="text-faint shrink-0"><Icon name="search" size={15} /></span>
         <span className="flex-1 text-[13px] text-faint">Search…</span>
-        <kbd className="text-[10px] text-faint px-1.5 py-0.5 rounded border border-line shrink-0">⌘K</kbd>
+        <kbd className="text-[10px] text-faint px-1.5 py-0.5 rounded border border-line shrink-0 font-sans">{mod} K</kbd>
       </button>
 
       {nav.map(navLink)}
@@ -173,7 +176,6 @@ export default function Sidebar() {
             </div>
           </Link>
           <ThemeToggle />
-          <NotificationBell />
           <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut(); router.push('/login') }}
             aria-label="Sign out" title="Sign out" className="tm-btn tm-btn-quiet tm-btn-icon">
             <Icon name="logout" size={16} />
@@ -191,7 +193,10 @@ export default function Sidebar() {
         style={{ background: 'var(--tm-bg-sidebar)', borderBottom: '1px solid var(--tm-border)' }}>
         <button onClick={() => setOpen(true)} aria-label="Open menu" style={{ color: 'var(--tm-text)' }}><Icon name="menu" /></button>
         <Logo size={24} />
-        <div className="ml-auto flex items-center gap-1"><NotificationBell /><ThemeToggle /></div>
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={openPalette} aria-label="Search" title="Search" className="tm-btn tm-btn-quiet tm-btn-icon"><Icon name="search" size={16} /></button>
+          <NotificationBell /><ThemeToggle />
+        </div>
       </div>
 
       {/* Desktop sidebar */}
