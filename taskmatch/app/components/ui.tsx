@@ -14,6 +14,7 @@ export type IconName =
   | 'plus' | 'more' | 'chevronDown' | 'trash' | 'upload' | 'arrowLeft' | 'alert' | 'clock'
   | 'search' | 'x' | 'logout' | 'mail' | 'sparkle' | 'target' | 'download' | 'history'
   | 'chevrons' | 'folder' | 'link' | 'building' | 'copy' | 'edit'
+  | 'bell' | 'inbox'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
@@ -55,6 +56,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   building: <><rect x="4.5" y="3.5" width="15" height="17" rx="1.5" /><path d="M9 8h1.5M13.5 8H15M9 12h1.5M13.5 12H15M10.5 20.5v-4h3v4" /></>,
   copy: <><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" /></>,
   edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
+  bell: <><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" /><path d="M10 20a2 2 0 0 0 4 0" /></>,
+  inbox: <><path d="M3.5 13.5 6 6h12l2.5 7.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-4Z" /><path d="M3.5 13.5H9a3 3 0 0 0 6 0h5.5" /></>,
 }
 
 export function Icon({ name, size = 20, strokeWidth = 1.8, className = '', style }:
