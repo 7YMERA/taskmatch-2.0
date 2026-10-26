@@ -88,11 +88,13 @@ session because the host RAM was critically low** (~1.7–2.6 GB free for most o
 dev-server restarts, production builds and a full test run unreliable. None is blocked by code — they're
 ready to build on a machine with headroom. Smallest first:
 
-1. **Avatars storage-bucket policies (security gap).** The `avatars` Supabase Storage bucket has no RLS
-   policies yet — table RLS is done, but storage objects aren't locked down, so upload/read rules are
-   effectively open. Fix: add storage policies (authenticated users can upload/replace their own avatar;
-   read scoped as intended). Needs a new `supabase/storage_avatars.sql` (storage.objects policies) + a short
-   note in a doc. Light once RAM allows; it's the one real security item left.
+1. **Avatars storage-bucket policies — DONE (SQL written; live-verify pending).** Was the one real
+   security gap: the `avatars` Supabase Storage bucket had no RLS policies. Fixed in
+   `supabase/storage_avatars.sql` — **public read** (the app shows avatars via `getPublicUrl`), and
+   **authenticated-only insert/update/delete** scoped to the `avatars` bucket. Writes aren't tied to
+   `auth.uid()` because the file name is `<studentId>-<timestamp>` and a student id ≠ the auth uid (a
+   leader can upload for others). **User must run the SQL once** in the SQL Editor. Only live verification
+   (upload an avatar after running it) is left — it needs a running dev session, deferred under low RAM.
 
 2. **Replace the "Complete" `prompt()` box with a themed dialog.** Marking a task complete still uses the
    browser's native `prompt()` to ask for hours (see the task detail / My Tasks complete flow). Replace it
