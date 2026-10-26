@@ -171,6 +171,24 @@ class DecideApprovalBody(BaseModel):
     decision: str = Field(..., pattern="^(approved|rejected)$")
     note: str | None = Field(default=None, max_length=500)
 
+class GithubPreviewBody(BaseModel):
+    owner: str = Field(..., min_length=1, max_length=100)
+    repo: str = Field(..., min_length=1, max_length=100)
+    state: str = Field(default="open", pattern="^(open|closed|all)$")
+    label: str | None = Field(default=None, max_length=100)
+    token: str | None = Field(default=None, max_length=200)   # optional, for private repos / higher rate limit
+
+class GithubIssue(BaseModel):
+    number: int
+    title: str = Field(..., min_length=1, max_length=500)
+    body: str | None = Field(default=None, max_length=10000)
+    url: str = Field(..., max_length=500)
+    labels: list[str] = Field(default_factory=list)
+
+class GithubCommitBody(BaseModel):
+    issues: list[GithubIssue] = Field(..., min_length=1, max_length=100)
+    project_id: str | None = Field(default=None, max_length=100)
+
 
 # ─── Global error handling — no raw stack-trace 500s leak to clients ───
 
@@ -1895,3 +1913,141 @@ def decide_approval(body: DecideApprovalBody, authorization: str = Header(None))
         details={"kind": appr["kind"], "target_id": appr.get("target_id"), "ran": bool(ran)},
     )
     return {"success": True, "status": body.decision, "action_ran": bool(ran)}
+
+
+# ─── GitHub Issues import (Level 3) ───
+# Pulls issues from a public (or token-authed) GitHub repo and turns the chosen ones into tasks.
+# Two steps: preview (fetch + show) then commit (create tasks). Labels map to a best-effort
+# severity; the issue URL is stamped so a re-import skips issues already brought in.
+
+_SEVERITY_FROM_LABEL = [
+    ("critical", "Critical"), ("urgent", "Critical"), ("security", "Critical"), ("p0", "Critical"),
+    ("high", "High"), ("important", "High"), ("p1", "High"),
+    ("low", "Low"), ("minor", "Low"), ("trivial", "Low"), ("p3", "Low"),
+]
+
+def _severity_from_labels(labels):
+    low = [str(l).lower() for l in (labels or [])]
+    for needle, sev in _SEVERITY_FROM_LABEL:
+        if any(needle in l for l in low):
+            return sev
+    return "Medium"
+
+
+@app.post("/import/github/preview")
+def github_preview(body: GithubPreviewBody, authorization: str = Header(None)):
+    """Fetch issues from a GitHub repo for review before import. Leader-only (tasks.manage).
+    Pull requests are filtered out. Returns issues not already imported into this workspace."""
+    require_permission(authorization, "tasks.manage")
+    import httpx
+
+    params = {"state": body.state, "per_page": 100}
+    if body.label:
+        params["labels"] = body.label
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "taskmatch"}
+    if body.token:
+        headers["Authorization"] = f"Bearer {body.token}"
+
+    url = f"https://api.github.com/repos/{body.owner}/{body.repo}/issues"
+    try:
+        r = httpx.get(url, params=params, headers=headers, timeout=20.0)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Couldn't reach GitHub. Check the connection and try again.")
+    if r.status_code == 404:
+        raise HTTPException(status_code=404, detail="Repo not found. Check owner/repo, or add a token for a private repo.")
+    if r.status_code == 403:
+        raise HTTPException(status_code=429, detail="GitHub rate limit hit. Add a token, or try again later.")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"GitHub returned {r.status_code}.")
+
+    raw = r.json()
+    # Which issue URLs are already imported into this workspace, so we don't offer dupes.
+    try:
+        existing = {t.get("external_ref") for t in (db().table("tasks").select("external_ref").execute().data or []) if t.get("external_ref")}
+    except Exception:
+        existing = set()   # column may not exist yet (run supabase/integrations.sql)
+
+    issues = []
+    for it in raw:
+        if "pull_request" in it:   # the issues endpoint also returns PRs — skip them
+            continue
+        if it["html_url"] in existing:
+            continue
+        issues.append({
+            "number": it["number"],
+            "title": it["title"][:500],
+            "body": (it.get("body") or "")[:10000],
+            "url": it["html_url"],
+            "labels": [l["name"] for l in it.get("labels", [])],
+            "suggested_severity": _severity_from_labels([l["name"] for l in it.get("labels", [])]),
+        })
+    return {"issues": issues, "count": len(issues), "already_imported": len(existing)}
+
+
+@app.post("/import/github/commit")
+def github_commit(body: GithubCommitBody, authorization: str = Header(None)):
+    """Create tasks from the chosen GitHub issues. Leader-only. Each task stores the issue URL
+    (external_ref) so it is only ever imported once. Returns how many were created vs skipped."""
+    require_permission(authorization, "tasks.manage")
+    actor_email, actor_role = actor_from_token(authorization)
+
+    try:
+        existing = {t.get("external_ref") for t in (db().table("tasks").select("external_ref").execute().data or []) if t.get("external_ref")}
+    except Exception:
+        existing = set()
+
+    created, skipped = 0, 0
+    for iss in body.issues:
+        if iss.url in existing:
+            skipped += 1
+            continue
+        row = {
+            "description": iss.title,
+            "severity": _severity_from_labels(iss.labels),
+            "status": "New",
+        }
+        if body.project_id:
+            row["project_id"] = body.project_id
+        # external_* columns are optional — only send them when the schema has them.
+        row["external_source"] = "github"
+        row["external_ref"] = iss.url
+        try:
+            db().table("tasks").insert(row).execute()
+            created += 1
+        except Exception:
+            # Likely the external_* columns don't exist yet — retry without them so import still works.
+            row.pop("external_source", None); row.pop("external_ref", None)
+            try:
+                db().table("tasks").insert(row).execute()
+                created += 1
+            except Exception:
+                skipped += 1
+
+    log_activity(
+        action="task.imported_github", entity_type="task",
+        summary=f"Imported {created} task(s) from GitHub ({skipped} skipped)",
+        actor_email=actor_email, actor_role=actor_role,
+        details={"created": created, "skipped": skipped},
+    )
+    return {"success": True, "created": created, "skipped": skipped}
+
+
+
+# ─── Matcher calibration (Level 3 — outcome feedback loop) ───
+
+@app.get("/matcher/calibration")
+def matcher_calibration(authorization: str = Header(None)):
+    """How well the matcher's skill requirements predicted real completion scores, per skill and
+    overall, with a plain verdict. Leader insight (insights.view). This is the feedback loop:
+    outcomes in, calibration out, so the weights can be tuned on evidence."""
+    require_permission(authorization, "insights.view")
+    skills = db().table("skills").select("id, skill_name").execute().data or []
+    skill_names = {s["id"]: s.get("skill_name") for s in skills}
+    assignments = (
+        db().table("assignments")
+        .select("status, score, tasks(task_skills(skill_id, min_proficiency))")
+        .eq("status", "Completed")
+        .limit(2000)
+        .execute()
+    ).data or []
+    return matching.calibration(assignments, skill_names)

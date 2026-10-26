@@ -272,3 +272,79 @@ def skill_health(skills, profiles, open_task_skills, wip_limit=3):
     order = {"gap": 0, "single": 1, "thin": 2, "ok": 3, "none": 4}
     out.sort(key=lambda s: (order[s["risk"]], -s["open_tasks"], -s["holders"], s["skill_name"] or ""))
     return out
+
+
+# ─── Outcome feedback loop (Level 3) ───
+# The matcher predicts fit; completed tasks tell us what actually happened. This measures how
+# well the two line up, per skill and overall, so leaders can see where the model is trusted and
+# where it is miscalibrated — and so the weights in WEIGHTS can be tuned on evidence, not feel.
+
+def _pearson(pairs):
+    """Correlation of (predicted, actual) pairs, in [-1, 1]; None when there is too little data
+    or no variance. A higher value means the prediction tracked the real outcome."""
+    n = len(pairs)
+    if n < 3:
+        return None
+    sx = sum(a for a, _ in pairs); sy = sum(b for _, b in pairs)
+    mx, my = sx / n, sy / n
+    cov = sum((a - mx) * (b - my) for a, b in pairs)
+    vx = sum((a - mx) ** 2 for a, _ in pairs)
+    vy = sum((b - my) ** 2 for _, b in pairs)
+    if vx == 0 or vy == 0:
+        return None
+    return round(cov / (vx ** 0.5 * vy ** 0.5), 3)
+
+
+def calibration(assignments, skill_names):
+    """How well did required-skill level predict the completion score, per skill and overall?
+
+    assignments rows carry score (0..1) and tasks(task_skills(skill_id, min_proficiency)).
+    For each completed, scored assignment we pair the task's required level for a skill with the
+    score it earned. Returns per-skill {n, avg_score, correlation} plus an overall summary and a
+    plain-language verdict leaders can act on.
+    """
+    by_skill = defaultdict(list)   # skill_id -> [(required_level, score)]
+    overall = []                   # [(required_level_sum_proxy, score)] for the whole model
+    for a in assignments:
+        if a.get("status") != "Completed" or a.get("score") is None:
+            continue
+        score = a["score"]
+        tss = (a.get("tasks") or {}).get("task_skills") or []
+        if not tss:
+            continue
+        levels = [ts.get("min_proficiency") or 1 for ts in tss]
+        overall.append((sum(levels) / len(levels), score))
+        for ts in tss:
+            by_skill[ts["skill_id"]].append((ts.get("min_proficiency") or 1, score))
+
+    skills = []
+    for sid, pairs in by_skill.items():
+        scores = [s for _, s in pairs]
+        skills.append({
+            "skill_id": sid, "skill_name": skill_names.get(sid),
+            "n": len(pairs),
+            "avg_score": round(sum(scores) / len(scores), 3),
+            "correlation": _pearson(pairs),
+        })
+    # Worst-calibrated (most negative correlation) first, then the thinnest evidence.
+    skills.sort(key=lambda s: (s["correlation"] if s["correlation"] is not None else 1, -s["n"]))
+
+    overall_corr = _pearson(overall)
+    n_total = len(overall)
+    if n_total < 3:
+        verdict = "Not enough finished work yet to judge the matcher — come back after a few more tasks are completed and scored."
+    elif overall_corr is None:
+        verdict = "Finished tasks don't vary enough yet to tell how well the matcher predicts outcomes."
+    elif overall_corr >= 0.3:
+        verdict = "The matcher's skill requirements line up well with how tasks actually turned out."
+    elif overall_corr <= -0.3:
+        verdict = "Higher skill requirements are tracking LOWER outcomes — worth reviewing: harder tasks may simply be scoring lower, or the weights may need tuning."
+    else:
+        verdict = "The link between required skills and outcomes is weak so far — more finished work will sharpen this."
+
+    return {
+        "overall": {"n": n_total, "correlation": overall_corr},
+        "skills": skills,
+        "verdict": verdict,
+        "weights": WEIGHTS,
+    }

@@ -70,6 +70,12 @@ First Phase 4 slice. Frontend-only, no schema, no new backend endpoint.
 ### What's next (Level 3 — "reframe as a product")
 Per ROADMAP Level 3, the remaining big items are: **integrations** (GitHub Issues / Jira import), and an **outcome feedback loop** that retrains the matcher from real completion scores. Both are large and partly backend/data-model work — good candidates for a fresh, well-scoped session (and for splitting across agents once the RAM situation allows).
 
+### Level 3 — STARTED (branch `level-3-integrations`, NOT merged)
+**1. GitHub Issues import.** `/integrations` page (leaders only; sidebar + palette). Backend in `main.py`: `POST /import/github/preview` (fetch issues from a public or token-authed repo via GitHub's REST API; filters out PRs; skips already-imported) and `POST /import/github/commit` (creates tasks; labels → best-effort severity via `_SEVERITY_FROM_LABEL`; stamps `external_source`/`external_ref`). Schema add: `supabase/integrations.sql` adds `external_source` + `external_ref` to `tasks` + a per-workspace unique index — **user must run it** for dedupe to persist; the API degrades gracefully without it (import still works, just no dedupe column). **Jira not done** — same shape, add a `/import/jira/*` pair later.
+**2. Outcome feedback loop = matcher calibration.** `matching.calibration(assignments, skill_names)` (pure, unit-tested in `test_calibration.py`) pairs each completed task's required skill level with the score it earned, computes a Pearson correlation per skill + overall, and returns a plain verdict. Exposed at `GET /matcher/calibration` (insights.view), shown on `/integrations`. **Deliberately NOT auto-retraining** `WEIGHTS` — a class/team doesn't have the data volume for that to be safe; this surfaces miscalibration for a human to tune the weights in `matching.py`. If Claude wants auto-tuning later, that's the natural extension (and needs a lot more completed-task data).
+- Verified live: calibration returned real numbers on the demo workspace (53 scored tasks). Backend 162 tests pass (adds `test_calibration.py` + L3 auth-contract tests). tsc clean, lint 0 errors.
+- **For Claude:** write `docs/PHASE-LEVEL3.md` (or extend an existing doc), and when you add Jira or auto-tuning, update the ROADMAP rows.
+
 ## Challenges, limitations & friction this session (the honest list)
 Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.
 
