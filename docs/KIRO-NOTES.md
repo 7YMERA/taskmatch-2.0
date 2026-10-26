@@ -3,6 +3,9 @@
 Quick catch-up for Claude (or future me) picking this repo up on another device.
 Everything below is already merged to `main` unless it says otherwise.
 
+## Why this file exists (the user's intent)
+The user (a product manager) develops TaskMatch 2.0 across **two assistants**: Kiro (me, in the Kiro Crew dashboard on this machine) and **Claude on another device**. Work flows both ways through GitHub. The user explicitly asked me to keep this file so that **when they switch back to Claude, Claude can catch up fast and then document and build on the work properly** — without re-deriving context or repeating steps. So treat this as the shared running log between the two agents: read it first, trust it over guesswork, and keep it current. When you (Claude) extend a feature here, update its section and tick the ROADMAP; when you hit a constraint, add it to the Challenges list. The goal is continuity across the hand-offs, and good documentation the PM can rely on.
+
 ## What shipped this session (all merged)
 
 | PR | What |
@@ -51,6 +54,13 @@ First Phase 4 slice. Frontend-only, no schema, no new backend endpoint.
 - Mounted once in `Sidebar.tsx` (so it's on every app page), plus the launcher button above the nav.
 - New `bell`/`inbox` icons were added in 3c; the palette reuses existing icons.
 - **For Claude to extend/document:** could add a real `/search` backend endpoint if client-side gets slow with large workspaces (currently caps at 500 tasks / 500 people / 200 projects, loaded once per open); could add recent-items, fuzzy ranking, and in-palette actions (assign, complete) beyond navigation. Needs its own `docs/PHASE4-SEARCH.md` and a ROADMAP tick when finalised.
+
+### Phase 4 — also added: Settings page, CSV exports, palette actions (same branch `phase-4-command-palette`, NOT merged)
+- **Settings page** — `taskmatch/app/settings/page.tsx`, routed at `/settings` (in the sidebar nav + a palette action). Real controls only: **theme** (dark/light via `lib/theme`), **notifications** (enable + interval 30s/1m/5m, persisted to `localStorage` key `tm_notif_pref`), **workspace** info + link to `/team`, link to `/profile`. The bell (`NotificationBell.tsx`) now READS `tm_notif_pref` — turning notifications off stops its polling; interval changes its cadence. Takes effect on next page load (bell reads the pref once on mount).
+- **CSV exports** — shared helper `taskmatch/app/lib/csv.ts` (`toCsv`, `downloadCsv`, `stamp`; BOM + CRLF so Excel opens clean). Exposed as palette actions **"Export tasks as CSV"** / **"Export people as CSV"** (group `Export`) — fetch via the Supabase client (RLS-scoped) and download. The helper is reusable: a per-page "Export" button can call it with the page's filtered rows later.
+- **In-palette assign/complete — deliberately NOT fully built.** A flat palette can't host the two-step pickers these need (assign = pick task + pick person; complete = pick assignment + enter hours). Instead the palette offers **navigation** into the existing flows (New task via `?new=1`, and the task-detail page where assign/start/complete already live). If you want true in-palette assign/complete, build a palette sub-mode (select task → select person) — noted as a follow-up, don't half-build it inline.
+
+**For Claude:** these three + the command palette are all on branch `phase-4-command-palette` / PR #24-area work, pending the user's review. When finalised, write `docs/PHASE4-SEARCH.md` (palette + settings + exports) and tick Phase 4 on the ROADMAP.
 
 ## Challenges, limitations & friction this session (the honest list)
 Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.

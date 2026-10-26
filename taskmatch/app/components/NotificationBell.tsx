@@ -18,6 +18,18 @@ type Note = {
 
 const POLL_MS = 60_000
 
+// Reads the user's notification preference (set on the Settings page). Polling can be turned
+// off, or its cadence changed; defaults to on at 60s when nothing is stored.
+function notifPref(): { enabled: boolean; intervalMs: number } {
+  try {
+    const raw = JSON.parse(localStorage.getItem('tm_notif_pref') || 'null')
+    if (raw && typeof raw === 'object') {
+      return { enabled: raw.enabled !== false, intervalMs: Math.max(15, Number(raw.intervalSec) || 60) * 1000 }
+    }
+  } catch { /* private mode */ }
+  return { enabled: true, intervalMs: POLL_MS }
+}
+
 function timeAgo(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
   if (s < 60) return 'just now'
@@ -44,8 +56,11 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
+    const pref = notifPref()
     load()
-    timer.current = setInterval(load, POLL_MS)
+    if (pref.enabled) {
+      timer.current = setInterval(load, pref.intervalMs)
+    }
     return () => { if (timer.current) clearInterval(timer.current) }
   }, [])
 
