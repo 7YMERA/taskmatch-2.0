@@ -204,10 +204,10 @@ export default function MyTasks() {
   const completed = assignments.filter(a => a.status === 'Completed')
     .sort((x, y) => (y.completed_at || '').localeCompare(x.completed_at || ''))
   const active = running.length + upNext.length
-  const weekEnd = new Date(Date.now() + 7 * DAY).toISOString().slice(0, 10)
+  const [weekEnd] = useState(() => new Date(Date.now() + 7 * DAY).toISOString().slice(0, 10))
   const dueSoon = [...running, ...upNext].filter(a => a.tasks?.due_date && a.tasks.due_date <= weekEnd)
   const overdue = dueSoon.filter(a => a.tasks.due_date < today).length
-  const since30 = new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10)
+  const [since30] = useState(() => new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10))
   const done30 = completed.filter(a => (a.completed_at || '').slice(0, 10) >= since30)
   const onTime = (a: any) => !a.tasks?.due_date ? null : (a.completed_at || '').slice(0, 10) <= a.tasks.due_date
   const dated = completed.filter(a => onTime(a) != null)

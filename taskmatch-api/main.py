@@ -28,6 +28,11 @@ import matching  # after load_dotenv: reads CAPACITY_HOURS / EVIDENCE_HALF_LIFE_
 
 app = FastAPI()
 
+# When the process started, and a version string — reported by /health so a dashboard
+# or uptime monitor can see which build is live and how long it has been up.
+APP_STARTED_AT = time.time()
+APP_VERSION = os.environ.get("APP_VERSION") or os.environ.get("RENDER_GIT_COMMIT", "dev")[:12]
+
 
 # ─── Rate limiting — per-client sliding window, in memory ───
 # Caps how many requests one client (IP) can make per minute, so a script can't
@@ -381,11 +386,39 @@ WIP_LIMIT = 3
 
 
 @app.get("/health")
-def health():
-    """Cheap, DB-free liveness check. The frontend pings this on load to wake the
+def health(deep: bool = False):
+    """Liveness and readiness check.
+
+    The default call is DB-free and cheap — the frontend pings it on load to wake the
     free-tier server before the user acts (avoids the cold-start error where a write
-    lands but the proxy times out the response)."""
-    return {"ok": True}
+    lands but the proxy times out the response). It reports the build, how long the
+    process has been up, and whether the service-role key is configured.
+
+    Pass ?deep=1 for a readiness probe that also runs one cheap query against the
+    database, so an uptime monitor can tell "process alive" from "can reach Supabase".
+    """
+    uptime = round(time.time() - APP_STARTED_AT, 1)
+    body = {
+        "ok": True,
+        "status": "ok",
+        "version": APP_VERSION,
+        "uptime_seconds": uptime,
+        "time": datetime.now(timezone.utc).isoformat(),
+        "service_role_configured": admin is not None,
+    }
+    if deep:
+        db_ok, db_error = True, None
+        try:
+            # Cheapest possible round-trip: ask for zero rows from a known table.
+            (admin or supabase).table("students").select("id").limit(1).execute()
+        except Exception as exc:  # noqa: BLE001 — report any DB failure, don't crash the probe
+            db_ok, db_error = False, str(exc)[:200]
+        body["database"] = {"ok": db_ok, **({"error": db_error} if db_error else {})}
+        if not db_ok:
+            body["ok"] = False
+            body["status"] = "degraded"
+            return JSONResponse(status_code=503, content=body)
+    return body
 
 # Performance-score bands (higher = better; score in 0..1)
 def score_band(avg_score, completed_count):

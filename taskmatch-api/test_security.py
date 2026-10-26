@@ -64,7 +64,11 @@ class FakeSupabase:
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(main, "supabase", FakeSupabase())
+    fake = FakeSupabase()
+    monkeypatch.setattr(main, "supabase", fake)
+    # Read endpoints query via the service-role `admin` client under RLS;
+    # patch it too so tests never reach the real network.
+    monkeypatch.setattr(main, "admin", fake)
     # A fresh, generous limiter per test so tests never throttle each other.
     monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1000))
     return TestClient(main.app)
