@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import logging
 import secrets
@@ -1869,13 +1870,16 @@ def mark_notifications_read(body: MarkReadBody, authorization: str = Header(None
 def list_approvals(status: str = "pending", authorization: str = Header(None)):
     """Pending approval requests for leaders to decide; a requester also sees their own.
     RLS enforces the same rule, so this read is safe for any signed-in member."""
-    require_user(authorization)
-    rows = (db().table("approvals")
-            .select("id, requested_by, kind, target_id, payload, status, note, "
-                    "decided_by, decided_at, created_at")
-            .eq("status", status)
-            .order("created_at", desc=True)
-            .limit(100).execute()).data or []
+    user = require_user(authorization)
+    q = (db().table("approvals")
+         .select("id, requested_by, kind, target_id, payload, status, note, "
+                 "decided_by, decided_at, created_at")
+         .eq("status", status))
+    # The API reads with the service-role key, so RLS doesn't filter this: do it here. Leaders see
+    # every request in the workspace; everyone else sees only their own.
+    if not can(role_of(user), "assign.others"):
+        q = q.eq("requested_by", user.id)
+    rows = (q.order("created_at", desc=True).limit(100).execute()).data or []
     return {"approvals": rows}
 
 
@@ -1884,6 +1888,11 @@ def request_approval(body: RequestApprovalBody, authorization: str = Header(None
     """A member asks a leader to approve an action. The request is recorded pending and
     the workspace's leaders are notified. The actual action runs only on approval."""
     user = require_user(authorization)
+    # A critical-task request carries an action that runs on approval, so the server must build it
+    # (from the caller's own student record, in /self-assign). Never take that payload from a client.
+    if body.kind == "self_assign_critical":
+        raise HTTPException(status_code=400,
+                            detail="To ask for a critical task, use Pick up on the task itself.")
     row = (db().table("approvals").insert({
         "requested_by": user.id, "kind": body.kind,
         "target_id": body.target_id, "payload": body.payload,
@@ -1911,10 +1920,13 @@ def decide_approval(body: DecideApprovalBody, authorization: str = Header(None))
     if appr["status"] != "pending":
         raise HTTPException(status_code=409, detail="This request was already decided.")
 
-    db().table("approvals").update({
+    # Only flip a row that is still pending, so two leaders deciding at once can't both run it.
+    claimed = (db().table("approvals").update({
         "status": body.decision, "decided_by": actor_email,
         "decided_at": now_iso(), "note": body.note or appr.get("note"),
-    }).eq("id", body.approval_id).execute()
+    }).eq("id", body.approval_id).eq("status", "pending").execute()).data
+    if not claimed:
+        raise HTTPException(status_code=409, detail="This request was already decided.")
 
     # On approval, run the action the request was holding.
     ran = None
@@ -2078,6 +2090,21 @@ def _jira_status_jql(state):
     return ""   # all
 
 
+
+_JIRA_HOST = re.compile(r"^[a-z0-9][a-z0-9-]*\.atlassian\.net$")
+
+
+def _jira_host(site):
+    """The bare Atlassian Cloud host from what the user typed ("https://yourco.atlassian.net/" ->
+    "yourco.atlassian.net"). Only *.atlassian.net is allowed, so the API can't be pointed at an
+    arbitrary or internal host and made to send requests (and the user's token) there."""
+    host = site.strip().lower()
+    host = re.sub(r"^https?://", "", host).split("/", 1)[0]
+    if not _JIRA_HOST.match(host):
+        raise HTTPException(status_code=422,
+                            detail="Use your Jira Cloud address, like yourco.atlassian.net.")
+    return host
+
 @app.post("/import/jira/preview")
 def jira_preview(body: JiraPreviewBody, authorization: str = Header(None)):
     """Fetch Jira issues for review before import. Leader-only (tasks.manage). Auth is the Jira
@@ -2099,7 +2126,7 @@ def jira_preview(body: JiraPreviewBody, authorization: str = Header(None)):
             parts.append(status)
         jql = " AND ".join(parts) + (" ORDER BY created DESC" if parts else "ORDER BY created DESC")
 
-    site = body.site.replace("https://", "").replace("http://", "").strip("/")
+    site = _jira_host(body.site)
     url = f"https://{site}/rest/api/3/search"
     auth = base64.b64encode(f"{body.email}:{body.token}".encode()).decode()
     headers = {"Authorization": f"Basic {auth}", "Accept": "application/json", "User-Agent": "taskmatch"}
@@ -2306,13 +2333,9 @@ def matcher_weights_set(body: MatcherWeightsBody, authorization: str = Header(No
     actor_email, actor_role = actor_from_token(authorization)
     # Validate against the matcher's rules (keys present, non-negative, same total) before saving.
     try:
-        clean = {k: int(body.weights[k]) for k in matching.WEIGHTS}
-    except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=422, detail="weights must have: " + ", ".join(matching.WEIGHTS))
-    if any(v < 0 for v in clean.values()):
-        raise HTTPException(status_code=422, detail="weights cannot be negative")
-    if sum(clean.values()) != sum(matching.WEIGHTS.values()):
-        raise HTTPException(status_code=422, detail=f"weights must sum to {sum(matching.WEIGHTS.values())}")
+        clean = matching.validate_weights(body.weights)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e) or "weights must have: " + ", ".join(matching.WEIGHTS))
 
     ws = current_workspace()
     try:
