@@ -62,6 +62,14 @@ First Phase 4 slice. Frontend-only, no schema, no new backend endpoint.
 
 **For Claude:** these three + the command palette are all on branch `phase-4-command-palette` / PR #24-area work, pending the user's review. When finalised, write `docs/PHASE4-SEARCH.md` (palette + settings + exports) and tick Phase 4 on the ROADMAP.
 
+### Phase 4 — COMPLETE: onboarding polish (Getting Started checklist)
+- `taskmatch/app/components/GettingStarted.tsx` — a dismissible checklist card shown on the **dashboard** (leaders only) when the workspace is sparse. Steps reflect real data: *add people* (peopleCount>0), *create first task* (taskCount>0), *invite teammates* (links to `/team`). Auto-hides once people + at least one task exist, or when dismissed (`localStorage` key `tm_getting_started_dismissed`). Mounted in `dashboard/page.tsx` right after the PageHeader.
+- The existing `/onboarding` create/join flow (Phase 3b) was already solid; the gap was the empty-dashboard dead-end, which this fills.
+- **Phase 4 is now fully done** on the ROADMAP: Ctrl+K palette, `/settings`, CSV exports, Getting Started. All on branch `phase-4-command-palette` (unmerged pending review).
+
+### What's next (Level 3 — "reframe as a product")
+Per ROADMAP Level 3, the remaining big items are: **integrations** (GitHub Issues / Jira import), and an **outcome feedback loop** that retrains the matcher from real completion scores. Both are large and partly backend/data-model work — good candidates for a fresh, well-scoped session (and for splitting across agents once the RAM situation allows).
+
 ## Challenges, limitations & friction this session (the honest list)
 Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.
 

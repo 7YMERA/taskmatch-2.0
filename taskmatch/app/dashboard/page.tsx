@@ -6,6 +6,7 @@ import { supabase, API, authHeaders } from '../lib/supabase'
 import axios from 'axios'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
+import GettingStarted from '../components/GettingStarted'
 import Donut from '../components/Donut'
 import { effectiveRole } from '../lib/role'
 import { Card, StatTile, Badge, Icon, bandAccent, Skeleton, PageHeader } from '../components/ui'
@@ -240,6 +241,10 @@ export default function Dashboard() {
       <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10 overflow-y-auto">
         <PageHeader title={isLeader ? 'Dashboard' : 'My dashboard'}
           sub={isLeader ? 'How your team and tasks are doing right now.' : 'Your work, scores and what is coming up.'} />
+
+        {roleReady && !loading && (
+          <GettingStarted peopleCount={students.length} taskCount={tasks.length} role={userRole} />
+        )}
 
         {!roleReady ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
