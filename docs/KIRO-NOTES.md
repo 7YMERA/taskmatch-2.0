@@ -96,7 +96,7 @@ ready to build on a machine with headroom. Smallest first:
    leader can upload for others). **User must run the SQL once** in the SQL Editor. Only live verification
    (upload an avatar after running it) is left — it needs a running dev session, deferred under low RAM.
 
-2. **Replace the "Complete" `prompt()` box with a themed dialog.** Marking a task complete still uses the
+2. **[Already done in #8, no `prompt()` left]** **Replace the "Complete" `prompt()` box with a themed dialog.** Marking a task complete still uses the
    browser's native `prompt()` to ask for hours (see the task detail / My Tasks complete flow). Replace it
    with the app's themed modal (there's already a confirm-dialog pattern in `app/components/ui.tsx` /
    `app/lib/ui.ts`) so it matches the design system and validates the hours input. Frontend-only.
@@ -132,7 +132,7 @@ this wall, so these are better done there. Anything UI-facing (2–4) wants a de
 These were asked for earlier and I couldn't finish them — the blocker was browser/screenshot tooling on this
 machine, not code. The user prefers to hand media capture to Claude on the other device.
 
-8. **"New feature" screenshots of the notification bell + the approvals inbox (Phase 3c).** Asked for as a
+8. **[Done by Claude in #28]** **"New feature" screenshots of the notification bell + the approvals inbox (Phase 3c).** Asked for as a
    showcase. **There is NO real "before"** — the bell and approvals are new in 3c, so frame them as
    new-feature shots, not a before/after pair. I **seeded demo data** to make the shots look live: 3
    notifications + 1 pending approval on the demo account's workspace (rows in `notifications` /
@@ -140,7 +140,7 @@ machine, not code. The user prefers to hand media capture to Claude on the other
    and light. Blocked locally by Windows PowerShell script-execution policy on the `playwright-cli.ps1`
    shim + tight RAM (Chromium ~400 MB on top of two dev servers). Delete the seeded rows when done.
 
-9. **Visual changelog comparing v1 → now (the user explicitly asked to compare against v1).** `docs/CHANGELOG-VISUAL.md`
+9. **[Done by Claude in #28]** **Visual changelog comparing v1 → now (the user explicitly asked to compare against v1).** `docs/CHANGELOG-VISUAL.md`
    currently has only landing/login/dashboard before/after pairs. The user wants a changelog covering **all**
    the big features versus **v1** (the old `taskmatch-git` repo): FYP→generic rebrand, auth hardening
    (token identity + RLS), the design-system/token UI, the marketing landing page, login redesign, dashboard
