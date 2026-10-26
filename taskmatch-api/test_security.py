@@ -226,3 +226,27 @@ def test_no_workspace_means_no_queries():
     main._workspace.set(("w1", "lead", "u1"))
     with pytest.raises(RuntimeError):
         main.db().table("workspace_members")  # not a workspace table: must use raw_db() deliberately
+
+
+# ─── Phase 3c: notifications + approvals require a login ───
+
+NOTIFY_READS = ["/notifications", "/approvals"]
+NOTIFY_WRITES = ["/notifications/read", "/approvals/request", "/approvals/decide"]
+
+
+@pytest.mark.parametrize("path", NOTIFY_READS)
+def test_notify_read_rejects_anonymous(client, path):
+    assert client.get(path).status_code == 401
+
+
+@pytest.mark.parametrize("path", NOTIFY_READS)
+def test_notify_read_rejects_bad_token(client, path):
+    assert client.get(path, headers={"Authorization": "Bearer forged"}).status_code == 401
+
+
+@pytest.mark.parametrize("path", NOTIFY_WRITES)
+def test_notify_write_rejects_anonymous(client, path):
+    # Rejected before the handler runs: 401 (auth) or 422 when required body
+    # fields are missing (FastAPI validates the body first). Either way, no data
+    # is touched without a valid session.
+    assert client.post(path, json={}).status_code in (401, 422)

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { effectiveRole, realRole, setRoleOverride, getRoleOverride, can, roleLabel, ROLES, type Role } from '../lib/role'
 import { ThemeToggle } from '../lib/theme'
 import { Icon, Logo, type IconName } from './ui'
+import NotificationBell from './NotificationBell'
 import { cachedWorkspaces, fetchWorkspaces, switchWorkspace, type WorkspaceState } from '../lib/workspace'
 
 export default function Sidebar() {
@@ -60,6 +61,7 @@ export default function Sidebar() {
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
   ]
   const adminNav = [
+    ...(can(role, 'assign.others') ? [{ label: 'Approvals', href: '/approvals', icon: 'inbox' as const }] : []),
     ...(can(role, 'team.manage') ? [{ label: 'Members & roles', href: '/team', icon: 'shield' as const }] : []),
     ...(can(role, 'audit.view') ? [{ label: 'Audit trail', href: '/audit', icon: 'history' as const }] : []),
   ]
@@ -159,6 +161,7 @@ export default function Sidebar() {
             </div>
           </Link>
           <ThemeToggle />
+          <NotificationBell />
           <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut(); router.push('/login') }}
             aria-label="Sign out" title="Sign out" className="tm-btn tm-btn-quiet tm-btn-icon">
             <Icon name="logout" size={16} />
@@ -175,7 +178,7 @@ export default function Sidebar() {
         style={{ background: 'var(--tm-bg-sidebar)', borderBottom: '1px solid var(--tm-border)' }}>
         <button onClick={() => setOpen(true)} aria-label="Open menu" style={{ color: 'var(--tm-text)' }}><Icon name="menu" /></button>
         <Logo size={24} />
-        <div className="ml-auto"><ThemeToggle /></div>
+        <div className="ml-auto flex items-center gap-1"><NotificationBell /><ThemeToggle /></div>
       </div>
 
       {/* Desktop sidebar */}
