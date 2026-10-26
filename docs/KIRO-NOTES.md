@@ -44,3 +44,24 @@ For the demo account's workspace I inserted **3 notifications** + **1 pending ap
 - **Never** `git push` to `main` — a safety policy blocks it. Push a feature branch + open a PR.
 - Don't chain `git commit`/`git push` with `{...}` braces or variable expansion in one command — the policy reads it as an unverifiable push target. Run commit and push as separate, literal commands.
 - No emojis in the product UI; use outline SVG icons. User also wants tasteful color variety (not just black/purple) across cards in both themes.
+
+## Phase 4 — started: Ctrl+K command palette + global search (NOT yet merged)
+First Phase 4 slice. Frontend-only, no schema, no new backend endpoint.
+- `taskmatch/app/components/CommandPalette.tsx` — opens on **Ctrl/⌘+K** (and a "Search… ⌘K" button in the sidebar). Searches `tasks`, `people`, `projects` in the current workspace (reads straight through the Supabase client; RLS scopes it). Also lists **role-gated quick actions** (go to pages, New task → `/tasks?new=1`, which the tasks page already honours). Keyboard: ↑/↓ move, Enter open, Esc close.
+- Mounted once in `Sidebar.tsx` (so it's on every app page), plus the launcher button above the nav.
+- New `bell`/`inbox` icons were added in 3c; the palette reuses existing icons.
+- **For Claude to extend/document:** could add a real `/search` backend endpoint if client-side gets slow with large workspaces (currently caps at 500 tasks / 500 people / 200 projects, loaded once per open); could add recent-items, fuzzy ranking, and in-palette actions (assign, complete) beyond navigation. Needs its own `docs/PHASE4-SEARCH.md` and a ROADMAP tick when finalised.
+
+## Challenges, limitations & friction this session (the honest list)
+Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.
+
+- **Host RAM is the big one.** This machine runs tight — free memory swung between ~1.5 GB and ~5 GB during the session, and the dashboard kept flagging "tight/critical". Consequences:
+  - I could **not** safely fan out work to parallel sub-agents. The spawn gate sat at 1/32 under "severe pressure" for long stretches, so the lint cleanup (184 issues) and the Phase 3c build were done **sequentially by hand** instead of split across agents. Slower, but reliable. On a bigger box this would have been a parallel wave and much faster.
+  - Browser automation (Chromium via Playwright) is ~400 MB on top of two dev servers — risky when memory is low, and it's why screenshot attempts were deferred/aborted.
+  - Had to serialise dev-server restarts and run **targeted** tests rather than the full suite at times.
+- **Windows PowerShell, not bash.** Every shell command runs in PowerShell. `&&` chaining fails; `npm`/`npx`/`playwright-cli` `.ps1` shims are blocked by the execution policy, so I must call `npm.cmd` / `npx.cmd` / `playwright-cli.cmd`. This cost several retries before I adapted.
+- **Browser screenshots never completed.** Combination of the two above (PowerShell `.ps1` block + tight RAM + the per-process Playwright session not persisting across separate `.cmd` calls). The bell/approvals "new feature" shots and the full visual changelog are still OPEN (see above). This is the main thing I could not finish — a capable but fiddly media task, better done where the browser tooling runs cleanly.
+- **Git push safety policy.** All pushes must go via feature branch + PR with a literal target; `main` is blocked. Not a limitation of capability, just a guardrail that shaped the workflow (lots of small PRs: #19–#23).
+- **Can't run SQL directly against Supabase.** No direct DB connection string; schema changes (the `*.sql` files) are copy-pasted into the Supabase SQL Editor by the user. So every schema step is a handoff, not something I apply end-to-end.
+- **Unit tests don't catch live-integration bugs.** The Phase 3c `WORKSPACE_TABLES` bug (#22) passed all unit tests because the fake Supabase client doesn't enforce the real scoped-table allow-list — only hitting the live DB surfaced the 500. Lesson: smoke-test new endpoints against real Supabase, not just the fakes.
+- **Two-agent workflow (me + Claude on another device).** Code arrives from both sides; I've had to fetch/fast-forward and reconcile Claude's commits more than once. This KIRO-NOTES file exists to reduce that friction. Keep it updated.
