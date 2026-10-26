@@ -123,9 +123,11 @@ def _fmt_day(d):
     return f"{d.day} {d.strftime('%b')}" if d else ""
 
 
-def fit(p, required, skill_names, task_words=None, wip_limit=3, capacity=None):
+def fit(p, required, skill_names, task_words=None, wip_limit=3, capacity=None, weights=None):
     """Score one profile against required {skill_id: min_level}. Returns (score 0..100, factors),
-    where each factor is {key, label, points, max, detail} so the app can show why."""
+    where each factor is {key, label, points, max, detail} so the app can show why.
+    weights overrides the global WEIGHTS for this one call (used by per-workspace auto-tune)."""
+    weights = weights or WEIGHTS
     capacity = capacity or CAPACITY_HOURS
     names = lambda ids: ", ".join(skill_names.get(i, "a skill") for i in ids)
 
@@ -192,8 +194,8 @@ def fit(p, required, skill_names, task_words=None, wip_limit=3, capacity=None):
 
     values = {"skills": skills, "experience": experience, "availability": availability, "record": record}
     details = {"skills": skills_detail, "experience": exp_detail, "availability": avail_detail, "record": rec_detail}
-    factors = [{"key": k, "label": LABELS[k], "points": round(WEIGHTS[k] * values[k], 1), "max": WEIGHTS[k],
-                "detail": details[k]} for k in WEIGHTS]
+    factors = [{"key": k, "label": LABELS[k], "points": round(weights[k] * values[k], 1), "max": weights[k],
+                "detail": details[k]} for k in weights]
     total = round(sum(f["points"] for f in factors))
     if missing:
         total = min(total, MISSING_CAP)   # below a required level is never more than "possible"
@@ -348,3 +350,73 @@ def calibration(assignments, skill_names):
         "verdict": verdict,
         "weights": WEIGHTS,
     }
+
+
+# ─── Auto-tune (Level 3) ───
+# calibration() measures how well the matcher predicts outcomes. Auto-tune goes one step further:
+# it looks at each of the four factors (skills / experience / availability / record), sees which
+# ones actually tracked the real completion score, and proposes new weights that lean toward the
+# factors that predicted well. It only ever PROPOSES — a leader applies it, so the matcher is
+# never silently re-ranked. Pure function (pairs in, weights out) so it is easy to test.
+
+WEIGHT_FLOOR = 5      # no factor is ever zeroed — each keeps at least this much say
+MIN_TUNE_SAMPLES = 8  # below this, there isn't enough finished work to tune on
+
+
+def suggest_weights(factor_pairs, base=None):
+    """Propose tuned weights from evidence.
+
+    factor_pairs: {factor_key: [(factor_value_0..1, actual_score_0..1), ...]} — one entry per
+    completed, scored assignment, per factor, recorded at completion time.
+    base: the weights to adjust (defaults to the current WEIGHTS), summing to 100.
+
+    Returns {suggested: {k: int}, correlations: {k: float|None}, n: int, tunable: bool, note: str}.
+    The suggested weights sum to the same total as base, each at least WEIGHT_FLOOR, so the change
+    is a re-balance — never a factor switched off.
+    """
+    base = dict(base or WEIGHTS)
+    total = sum(base.values())
+    keys = list(base.keys())
+    n = max((len(factor_pairs.get(k, [])) for k in keys), default=0)
+
+    corr = {k: _pearson(factor_pairs.get(k, [])) for k in keys}
+
+    if n < MIN_TUNE_SAMPLES:
+        return {"suggested": base, "correlations": corr, "n": n, "tunable": False,
+                "note": f"Need at least {MIN_TUNE_SAMPLES} completed, scored tasks to tune (have {n})."}
+
+    # Turn each correlation into a non-negative "trust" in that factor. A factor that tracked the
+    # outcome gets more trust; one that didn't (or is unknown) keeps a small neutral trust so it
+    # is never dropped. Blend with the current weights (50/50) so one quiet term can't swing wildly.
+    trust = {k: max((corr[k] or 0.0), 0.0) + 0.15 for k in keys}
+    trust_total = sum(trust.values()) or 1.0
+    evidence_share = {k: trust[k] / trust_total for k in keys}
+    base_share = {k: base[k] / total for k in keys}
+    blended = {k: 0.5 * base_share[k] + 0.5 * evidence_share[k] for k in keys}
+
+    # Scale to the original total, apply the floor, then fix rounding drift on the largest term.
+    raw = {k: blended[k] * total for k in keys}
+    floored = {k: max(raw[k], WEIGHT_FLOOR) for k in keys}
+    scale = (total - WEIGHT_FLOOR * len(keys)) / (sum(floored.values()) - WEIGHT_FLOOR * len(keys) or 1.0)
+    suggested = {k: WEIGHT_FLOOR + round((floored[k] - WEIGHT_FLOOR) * scale) for k in keys}
+    drift = total - sum(suggested.values())
+    if drift:
+        biggest = max(keys, key=lambda k: suggested[k])
+        suggested[biggest] += drift
+
+    return {"suggested": suggested, "correlations": corr, "n": n, "tunable": True,
+            "note": "Weights proposed from how well each factor predicted real outcomes. Review before applying."}
+
+
+def set_weights(new):
+    """Replace the live WEIGHTS in place (keeps the same dict object fit() reads). Validates the
+    keys and that the total is unchanged, so a bad payload can't corrupt scoring."""
+    if set(new) != set(WEIGHTS):
+        raise ValueError("weights must have exactly the keys: " + ", ".join(WEIGHTS))
+    vals = {k: int(new[k]) for k in WEIGHTS}
+    if any(v < 0 for v in vals.values()):
+        raise ValueError("weights cannot be negative")
+    if sum(vals.values()) != sum(WEIGHTS.values()):
+        raise ValueError(f"weights must sum to {sum(WEIGHTS.values())}")
+    WEIGHTS.update(vals)
+    return dict(WEIGHTS)

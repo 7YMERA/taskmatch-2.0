@@ -85,8 +85,8 @@ Biggest scope. "Startup", not "FYP".
 | Task | Why |
 |---|---|
 | Multi-team / multi-org | beyond one UTP class (✅ workspaces, Phase 3b) |
-| Integrations (GitHub Issues, Jira) | ✅ GitHub Issues import (preview → pick → import, dedup by issue URL); Jira still todo |
-| Outcome feedback loop retrains the matcher | ✅ matcher calibration report (predicted skill level vs real completion score, per skill + overall, with a verdict); auto-retrain of weights still todo |
+| Integrations (GitHub Issues, Jira) | ✅ done — GitHub **and** Jira import (preview → pick → import, dedup by issue URL/key). [PHASE-LEVEL3.md](PHASE-LEVEL3.md) |
+| Outcome feedback loop retrains the matcher | ✅ done — calibration report (predicted skill level vs real completion score, per skill + overall) **plus** auto-tune: it proposes re-balanced fit weights from how well each factor predicted outcomes; a leader applies them (off by default, never silent). [PHASE-LEVEL3.md](PHASE-LEVEL3.md) |
 
 ---
 

@@ -257,9 +257,14 @@ def test_phase3c_tables_are_workspace_scoped():
     assert {'notifications', 'approvals'} <= main.WORKSPACE_TABLES
 
 
-# Level 3: GitHub import + matcher calibration require a login / permission.
-L3_READS = ['/matcher/calibration']
-L3_WRITES = ['/import/github/preview', '/import/github/commit']
+def test_matcher_weights_table_is_workspace_scoped():
+    assert 'matcher_weights' in main.WORKSPACE_TABLES
+
+
+# Level 3: GitHub/Jira import + matcher calibration/weights require a login / permission.
+L3_READS = ['/matcher/calibration', '/matcher/weights']
+L3_WRITES = ['/import/github/preview', '/import/github/commit',
+             '/import/jira/preview', '/import/jira/commit', '/matcher/weights']
 
 @pytest.mark.parametrize('path', L3_READS)
 def test_l3_read_rejects_anonymous(client, path):
