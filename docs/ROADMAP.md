@@ -58,7 +58,8 @@ ships as its own pull request with before/after screenshots.
 | 1c | My Tasks focus page, task and person quick views, create task in a side panel, People cards | ✅ done ([PHASE1C-WORKSPACE.md](PHASE1C-WORKSPACE.md)) |
 | 2 | Roles and permissions, audit trail, user management, "away" status | ✅ done ([PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md)) |
 | 3 | AI assist: suggested skills, hours and severity for new tasks, each with a confidence level, confirmed by a person | ✅ done ([PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md)) |
-| 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ◐ in review ([PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md)) |
+| 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ✅ done ([PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md)) |
+| 3d | People page and smarter matching: explainable fit score, proven skills, team insights (gaps, single points of failure, mentors, hours), Find a match, "Who could take this?" in New task, smarter free suggestions | ◐ in review ([PEOPLE-MATCHING.md](PEOPLE-MATCHING.md)) |
 | 3c | Notification centre, approvals | ☐ next (built on workspaces) |
 | 4 | Search, Ctrl+K, exports, settings, onboarding | ☐ todo |
 
@@ -69,12 +70,12 @@ ships as its own pull request with before/after screenshots.
 The dissertation itself flagged these: workload scored lowest, skills are pure
 self-declaration. These add real value for TaskMatch specifically.
 
-| Task | Why |
-|---|---|
-| Skill *evidence* from completed tasks, not just claims | trust the skill data |
-| Skill *decay* over time | stale skills fade |
-| Per-person / per-role capacity (not a flat WIP of 3) | real teams differ |
-| Explainable, tunable match score | leaders trust and adjust it |
+| Task | Why | Status |
+|---|---|---|
+| Skill *evidence* from completed tasks, not just claims | trust the skill data | ✅ proven skills ([PEOPLE-MATCHING.md](PEOPLE-MATCHING.md)) |
+| Skill *decay* over time | stale skills fade | ✅ evidence halves every 180 days (`EVIDENCE_HALF_LIFE_DAYS`) |
+| Per-person / per-role capacity (not a flat WIP of 3) | real teams differ | ◐ hours count as well as tasks (`CAPACITY_HOURS`); per-person capacity still todo |
+| Explainable, tunable match score | leaders trust and adjust it | ✅ fit score with its four parts shown; weights in `matching.py` |
 
 ---
 

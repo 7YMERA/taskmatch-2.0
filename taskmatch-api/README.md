@@ -34,6 +34,8 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | Claude API key for AI assist (console.anthropic.com → API keys). Without it, suggestions come from the free built-in engine (`suggest_history.py`) instead. Never expose to the browser. | no |
 | `AI_MODEL` | Claude model for AI assist (default `claude-opus-5-5`). | no |
 | `AI_RATE_LIMIT_PER_MINUTE` | Suggestion requests per user per minute (default `10`). | no |
+| `CAPACITY_HOURS` | Hours of active work one person can carry, for the fit score's availability part and Team insights (default `20`). | no |
+| `EVIDENCE_HALF_LIFE_DAYS` | How fast proven experience fades: finished work counts half as much after this many days (default `180`). | no |
 
 ## Run
 
@@ -79,8 +81,10 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | — | liveness |
-| GET | `/recommend/{task_id}` | user | ranked students for a task |
-| GET | `/recommend-tasks/{student_id}` | user | ranked tasks for a student |
+| GET | `/recommend/{task_id}` | user | everyone ranked for a task by fit score (0–100, with its four parts; see `matching.py`) |
+| GET | `/recommend-tasks/{student_id}` | user | open tasks for a person, by fit score |
+| POST | `/match/people` | user | everyone ranked for any skills and levels (+ optional description), same fit score |
+| GET | `/people/insights` | user | load in hours, proven skills, skill coverage and risk, tasks nobody available can take |
 | POST | `/assign` | admin, lead | assign a student to a task |
 | POST | `/auto-assign` | admin, lead | pick and assign one person by mode: `best_match`, `round_robin` or `least_loaded` (`dry_run: true` previews the pick) |
 | POST | `/self-assign` | admin, lead, member | pick up a task for yourself |

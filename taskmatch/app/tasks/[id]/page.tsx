@@ -7,6 +7,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { logActivity } from '../../lib/log'
 import Sidebar from '../../components/Sidebar'
+import { FitRing, FitSummary } from '../../components/FitScore'
 import ProjectChip from '../../components/ProjectChip'
 import type { Project } from '../../lib/projects'
 import { toast, confirmDialog, promptDialog } from '../../lib/ui'
@@ -18,7 +19,7 @@ const PROFICIENCY = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Assignment modes: the server picks one qualified person; every pick comes with its reason.
 type Mode = 'best_match' | 'round_robin' | 'least_loaded'
 const MODES: { key: Mode; label: string; hint: string }[] = [
-  { key: 'best_match', label: 'Best match', hint: 'Top of the ranked list: strongest skill match, then least busy.' },
+  { key: 'best_match', label: 'Best match', hint: 'Top of the ranked list: the highest fit score among people who meet every skill.' },
   { key: 'round_robin', label: 'Round robin', hint: 'Takes turns: whoever has gone longest without a new task.' },
   { key: 'least_loaded', label: 'Least loaded', hint: 'Fewest committed hours on their active tasks.' },
 ]
@@ -335,7 +336,7 @@ export default function TaskDetail() {
               {/* Recommendations */}
               <Card className="p-5">
                 <p className="text-sm font-medium mb-1" style={TEXT}>Recommended</p>
-                <p className="text-[11px] mb-3" style={FAINT}>Ranked by: meets all required skills first → best skill match → least busy (WIP). The performance band is shown for context, but it doesn&apos;t set the order — a strong skill-match can rank above a higher performer.</p>
+                <p className="text-[11px] mb-3" style={FAINT}>Ranked by fit score out of 100: skills (45), proven experience on finished work (20), availability in slots and hours (20) and track record (15). People who meet every skill come first. Press Why? on anyone to see the parts.</p>
                 {isClosed(task) && (
                   <div className="mb-3 rounded-lg p-3" style={{ ...ROW, border: '1px solid var(--tm-border)' }}>
                     <p className="text-xs flex items-start gap-1.5" style={MUTED}>
@@ -387,10 +388,12 @@ export default function TaskDetail() {
                 <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
                   {recs.filter(r => !assignedIds.has(r.student_id)).map(r => (
                     <div key={r.student_id} className="flex items-center gap-3 rounded-lg p-3" style={ROW}>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                        style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
-                        {initials(r.name)}
-                      </div>
+                      {r.fit_score != null ? <FitRing score={r.fit_score} size={36} /> : (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                          style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
+                          {initials(r.name)}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm flex items-center gap-2 flex-wrap" style={TEXT}>
                           {r.name}
@@ -400,6 +403,7 @@ export default function TaskDetail() {
                           {!r.qualified && !r.over_wip && !r.away && <span title="Below the required skill level — can still be assigned as a growth pairing"><Badge accent="rose">below min</Badge></span>}
                         </p>
                         <p className="text-xs italic mt-0.5" style={FAINT}>{r.justification}</p>
+                        {r.fit_factors && <div className="mt-1.5"><FitSummary score={r.fit_score} factors={r.fit_factors} /></div>}
                       </div>
                       {can(userRole, 'assign.others') && (
                         <Button variant="ghost" className="tm-btn-sm shrink-0"

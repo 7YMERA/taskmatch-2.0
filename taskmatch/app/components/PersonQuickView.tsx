@@ -5,26 +5,34 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '../lib/supabase'
+import axios from 'axios'
+import { supabase, API, authHeaders } from '../lib/supabase'
 import { Drawer, Icon } from './ui'
+import { FitRing } from './FitScore'
 
 const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
 const initials = (n: string) => (n || '?').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
 const fmtDay = (d: string) => new Date(d.slice(0, 10) + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 
-export default function PersonQuickView({ person, wip, wipLimit, stat, showScores, groupColor, onClose }: {
+export default function PersonQuickView({ person, wip, wipLimit, stat, insight, capacity, showScores, groupColor, onClose }: {
   person: any | null
   wip?: { wip: number; active_tasks?: { task_id: string; status: string; description: string }[] }
   wipLimit: number
   stat?: { avg_score: number | null; completed_count: number; band: string }
+  insight?: { active_hours: number; proven: { skill_id: string; count: number; last: string | null }[] }   // from /people/insights
+  capacity?: number
   showScores: boolean
   groupColor: (g: string) => string
   onClose: () => void
 }) {
   const [history, setHistory] = useState<any[] | null>(null)
+  const [goodFor, setGoodFor] = useState<any[] | null>(null)
   useEffect(() => {
     if (!person) return
-    setHistory(null)
+    setHistory(null); setGoodFor(null)
+    authHeaders().then(headers => axios.get(`${API}/recommend-tasks/${person.id}`, { headers }))
+      .then(res => setGoodFor(res.data.qualified || []))
+      .catch(() => setGoodFor([]))
     supabase.from('assignments').select('id, status, completed_at, assigned_date, tasks(id, description, due_date)')
       .eq('student_id', person.id).order('assigned_date', { ascending: false })
       .then(({ data }) => setHistory(data || []))
@@ -36,6 +44,7 @@ export default function PersonQuickView({ person, wip, wipLimit, stat, showScore
   const dated = done.filter(a => a.tasks?.due_date && a.completed_at)
   const onTime = dated.filter(a => a.completed_at.slice(0, 10) <= a.tasks.due_date).length
   const w = wip?.wip ?? 0
+  const provenBy = Object.fromEntries((insight?.proven || []).map(p => [p.skill_id, p]))
   const state = w === 0 ? ['Free right now', 'var(--tm-chart-2)'] : w >= wipLimit ? ['At their limit', 'var(--tm-rose)'] : [`Has room for ${wipLimit - w} more`, 'var(--tm-text-muted)']
 
   return (
@@ -63,6 +72,7 @@ export default function PersonQuickView({ person, wip, wipLimit, stat, showScore
         <div className="rounded-lg p-3" style={{ background: 'var(--tm-surface-2)' }}>
           <p className="text-[11px] text-faint">Workload</p>
           <p className="text-lg font-semibold tabular-nums text-fg">{w}<span className="text-xs text-faint">/{wipLimit}</span></p>
+          {insight && <p className="text-[11px] text-faint tabular-nums">{insight.active_hours}h{capacity ? ` of ${capacity}h` : ''}</p>}
         </div>
         <div className="rounded-lg p-3" style={{ background: 'var(--tm-surface-2)' }}>
           <p className="text-[11px] text-faint">Finished</p>
@@ -89,17 +99,35 @@ export default function PersonQuickView({ person, wip, wipLimit, stat, showScore
         </div>
       )}
 
-      <p className="text-xs font-medium text-muted mb-2">Skills ({skills.length})</p>
+      <p className="text-xs font-medium text-muted mb-2 flex items-center gap-2">Skills ({skills.length})
+        {insight && <span className="font-normal text-faint">· {Object.keys(provenBy).filter(k => skills.some((s: any) => s.skill_id === k)).length} proven on finished work</span>}
+      </p>
       {skills.length === 0 ? <p className="text-xs text-faint mb-5">No skills declared yet.</p> : (
         <div className="flex flex-col gap-2 mb-5">
           {skills.map((ss: any) => (
             <div key={ss.skill_id} className="grid grid-cols-[1fr_6rem_5.5rem] items-center gap-3">
-              <span className="text-sm text-fg truncate">{ss.skills?.skill_name}</span>
+              <span className="text-sm text-fg truncate flex items-center gap-1.5" title={provenBy[ss.skill_id] ? `Used on ${provenBy[ss.skill_id].count} finished task(s)` : 'Declared, not yet used on finished work'}>
+                {ss.skills?.skill_name}
+                {provenBy[ss.skill_id] && <span className="text-[10px] inline-flex items-center gap-0.5 shrink-0" style={{ color: 'var(--tm-emerald)' }}><Icon name="check" size={10} strokeWidth={3} />{provenBy[ss.skill_id].count}×</span>}
+              </span>
               <span className="flex gap-1" aria-hidden>
                 {[1, 2, 3].map(l => <span key={l} className="h-1.5 flex-1 rounded-full" style={{ background: l <= ss.proficiency ? 'var(--tm-chart-1)' : 'var(--tm-track)' }} />)}
               </span>
               <span className="text-[11px] text-muted">{LEVELS[ss.proficiency]}</span>
             </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs font-medium text-muted mb-2">Good fit for</p>
+      {goodFor == null ? <p className="text-xs text-faint mb-5">Loading…</p> : goodFor.length === 0 ? <p className="text-xs text-faint mb-5">No open tasks match their skills right now.</p> : (
+        <div className="flex flex-col gap-1.5 mb-5">
+          {goodFor.slice(0, 3).map(t => (
+            <Link key={t.task_id} href={`/tasks/${t.task_id}`} className="flex items-center gap-2.5 text-sm text-fg hover:underline">
+              {t.fit_score != null && <FitRing score={t.fit_score} size={28} />}
+              <span className="truncate flex-1">{t.description}</span>
+              {t.severity && <span className="text-[11px] text-faint shrink-0">{t.severity}</span>}
+            </Link>
           ))}
         </div>
       )}
