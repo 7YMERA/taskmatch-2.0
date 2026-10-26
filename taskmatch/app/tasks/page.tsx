@@ -337,7 +337,7 @@ const updateTaskStatus = async (id: string, status: string) => {
   // SLA-style states. Delayed = breached & not done (active). Closed = breached
   // & not done past the grace window (auto-locked). Late = delivered after due.
   const GRACE_DAYS = 7
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const [todayStr] = useState(() => new Date().toISOString().slice(0, 10))
   const daysOverdue = (due: string) => Math.floor((Date.parse(todayStr) - Date.parse(due)) / 86400000)
   const isClosed = (t: any) => t.status !== 'Completed' && t.due_date && daysOverdue(t.due_date) > GRACE_DAYS
   const isDelayed = (t: any) => t.status !== 'Completed' && t.due_date && t.due_date < todayStr && !isClosed(t)
@@ -364,7 +364,7 @@ const updateTaskStatus = async (id: string, status: string) => {
   ])) as string[]).sort((a, b) => (_groupCreatedAt[b] ?? 0) - (_groupCreatedAt[a] ?? 0))
   const activeOn = (t: any) => (allAssignees[t.id] || []).filter(a => a.status === 'Assigned' || a.status === 'In Progress')
   const isUnstaffed = (t: any) => t.status !== 'Completed' && !isClosed(t) && activeOn(t).length === 0
-  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const [weekAhead] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
   const matchesPreset = (t: any) =>
     preset === 'unassigned' ? isUnstaffed(t)
       : preset === 'due-week' ? t.status !== 'Completed' && !!t.due_date && t.due_date >= todayStr && t.due_date <= weekAhead

@@ -23,12 +23,11 @@ Same features. Real engineering. This is the current focus.
 | 6 | Rate limiting | protect the free tier from abuse | ✅ done |
 | 6b | Login required on read endpoints + row-level security on every table | the public key alone can't read or write data | ✅ done (`supabase/rls.sql`) |
 | 7 | Test suite for the matcher + core logic | change code safely | ✅ done (pytest) |
-| 8 | CI on every push (lint, type-check, tests) | catch breaks automatically | ✅ done (lint advisory) |
+| 8 | CI on every push (lint, type-check, tests) | catch breaks automatically | ✅ done (lint now **blocking**) |
 | 9 | API README + setup guide | a marker/dev can run it | ✅ done |
-| 10 | Structured logging + `/health` detail | see what the server is doing | ◐ logging done; `/health` is still a bare liveness check |
+| 10 | Structured logging + `/health` detail | see what the server is doing | ✅ done (`/health` reports version, uptime, service-role state, `?deep=1` DB probe) |
 
-**Left in Level 1:** `/health` detail (#10), storage policies for the `avatars`
-bucket, and making lint blocking in CI.
+**Left in Level 1:** storage policies for the `avatars` bucket.
 
 ### UI refresh (runs alongside Level 1)
 
@@ -101,6 +100,9 @@ Biggest scope. "Startup", not "FYP".
   but it should not reach production unchanged.
 - ~~Supabase client is created separately in ~8 frontend files — one shared helper.~~ Done: `app/lib/supabase.ts`.
 - `taskmatch-api/main.py` is a single large file; split into modules as it grows.
-- Frontend lint has legacy `any` types (`dashboard/page.tsx`, `SkillPicker.tsx`)
-  and unused imports. CI runs lint as **advisory** until these are cleaned; make
-  it blocking once fixed. Type-check and tests ARE blocking gates.
+- Frontend lint has legacy `any` types and the strict React-Compiler rules
+  (`react-hooks/set-state-in-effect`, `immutability`, `exhaustive-deps`) fire on
+  standard data-loading patterns. These are set to **warning**, so lint is now a
+  **blocking** CI gate for real errors (type errors, syntax, impure render calls)
+  while the `any`/compiler cleanup is tracked here. Type-check and tests are also
+  blocking gates.

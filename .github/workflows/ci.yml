@@ -44,5 +44,5 @@ jobs:
         run: npm ci
       - name: Type-check
         run: npx tsc --noEmit
-      - name: Lint (advisory — legacy 'any' cleanup tracked in ROADMAP)
-        run: npm run lint || true
+      - name: Lint (blocking — errors fail the build; `any` and React-Compiler debt are warnings, tracked in ROADMAP)
+        run: npm run lint
