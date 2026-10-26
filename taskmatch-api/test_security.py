@@ -250,3 +250,8 @@ def test_notify_write_rejects_anonymous(client, path):
     # fields are missing (FastAPI validates the body first). Either way, no data
     # is touched without a valid session.
     assert client.post(path, json={}).status_code in (401, 422)
+
+
+# Regression: the Phase 3c tables must be registered as workspace-scoped, or db() raises.
+def test_phase3c_tables_are_workspace_scoped():
+    assert {'notifications', 'approvals'} <= main.WORKSPACE_TABLES

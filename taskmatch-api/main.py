@@ -226,7 +226,8 @@ def raw_db():
 _workspace = ContextVar("workspace", default=None)   # (workspace_id, role, user_id)
 
 WORKSPACE_TABLES = {"students", "tasks", "assignments", "skills", "student_skills", "task_skills",
-                    "groups", "task_comments", "activity_logs", "projects"}
+                    "groups", "task_comments", "activity_logs", "projects",
+                    "notifications", "approvals"}
 
 
 class ScopedTable:
