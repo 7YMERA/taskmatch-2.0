@@ -58,6 +58,11 @@ of real teams and, one day, offering as a product.
 | **Look and feel** | Six-colour palette; white-on-white text in light mode | Neutral base with one indigo accent, per-theme tokens, Geist type, theme follows your OS |
 | **Dashboard** | Totals at one point in time | Date ranges, KPI trends with sparklines, "needs attention", matching health, workload heatmap, skills coverage |
 | **Assigning work** | Pick a person from a ranked list | Also auto-assign by best match, round robin or least loaded, previewed with the reason before confirming |
+| **Assigning work, part 2** | Ranked by skill only | An explainable fit score out of 100 (skills, proven experience, availability, record), tunable per workspace from real outcomes |
+| **Teams** | One shared list for everyone | Workspaces with their own people, tasks and roles; projects inside them; invite links |
+| **Roles** | Leader or student, editable by the user | Admin, team lead, member, viewer, enforced by the API and the database, with an audit trail |
+| **Staying informed** | Nothing | Notification bell, approvals for critical tasks, Ctrl+K search, CSV exports |
+| **Integrations** | None | Import issues from GitHub or Jira |
 | **Dialogs** | Browser `prompt()` boxes | Themed in-app dialogs |
 | **Documentation** | Default framework README | Setup guides, API reference, roadmap and visual changelogs |
 
@@ -101,10 +106,52 @@ of real teams and, one day, offering as a product.
 |---|---|
 | ![Workload](docs/screenshots/phase1/after-workload-dark.png) | ![Skills](docs/screenshots/phase1/after-skills-dark.png) |
 
-### In progress
-- **Phase 1b:** rebuilding the Tasks and People pages with views, saved filters and a skills matrix.
+### 5. Phase 1b and 1c: Tasks, People and My Tasks ([#7](https://github.com/7YMERA/taskmatch-2.0/pull/7), [#8](https://github.com/7YMERA/taskmatch-2.0/pull/8))
+- Tasks as a list, a board or a calendar, with search, quick and saved views and bulk actions.
+- People with skill and availability filters and a skills matrix.
+- My Tasks as a personal focus page with live timers, plus side-panel quick views.
+- **Details: [PHASE1B-TASKS-PEOPLE.md](docs/PHASE1B-TASKS-PEOPLE.md), [PHASE1C-WORKSPACE.md](docs/PHASE1C-WORKSPACE.md)**
 
-The earliest login and landing revamps are in [docs/CHANGELOG-VISUAL.md](docs/CHANGELOG-VISUAL.md).
+### 6. Phase 2: roles and audit trail ([#9](https://github.com/7YMERA/taskmatch-2.0/pull/9))
+- Four roles (admin, team lead, member, viewer) that only the server can change, checked by the API
+  and by the database. Before, any student could make themselves a leader.
+- A Members & roles page, an audit trail that can't be forged, and an "away" status.
+- **Details: [PHASE2-ROLES-AUDIT.md](docs/PHASE2-ROLES-AUDIT.md)**
+
+### 7. Phase 3 and 3b: suggestions, workspaces and projects ([#10](https://github.com/7YMERA/taskmatch-2.0/pull/10) – [#12](https://github.com/7YMERA/taskmatch-2.0/pull/12))
+- New task suggests skills, hours and severity, each with a confidence level, and nothing is
+  applied until a person clicks Use. Free by default; Claude is used only if an API key is set.
+- Multiple teams like Jira: workspaces, a switcher, invite links, a role per workspace, projects.
+- **Details: [PHASE3-AI-ASSIST.md](docs/PHASE3-AI-ASSIST.md), [PHASE3B-WORKSPACES.md](docs/PHASE3B-WORKSPACES.md)**
+
+### 8. People page and smarter matching ([#18](https://github.com/7YMERA/taskmatch-2.0/pull/18))
+- A fit score out of 100 that always shows its four parts, skills proven by finished work that
+  fade with age, Team insights (gaps, single points of failure, mentors) and Find a match.
+- **Details: [PEOPLE-MATCHING.md](docs/PEOPLE-MATCHING.md)**
+
+### 9. Phase 3c and 4: notifications, approvals, search, settings ([#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28))
+- A notification bell, and an approvals inbox where a lead signs off on a member taking a critical task.
+- A Ctrl+K palette to search tasks, people and projects or jump to any page, CSV exports, a
+  Settings page, and a Getting Started checklist for new workspaces.
+- Level 1 finished: a detailed `/health` check and lint that blocks CI.
+- **Details: [PHASE3C-NOTIFICATIONS.md](docs/PHASE3C-NOTIFICATIONS.md), [CHANGELOG-VISUAL.md](docs/CHANGELOG-VISUAL.md#bell-and-ctrlk-polish)**
+
+| Notifications | Ctrl+K search |
+|---|---|
+| ![Notifications](docs/screenshots/bell-palette/after-bell-dark.png) | ![Command palette](docs/screenshots/bell-palette/after-palette-search-light.png) |
+
+### 10. Level 3: integrations and a matcher that learns ([#25](https://github.com/7YMERA/taskmatch-2.0/pull/25), [#26](https://github.com/7YMERA/taskmatch-2.0/pull/26), shipped in [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27))
+- Import issues from GitHub or Jira as tasks, without duplicates.
+- Calibration shows how well each part of the fit score predicted real results, and auto-tune
+  proposes new weights that a lead reviews and applies. Nothing changes on its own.
+- **Details: [PHASE-LEVEL3.md](docs/PHASE-LEVEL3.md)**
+
+### Every release, with before/after screenshots
+
+**[docs/CHANGELOG-VISUAL.md](docs/CHANGELOG-VISUAL.md)** lists every release, newest first.
+How the two AI assistants split the work is in [CLAUDE-NOTES.md](docs/CLAUDE-NOTES.md) and
+[KIRO-NOTES.md](docs/KIRO-NOTES.md).
+
 
 ---
 
@@ -113,8 +160,10 @@ The earliest login and landing revamps are in [docs/CHANGELOG-VISUAL.md](docs/CH
 1. A lead creates a task and tags the skills it needs.
 2. The API scores every person against those skills, using the level they hold for each.
 3. People who are already at the work-in-progress limit (3 active tasks) are left out.
-4. The result is a ranked list: strongest skill match first, then least busy. A strong
-   member can be paired with a learner so skills spread.
+4. Each person gets a fit score out of 100: skills (45), proven experience from finished work
+   (20), availability (20) and track record (15). The app always shows the four parts, and a
+   workspace can retune the weights from real outcomes. A strong member can be paired with a
+   learner so skills spread.
 5. The lead assigns from the list, or lets TaskMatch pick by mode:
 
 | Mode | Who it picks |
@@ -136,15 +185,15 @@ past its due date is closed and locked automatically.
 | Backend | [FastAPI](https://fastapi.tiangolo.com) (Python 3.11+), Pydantic |
 | Database and auth | [Supabase](https://supabase.com) (Postgres, Auth, Storage) with row-level security |
 | Testing and CI | pytest, TypeScript type-check, ESLint, GitHub Actions |
-| Hosting (suggested) | Vercel for the frontend, Render for the API |
+| Hosting | Vercel for the frontend, Render for the API ([live demo](https://taskmatch-umber.vercel.app)) |
 
 ## Repository layout
 
 ```
 taskmatch/        Next.js frontend (pages in app/, design system in app/components/ui.tsx)
 taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
-supabase/         Database security policies (rls.sql, then roles.sql, then workspaces.sql)
-docs/             Roadmap, redesign and Phase 1 write-ups, screenshots
+supabase/         Database scripts, run in order (see "The database" below)
+docs/             Roadmap, a write-up per phase, visual changelog, assistant notes, screenshots
 .github/          CI workflow
 ```
 
@@ -184,6 +233,12 @@ existing account joins it with the role it has now. Admins rename it, send invit
 change roles on the **Members & roles** page. New accounts create their own workspace or join
 one with an invite link.
 
+Then run these once, in this order:
+[`supabase/notifications.sql`](supabase/notifications.sql) (notification bell and approvals),
+[`supabase/integrations.sql`](supabase/integrations.sql) (GitHub and Jira import),
+[`supabase/matcher_weights.sql`](supabase/matcher_weights.sql) (tuned matcher weights) and
+[`supabase/storage_avatars.sql`](supabase/storage_avatars.sql) (profile picture uploads).
+
 Optional: run [`supabase/demo-data.sql`](supabase/demo-data.sql) to make a fresh install look lived
 in. It names the workspace, adds projects and files your tasks into them, gives open tasks to the
 best-matching people, and adds a second workspace so the switcher has somewhere to go. Then run
@@ -218,7 +273,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-CI runs the backend tests and the frontend type-check on every push and pull request.
+CI runs the backend tests, the frontend type-check and lint on every push and pull request.
 
 > Never commit `.env` or `.env.local`. Both are git-ignored, and the service-role key
 > must only ever live on the server.
@@ -229,8 +284,8 @@ CI runs the backend tests and the frontend type-check on every push and pull req
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 
-**Level 1: production-grade** (nearly done). Security, validation, tests, CI and docs are
-in. Left: a detailed `/health` check, storage policies for avatars, and blocking lint in CI.
+**Level 1: production-grade** ✅ done. Security, validation, tests, CI with blocking lint, a
+detailed `/health` check, storage policies and docs are all in.
 
 **Feature overhaul**, one phase per pull request, each with before/after screenshots:
 
@@ -240,16 +295,17 @@ in. Left: a detailed `/health` check, storage policies for avatars, and blocking
 | 1b, 1c | Tasks and People pages rebuilt (views, saved filters, skills matrix, quick views) | ✅ done |
 | 2 | Roles and permissions, audit trail, user management, "away" status | ✅ done |
 | 3, 3b | Suggested skills, hours and severity (always confirmed by a person); workspaces and projects | ✅ done |
-| 3d | People page and smarter matching: explainable fit score, proven skills, team insights | ◐ in review |
-| 3c | Notifications and approvals | ☐ planned |
-| 4 | Global search, Ctrl+K command palette, exports, settings, multiple teams | ☐ planned |
+| 3d | People page and smarter matching: explainable fit score, proven skills, team insights | ✅ done |
+| 3c | Notifications and approvals | ✅ done |
+| 4 | Ctrl+K search, exports, settings, onboarding | ✅ done |
 
 **Level 2: smarter matching.** Skill evidence from completed tasks, skill decay over
 time, hours as well as a task limit, and an explainable, tunable score are in (see
 [docs/PEOPLE-MATCHING.md](docs/PEOPLE-MATCHING.md)). Per-person capacity is next.
 
-**Level 3: a product.** Multiple teams and organisations, integrations such as GitHub
-Issues and Jira, and a feedback loop so matching learns from outcomes.
+**Level 3: a product.** Multiple teams, GitHub and Jira import, and a matcher that proposes new
+weights from real outcomes are in (see [docs/PHASE-LEVEL3.md](docs/PHASE-LEVEL3.md)). Next: more
+importers, scheduled re-sync, and design-system cleanup of the last few pages.
 
 ---
 
