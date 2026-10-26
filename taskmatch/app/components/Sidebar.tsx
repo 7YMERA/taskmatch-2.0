@@ -64,6 +64,7 @@ export default function Sidebar() {
   ]
   const adminNav = [
     ...(can(role, 'assign.others') ? [{ label: 'Approvals', href: '/approvals', icon: 'inbox' as const }] : []),
+    ...(can(role, 'tasks.manage') ? [{ label: 'Integrations', href: '/integrations', icon: 'link' as const }] : []),
     ...(can(role, 'team.manage') ? [{ label: 'Members & roles', href: '/team', icon: 'shield' as const }] : []),
     ...(can(role, 'audit.view') ? [{ label: 'Audit trail', href: '/audit', icon: 'history' as const }] : []),
   ]

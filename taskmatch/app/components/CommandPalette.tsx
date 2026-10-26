@@ -85,6 +85,7 @@ export default function CommandPalette() {
       { id: 'a-newtask', label: 'New task', sub: 'Create a task', group: 'Actions', icon: 'plus', href: '/tasks?new=1' },
     ]
     if (can(role, 'assign.others')) a.push({ id: 'a-approvals', label: 'Go to Approvals', group: 'Actions', icon: 'inbox', href: '/approvals' })
+    if (can(role, 'tasks.manage')) a.push({ id: 'a-integrations', label: 'Go to Integrations', group: 'Actions', icon: 'link', href: '/integrations' })
     if (can(role, 'audit.view')) a.push({ id: 'a-audit', label: 'Go to Audit trail', group: 'Actions', icon: 'history', href: '/audit' })
     if (can(role, 'team.manage')) a.push({ id: 'a-team', label: 'Go to Members & roles', group: 'Actions', icon: 'shield', href: '/team' })
 
