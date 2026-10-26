@@ -12,6 +12,8 @@ import { effectiveRole, can } from '../lib/role'
 import { toast, confirmDialog, promptDialog } from '../lib/ui'
 import { TaskBoard, TaskCalendar } from '../components/TaskViews'
 import TaskQuickView from '../components/TaskQuickView'
+import { FitRing, FitSummary } from '../components/FitScore'
+import WhoCouldTake from '../components/WhoCouldTake'
 import AISuggest, { type AIReview } from '../components/AISuggest'
 import ProjectChip from '../components/ProjectChip'
 import { fetchProjects, projectColor, type Project } from '../lib/projects'
@@ -599,6 +601,7 @@ const updateTaskStatus = async (id: string, status: string) => {
             <div className="mb-4">
               <SkillPicker skills={skills} value={taskSkills} onChange={setTaskSkills} field="min_proficiency" labels={['Min: Beginner', 'Min: Intermediate', 'Min: Advanced']} />
             </div>
+            <WhoCouldTake need={taskSkills} description={form.description} />
 
         </Drawer>
 
@@ -840,7 +843,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                     ) : (
                     <>
                     <p className="text-xs mb-1" style={MUTED}>{task.status === 'New' ? 'Recommended students' : 'Recommended to add'}</p>
-                    <p className="text-[11px] mb-3" style={FAINT}>Ranked by: meets all required skills first → best skill match → least busy (WIP), not by performance band. Already-assigned students are hidden; the rest continue on the next page.</p>
+                    <p className="text-[11px] mb-3" style={FAINT}>Ranked by fit score out of 100: skills, proven experience, availability and track record (press Why? on anyone to see the parts). People who meet every skill come first. Already-assigned students are hidden; the rest continue on the next page.</p>
                     {!recommendations[task.id] ? (
                       <div className="flex flex-col gap-2">
                         {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 56 }} />)}
@@ -875,10 +878,12 @@ const updateTaskStatus = async (id: string, status: string) => {
                           <div className="flex flex-col gap-2">
                             {pageItems.map((r: any) => (
                               <div key={r.student_id} className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--tm-surface-1)' }}>
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                                  style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
-                                  {initials(r.name)}
-                                </div>
+                                {r.fit_score != null ? <FitRing score={r.fit_score} size={36} /> : (
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                                    style={r.qualified ? AVATAR : { background: 'var(--tm-surface-2)', ...FAINT }}>
+                                    {initials(r.name)}
+                                  </div>
+                                )}
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm flex items-center gap-2 flex-wrap" style={TEXT}>
                                     {r.name}
@@ -892,6 +897,7 @@ const updateTaskStatus = async (id: string, status: string) => {
                                     <span style={{ color: r.wip >= 2 ? 'var(--tm-amber)' : 'var(--tm-emerald)' }}>WIP {r.wip}/3</span>
                                   </p>
                                   <p className="text-xs mt-0.5 italic" style={FAINT}>{r.justification}</p>
+                                  {r.fit_factors && <div className="mt-1.5"><FitSummary score={r.fit_score} factors={r.fit_factors} /></div>}
                                 </div>
                                 {can(userRole, 'tasks.manage') && (
                                   <Button variant="ghost" className="tm-btn-sm shrink-0"

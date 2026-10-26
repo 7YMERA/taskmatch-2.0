@@ -15,7 +15,7 @@ type SkillSug = { skill_id: string; skill_name: string; min_level: number; confi
 export type Suggestion = {
   skills: SkillSug[]
   hours: { estimate: number; low: number; high: number; confidence: Confidence; reason: string
-           based_on: { task_id: string; description: string; actual_hours: number | null }[] }
+           based_on: { task_id: string; description: string; actual_hours: number | null }[]; note?: string }
   severity: { value: string; confidence: Confidence; reason: string }
   question: string
   model: string
@@ -174,6 +174,7 @@ export default function AISuggest({ description, notes, engine, canConfigure, on
                   ? <>Based on {sug.hours.based_on.length} similar finished task{sug.hours.based_on.length === 1 ? '' : 's'}: {sug.hours.based_on.map(b => `${b.description}${b.actual_hours != null ? ` (${b.actual_hours}h)` : ''}`).join(', ')}</>
                   : 'No similar finished tasks yet, so this is a rough guess.'}
               </p>
+              {sug.hours.note && <p className="text-[11px] leading-snug mt-1 flex items-start gap-1" style={{ color: 'var(--tm-amber)' }}><span className="shrink-0 mt-[1px]"><Icon name="clock" size={11} /></span>{sug.hours.note}</p>}
             </div>
             {actions('hours', acceptHours)}
           </div>
