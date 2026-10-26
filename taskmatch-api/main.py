@@ -190,6 +190,30 @@ class GithubCommitBody(BaseModel):
     project_id: str | None = Field(default=None, max_length=100)
 
 
+# Jira import — mirrors the GitHub shape. site is the Atlassian host (yourco.atlassian.net),
+# auth is the Jira account email + an API token (https://id.atlassian.com/manage/api-tokens),
+# and jql narrows which issues to fetch (defaults to open issues in the project).
+class JiraPreviewBody(BaseModel):
+    site: str = Field(..., min_length=3, max_length=200)      # e.g. yourco.atlassian.net
+    email: str = Field(..., min_length=3, max_length=200)     # Jira account email
+    token: str = Field(..., min_length=1, max_length=400)     # Jira API token
+    project: str | None = Field(default=None, max_length=50)  # project key, e.g. TM
+    jql: str | None = Field(default=None, max_length=500)      # optional custom JQL, overrides project/state
+    state: str = Field(default="open", pattern="^(open|closed|all)$")
+
+class JiraIssue(BaseModel):
+    key: str = Field(..., min_length=1, max_length=50)         # e.g. TM-42
+    title: str = Field(..., min_length=1, max_length=500)
+    body: str | None = Field(default=None, max_length=10000)
+    url: str = Field(..., max_length=500)
+    priority: str | None = Field(default=None, max_length=50)  # Jira priority name, mapped to severity
+
+class JiraCommitBody(BaseModel):
+    site: str = Field(..., min_length=3, max_length=200)
+    issues: list[JiraIssue] = Field(..., min_length=1, max_length=100)
+    project_id: str | None = Field(default=None, max_length=100)
+
+
 # ─── Global error handling — no raw stack-trace 500s leak to clients ───
 
 @app.exception_handler(Exception)
@@ -245,7 +269,7 @@ _workspace = ContextVar("workspace", default=None)   # (workspace_id, role, user
 
 WORKSPACE_TABLES = {"students", "tasks", "assignments", "skills", "student_skills", "task_skills",
                     "groups", "task_comments", "activity_logs", "projects",
-                    "notifications", "approvals"}
+                    "notifications", "approvals", "matcher_weights"}
 
 
 class ScopedTable:
@@ -607,6 +631,7 @@ def rank_people(required, description=""):
     skill_names = skill_name_map()
     task_words = suggest_history.words(description) if description else None
     total_required = len(required)
+    active_weights = load_active_weights()   # workspace's applied weights, or the default
 
     candidates = []
     for student in students:
@@ -633,7 +658,7 @@ def rank_people(required, description=""):
         avg_score = matching.avg_score(p)
         band = score_band(avg_score, len(p["scores"]))
         unrated = band == "unrated"
-        fit_score, factors = matching.fit(p, required, skill_names, task_words, WIP_LIMIT)
+        fit_score, factors = matching.fit(p, required, skill_names, task_words, WIP_LIMIT, weights=active_weights)
         mentor = None
         if missing:
             m = matching.mentor_for(missing[0], profiles, exclude={student_id})
@@ -2032,6 +2057,157 @@ def github_commit(body: GithubCommitBody, authorization: str = Header(None)):
     return {"success": True, "created": created, "skipped": skipped}
 
 
+# ─── Jira import (Level 3) — same shape as GitHub: preview, pick, commit, dedupe ───
+
+_JIRA_PRIORITY_TO_SEVERITY = {
+    "highest": "Critical", "blocker": "Critical",
+    "high": "High", "major": "High",
+    "medium": "Medium", "normal": "Medium",
+    "low": "Low", "minor": "Low", "lowest": "Low", "trivial": "Low",
+}
+
+def _severity_from_priority(priority):
+    return _JIRA_PRIORITY_TO_SEVERITY.get(str(priority or "").strip().lower(), "Medium")
+
+
+def _jira_status_jql(state):
+    if state == "open":
+        return "statusCategory != Done"
+    if state == "closed":
+        return "statusCategory = Done"
+    return ""   # all
+
+
+@app.post("/import/jira/preview")
+def jira_preview(body: JiraPreviewBody, authorization: str = Header(None)):
+    """Fetch Jira issues for review before import. Leader-only (tasks.manage). Auth is the Jira
+    account email + an API token (Basic auth, Atlassian Cloud). Returns issues not already
+    imported into this workspace."""
+    require_permission(authorization, "tasks.manage")
+    import base64
+    import httpx
+
+    # Build JQL: explicit jql wins; otherwise project + open/closed/all, newest first.
+    if body.jql:
+        jql = body.jql
+    else:
+        parts = []
+        if body.project:
+            parts.append(f'project = "{body.project}"')
+        status = _jira_status_jql(body.state)
+        if status:
+            parts.append(status)
+        jql = " AND ".join(parts) + (" ORDER BY created DESC" if parts else "ORDER BY created DESC")
+
+    site = body.site.replace("https://", "").replace("http://", "").strip("/")
+    url = f"https://{site}/rest/api/3/search"
+    auth = base64.b64encode(f"{body.email}:{body.token}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth}", "Accept": "application/json", "User-Agent": "taskmatch"}
+    params = {"jql": jql, "maxResults": 100, "fields": "summary,description,priority,status"}
+
+    try:
+        r = httpx.get(url, params=params, headers=headers, timeout=20.0)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Couldn't reach Jira. Check the site address and try again.")
+    if r.status_code in (401, 403):
+        raise HTTPException(status_code=401, detail="Jira rejected the login. Check the email and API token.")
+    if r.status_code == 400:
+        raise HTTPException(status_code=400, detail="Jira rejected the query. Check the project key or JQL.")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Jira returned {r.status_code}.")
+
+    data = r.json()
+    try:
+        existing = {t.get("external_ref") for t in (db().table("tasks").select("external_ref").execute().data or []) if t.get("external_ref")}
+    except Exception:
+        existing = set()
+
+    issues = []
+    for it in data.get("issues", []):
+        key = it.get("key")
+        issue_url = f"https://{site}/browse/{key}"
+        if issue_url in existing:
+            continue
+        fields = it.get("fields") or {}
+        priority = (fields.get("priority") or {}).get("name") if fields.get("priority") else None
+        issues.append({
+            "key": key,
+            "title": (fields.get("summary") or key)[:500],
+            "body": _jira_text(fields.get("description"))[:10000],
+            "url": issue_url,
+            "priority": priority,
+            "suggested_severity": _severity_from_priority(priority),
+        })
+    return {"issues": issues, "count": len(issues), "already_imported": len(existing)}
+
+
+def _jira_text(desc):
+    """Jira Cloud returns description as Atlassian Document Format (nested JSON) or None.
+    Pull the plain text out of it; tolerate a plain string too."""
+    if not desc:
+        return ""
+    if isinstance(desc, str):
+        return desc
+    out = []
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("type") == "text" and node.get("text"):
+                out.append(node["text"])
+            for child in node.get("content", []) or []:
+                walk(child)
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+    walk(desc)
+    return " ".join(out)
+
+
+@app.post("/import/jira/commit")
+def jira_commit(body: JiraCommitBody, authorization: str = Header(None)):
+    """Create tasks from the chosen Jira issues. Leader-only. Each task stores the issue URL
+    (external_ref) so it is only ever imported once. Returns how many were created vs skipped."""
+    require_permission(authorization, "tasks.manage")
+    actor_email, actor_role = actor_from_token(authorization)
+
+    try:
+        existing = {t.get("external_ref") for t in (db().table("tasks").select("external_ref").execute().data or []) if t.get("external_ref")}
+    except Exception:
+        existing = set()
+
+    created, skipped = 0, 0
+    for iss in body.issues:
+        if iss.url in existing:
+            skipped += 1
+            continue
+        row = {
+            "description": iss.title,
+            "severity": _severity_from_priority(iss.priority),
+            "status": "New",
+        }
+        if body.project_id:
+            row["project_id"] = body.project_id
+        row["external_source"] = "jira"
+        row["external_ref"] = iss.url
+        try:
+            db().table("tasks").insert(row).execute()
+            created += 1
+        except Exception:
+            row.pop("external_source", None); row.pop("external_ref", None)
+            try:
+                db().table("tasks").insert(row).execute()
+                created += 1
+            except Exception:
+                skipped += 1
+
+    log_activity(
+        action="task.imported_jira", entity_type="task",
+        summary=f"Imported {created} task(s) from Jira ({skipped} skipped)",
+        actor_email=actor_email, actor_role=actor_role,
+        details={"created": created, "skipped": skipped},
+    )
+    return {"success": True, "created": created, "skipped": skipped}
+
+
 
 # ─── Matcher calibration (Level 3 — outcome feedback loop) ───
 
@@ -2051,3 +2227,106 @@ def matcher_calibration(authorization: str = Header(None)):
         .execute()
     ).data or []
     return matching.calibration(assignments, skill_names)
+
+
+# ─── Matcher auto-tune (Level 3) ───
+# calibration() says how well the matcher predicts; auto-tune proposes re-balanced weights from
+# how well each of the four factors tracked real outcomes. It is OFF by default: no saved row
+# means the default WEIGHTS are used, and a leader must explicitly apply a suggestion. The applied
+# weights live per workspace in matcher_weights, so one team tuning its matcher never changes
+# another's. Nothing is ever re-ranked silently.
+
+def load_active_weights():
+    """The workspace's applied matcher weights, or the default when none are saved / the table
+    isn't there yet. Never raises — matching must always work."""
+    try:
+        rows = db().table("matcher_weights").select("weights").limit(1).execute().data or []
+    except Exception:
+        return dict(matching.WEIGHTS)
+    if rows and isinstance(rows[0].get("weights"), dict):
+        w = rows[0]["weights"]
+        if set(w) == set(matching.WEIGHTS):
+            try:
+                return {k: int(w[k]) for k in matching.WEIGHTS}
+            except (TypeError, ValueError):
+                pass
+    return dict(matching.WEIGHTS)
+
+
+def _factor_pairs_for_tuning():
+    """For every completed, scored assignment, recompute the four fit factors for that person on
+    that task and pair each (0..1 factor value) with the real score. Feeds suggest_weights()."""
+    students, student_skills, assignments = load_people()
+    profiles = matching.build_profiles(students, student_skills, assignments)
+    skill_names = skill_name_map()
+    pairs = {k: [] for k in matching.WEIGHTS}
+    for a in assignments:
+        if a.get("status") != "Completed" or a.get("score") is None:
+            continue
+        p = profiles.get(a.get("student_id"))
+        task = a.get("tasks") or {}
+        tss = task.get("task_skills") or []
+        if not p or not tss:
+            continue
+        required = {ts["skill_id"]: ts.get("min_proficiency") or 1 for ts in tss}
+        words = suggest_history.words(task.get("description") or "") if task.get("description") else None
+        _, factors = matching.fit(p, required, skill_names, words, WIP_LIMIT)
+        score = a["score"]
+        for f in factors:
+            if f["max"]:
+                pairs[f["key"]].append((f["points"] / f["max"], score))
+    return pairs
+
+
+@app.get("/matcher/weights")
+def matcher_weights_get(authorization: str = Header(None)):
+    """Current active weights, the default, and a proposed re-balance from outcomes. Leader-only.
+    Reading never changes anything — applying is a separate explicit POST."""
+    require_permission(authorization, "insights.view")
+    active = load_active_weights()
+    suggestion = matching.suggest_weights(_factor_pairs_for_tuning(), base=active)
+    return {
+        "active": active,
+        "default": dict(matching.WEIGHTS) if active != matching.WEIGHTS else active,
+        "is_default": active == matching.WEIGHTS,
+        "labels": matching.LABELS,
+        "suggestion": suggestion,
+    }
+
+
+class MatcherWeightsBody(BaseModel):
+    weights: dict = Field(..., description="e.g. {skills:45, experience:20, availability:20, record:15}")
+
+
+@app.post("/matcher/weights")
+def matcher_weights_set(body: MatcherWeightsBody, authorization: str = Header(None)):
+    """Apply weights for this workspace (leader-only). Validates keys/total, then upserts the row.
+    Pass the default weights to reset. This is the only thing that changes how the matcher ranks."""
+    require_permission(authorization, "tasks.manage")
+    actor_email, actor_role = actor_from_token(authorization)
+    # Validate against the matcher's rules (keys present, non-negative, same total) before saving.
+    try:
+        clean = {k: int(body.weights[k]) for k in matching.WEIGHTS}
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="weights must have: " + ", ".join(matching.WEIGHTS))
+    if any(v < 0 for v in clean.values()):
+        raise HTTPException(status_code=422, detail="weights cannot be negative")
+    if sum(clean.values()) != sum(matching.WEIGHTS.values()):
+        raise HTTPException(status_code=422, detail=f"weights must sum to {sum(matching.WEIGHTS.values())}")
+
+    ws = current_workspace()
+    try:
+        existing = db().table("matcher_weights").select("id").limit(1).execute().data or []
+        if existing:
+            db().table("matcher_weights").update({"weights": clean}).eq("id", existing[0]["id"]).execute()
+        else:
+            db().table("matcher_weights").insert({"weights": clean}).execute()
+    except Exception:
+        raise HTTPException(status_code=409, detail="Couldn't save weights — run supabase/matcher_weights.sql first.")
+
+    log_activity(
+        action="matcher.weights_applied", entity_type="matcher",
+        summary=f"Applied matcher weights {clean}",
+        actor_email=actor_email, actor_role=actor_role, details=clean,
+    )
+    return {"success": True, "active": clean, "is_default": clean == matching.WEIGHTS}

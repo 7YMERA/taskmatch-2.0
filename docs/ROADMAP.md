@@ -27,7 +27,7 @@ Same features. Real engineering. This is the current focus.
 | 9 | API README + setup guide | a marker/dev can run it | ✅ done |
 | 10 | Structured logging + `/health` detail | see what the server is doing | ✅ done (`/health` reports version, uptime, service-role state, `?deep=1` DB probe) |
 
-**Left in Level 1:** storage policies for the `avatars` bucket.
+**Left in Level 1:** ~~storage policies for the `avatars` bucket.~~ Done — `supabase/storage_avatars.sql` (public read, authenticated writes). Run it once in the SQL Editor.
 
 ### UI refresh (runs alongside Level 1)
 
@@ -85,8 +85,8 @@ Biggest scope. "Startup", not "FYP".
 | Task | Why |
 |---|---|
 | Multi-team / multi-org | beyond one UTP class (✅ workspaces, Phase 3b) |
-| Integrations (GitHub Issues, Jira) | ✅ GitHub Issues import (preview → pick → import, dedup by issue URL); Jira still todo |
-| Outcome feedback loop retrains the matcher | ✅ matcher calibration report (predicted skill level vs real completion score, per skill + overall, with a verdict); auto-retrain of weights still todo |
+| Integrations (GitHub Issues, Jira) | ✅ done — GitHub **and** Jira import (preview → pick → import, dedup by issue URL/key). [PHASE-LEVEL3.md](PHASE-LEVEL3.md) |
+| Outcome feedback loop retrains the matcher | ✅ done — calibration report (predicted skill level vs real completion score, per skill + overall) **plus** auto-tune: it proposes re-balanced fit weights from how well each factor predicted outcomes; a leader applies them (off by default, never silent). [PHASE-LEVEL3.md](PHASE-LEVEL3.md) |
 
 ---
 
@@ -94,7 +94,7 @@ Biggest scope. "Startup", not "FYP".
 
 - ~~Old repo history still contains the public *publishable* Supabase key.~~ Done: the
   key was rotated in Supabase and RLS is on for every table.
-- The `avatars` storage bucket has no storage policies yet (RLS covers tables only).
+- ~~The `avatars` storage bucket has no storage policies yet (RLS covers tables only).~~ Done: `supabase/storage_avatars.sql` (public read, authenticated insert/update/delete on the bucket).
 - "Complete" still uses the browser's `prompt()` box for hours; replace it with a
   themed dialog.
 - `role.ts` UI role-toggle is a testing aid; the server now ignores it (correct),
