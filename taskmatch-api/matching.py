@@ -408,9 +408,10 @@ def suggest_weights(factor_pairs, base=None):
             "note": "Weights proposed from how well each factor predicted real outcomes. Review before applying."}
 
 
-def set_weights(new):
-    """Replace the live WEIGHTS in place (keeps the same dict object fit() reads). Validates the
-    keys and that the total is unchanged, so a bad payload can't corrupt scoring."""
+def validate_weights(new):
+    """Check a proposed set of weights and return a clean copy. Raises ValueError on wrong keys,
+    negative values or a changed total. Never touches the global WEIGHTS: the defaults are shared by
+    every workspace on the server, so a workspace's own weights are passed to fit() instead."""
     if set(new) != set(WEIGHTS):
         raise ValueError("weights must have exactly the keys: " + ", ".join(WEIGHTS))
     vals = {k: int(new[k]) for k in WEIGHTS}
@@ -418,5 +419,4 @@ def set_weights(new):
         raise ValueError("weights cannot be negative")
     if sum(vals.values()) != sum(WEIGHTS.values()):
         raise ValueError(f"weights must sum to {sum(WEIGHTS.values())}")
-    WEIGHTS.update(vals)
-    return dict(WEIGHTS)
+    return vals

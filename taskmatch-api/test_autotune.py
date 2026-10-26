@@ -40,34 +40,27 @@ def test_predictive_factor_gains_weight():
     assert r["suggested"]["skills"] >= matching.WEIGHTS["skills"] - 2   # retained or grown
 
 
-def test_set_weights_validates():
-    original = dict(matching.WEIGHTS)
+def test_validate_weights_checks_input():
+    # wrong total
     try:
-        # wrong total
-        try:
-            matching.set_weights({"skills": 10, "experience": 10, "availability": 10, "record": 10})
-            assert False, "should reject a total != 100"
-        except ValueError:
-            pass
-        # missing a key
-        try:
-            matching.set_weights({"skills": 100})
-            assert False, "should reject missing keys"
-        except ValueError:
-            pass
-        # valid
-        applied = matching.set_weights({"skills": 40, "experience": 25, "availability": 20, "record": 15})
-        assert applied["skills"] == 40 and sum(applied.values()) == 100
-    finally:
-        matching.set_weights(original)   # restore the global for other tests
+        matching.validate_weights({"skills": 10, "experience": 10, "availability": 10, "record": 10})
+        assert False, "should reject a total != 100"
+    except ValueError:
+        pass
+    # missing a key
+    try:
+        matching.validate_weights({"skills": 100})
+        assert False, "should reject missing keys"
+    except ValueError:
+        pass
+    # valid
+    clean = matching.validate_weights({"skills": 40, "experience": 25, "availability": 20, "record": 15})
+    assert clean["skills"] == 40 and sum(clean.values()) == 100
 
 
-def test_set_weights_updates_in_place_object():
-    before = matching.WEIGHTS   # same dict object fit() reads
+def test_validate_weights_leaves_shared_defaults_alone():
+    # The defaults are shared by every workspace on the server, so validating (or applying) one
+    # workspace's weights must never change them.
     original = dict(matching.WEIGHTS)
-    try:
-        matching.set_weights({"skills": 30, "experience": 30, "availability": 20, "record": 20})
-        assert matching.WEIGHTS is before   # object identity preserved (fit sees the change)
-        assert matching.WEIGHTS["skills"] == 30
-    finally:
-        matching.set_weights(original)
+    matching.validate_weights({"skills": 30, "experience": 30, "availability": 20, "record": 20})
+    assert matching.WEIGHTS == original

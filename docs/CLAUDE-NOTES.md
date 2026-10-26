@@ -73,37 +73,26 @@ on Supabase: `rls.sql` → `roles.sql` → `workspaces.sql` → (optional) demo 
 
 ## Review of Kiro's work since #18 (written 2026-10-26)
 Read through PRs #19–#24 (on `main`) and the `level-3-integrations` branch. Overall the work is solid,
-well documented and consistent with the existing patterns. Things to know:
+well documented and consistent with the existing patterns. What I found, and what PR #27 did about it:
 
-1. **Level 3 is not on `main`.** PR #25 (GitHub import + calibration) and #26 (Jira + auto-tune) are
-   **closed without being merged** into `main`; the work sits on branch `level-3-integrations`. Reopen
-   #25 or open a new PR from that branch if it should ship. Its SQL (`integrations.sql`,
-   `matcher_weights.sql`, `storage_avatars.sql`) has to be run as well.
-2. **KIRO-NOTES on `main` contains the demo admin login (email + password) and the Supabase publishable
-   key, in a public repo.** The publishable key is designed to be public, so that part is fine. The demo
-   account is an **admin**, so anyone reading the repo can sign in and change or delete the demo data.
-   Suggest: remove the password from the notes and change it, or make the demo account a viewer.
-3. **Any member can list every pending approval.** `GET /approvals` uses the service-role client, so the
-   RLS rule mentioned in its comment does not apply; members see all pending requests in the workspace,
-   not only their own. Low risk, but the comment is misleading. Fix: filter by `requested_by` unless
-   the caller can `assign.others`.
-4. **`/approvals/request` takes a free-form `payload`.** A member could file a `self_assign_critical`
-   request naming a different student or task; if a leader approves without reading closely, that
-   assignment runs. Fix: build the payload on the server (as `/self-assign` already does) and reject
-   client-supplied payloads for that kind.
-5. **Approving is check-then-update, not atomic.** Two leaders approving at the same moment could both
-   run the assignment. Fix: update with `.eq("status", "pending")` and only run the action if a row changed.
-6. **Jira `site` is any host** (on the Level 3 branch). The server will call whatever host a leader types.
-   Suggest limiting it to `*.atlassian.net` to avoid the API being used to probe other hosts.
-7. **`matching.set_weights()` mutates the global default weights** (Level 3 branch). It isn't called by
-   the API today (per-workspace weights are loaded from the table instead), but if anyone calls it, it
-   would change scoring for every workspace on the server. Suggest deleting it or making it return a copy.
-8. **Seeded test rows**: Kiro added 3 notifications + 1 approval to the demo workspace for screenshots.
-   Delete them once the screenshots exist.
+| # | Finding | Status |
+|---|---|---|
+| 1 | **Level 3 was never merged.** PRs #25 and #26 were closed without merging into `main`, so GitHub/Jira import and matcher calibration/auto-tune weren't live. | **Fixed in #27**: `level-3-integrations` merged in. Its SQL still has to be run: `integrations.sql`, `matcher_weights.sql`, `storage_avatars.sql`. |
+| 2 | **KIRO-NOTES had the demo admin login and the publishable key, in a public repo.** Anyone could sign in as admin on the live site. | **Removed from the file in #27.** It is still in git history, so the owner must **change the demo password** in Supabase (Authentication → Users). |
+| 3 | **Any member could list every pending approval.** `GET /approvals` reads with the service-role key, so RLS didn't filter it. | **Fixed**: members only get their own requests; leaders get all. |
+| 4 | **`/approvals/request` took a client-built payload** for `self_assign_critical`, so a member could name another person or task and have it run on approval. | **Fixed**: that kind is only created by `/self-assign`, which builds the payload on the server. |
+| 5 | **Approving was check-then-update**, so two leaders at once could both run the action. | **Fixed**: the update only matches a row still `pending`; the loser gets 409. |
+| 6 | **Jira `site` accepted any host**, so the API could be pointed at internal addresses with the user's token. | **Fixed**: only `*.atlassian.net` (`_jira_host()`). |
+| 7 | **`matching.set_weights()` changed the shared default weights** for every workspace on the server. | **Fixed**: replaced by `validate_weights()`, which returns a copy and is what `POST /matcher/weights` now uses. |
+| 8 | **Seeded test rows**: 3 notifications + 1 approval in the demo workspace, for screenshots. | Open: delete once the screenshots exist. |
+| 9 | **Vercel previews still built for `claude/*` branches**: `"*"` doesn't match a `/`, so the filter from #20 missed them. | **Fixed**: added `"**": false` to `vercel.json`. |
+| – | KIRO-NOTES deferred item 2 (replace the `prompt()` Complete box) | Already done: there is no `prompt()` left in `taskmatch/app`; #8 added the themed dialog. |
+
+Tests for 3–7 are in `taskmatch-api/test_approvals.py` and `test_autotune.py` (185 backend tests pass).
 
 ## Suggestions / what's next
 In rough order of value:
-1. Decide on the Level 3 branch (merge or park), then fix review items 2–5 above in one small PR.
+1. Run the Level 3 SQL, change the demo password, and delete the seeded test rows (review items 1, 2, 8).
 2. Take the deferred media work from KIRO-NOTES (bell + approvals "new feature" shots, and the full
    v1 → v2 visual changelog in `docs/CHANGELOG-VISUAL.md`). Claude's mock harness can do this without
    touching the live database.
