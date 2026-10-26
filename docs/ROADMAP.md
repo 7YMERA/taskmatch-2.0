@@ -58,7 +58,7 @@ ships as its own pull request with before/after screenshots.
 | 2 | Roles and permissions, audit trail, user management, "away" status | ✅ done ([PHASE2-ROLES-AUDIT.md](PHASE2-ROLES-AUDIT.md)) |
 | 3 | AI assist: suggested skills, hours and severity for new tasks, each with a confidence level, confirmed by a person | ✅ done ([PHASE3-AI-ASSIST.md](PHASE3-AI-ASSIST.md)) |
 | 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ✅ done ([PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md)) |
-| 3d | People page and smarter matching: explainable fit score, proven skills, team insights (gaps, single points of failure, mentors, hours), Find a match, "Who could take this?" in New task, smarter free suggestions | ◐ in review ([PEOPLE-MATCHING.md](PEOPLE-MATCHING.md)) |
+| 3d | People page and smarter matching: explainable fit score, proven skills, team insights (gaps, single points of failure, mentors, hours), Find a match, "Who could take this?" in New task, smarter free suggestions | ✅ done ([PEOPLE-MATCHING.md](PEOPLE-MATCHING.md)) |
 | 3c | Notification centre, approvals | ✅ done ([PHASE3C-NOTIFICATIONS.md](PHASE3C-NOTIFICATIONS.md)) |
 | 4 | Search, Ctrl+K, exports, settings, onboarding | ✅ done (Ctrl+K palette, /settings, CSV exports, Getting Started checklist) |
 
