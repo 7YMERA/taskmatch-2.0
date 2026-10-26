@@ -156,6 +156,21 @@ class SuggestTaskBody(BaseModel):
     description: str = Field(..., min_length=3, max_length=500)
     notes: str = Field(default="", max_length=2000)
 
+class MarkReadBody(BaseModel):
+    # One id, or omit to mark every unread notification read.
+    notification_id: str | None = Field(default=None, min_length=1)
+
+class RequestApprovalBody(BaseModel):
+    kind: str = Field(..., pattern="^(self_assign_critical|reassign|other)$")
+    target_id: str | None = Field(default=None, max_length=200)
+    payload: dict | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+class DecideApprovalBody(BaseModel):
+    approval_id: str = Field(..., min_length=1)
+    decision: str = Field(..., pattern="^(approved|rejected)$")
+    note: str | None = Field(default=None, max_length=500)
+
 
 # ─── Global error handling — no raw stack-trace 500s leak to clients ───
 
@@ -465,6 +480,53 @@ def log_activity(action, entity_type, entity_id=None, summary=None,
             "actor_role": actor_role,
             "details": details,
         }).execute()
+    except Exception:
+        pass
+
+
+# ─── Notifications (Phase 3c) ───
+# Best-effort, exactly like log_activity: a failed notify must never block the real action.
+# Rows are written with the workspace-scoped service-role client, so RLS is satisfied by the
+# workspace_id default; the recipient only ever reads their own via the notifications_read policy.
+
+def _user_id_for_student(student_id):
+    """The auth user_id behind a student row, via their email -> workspace_members.
+    None when the student has no linked account (e.g. added by a leader, never signed in)."""
+    try:
+        srow = db().table("students").select("email").eq("id", student_id).execute().data
+        email = srow[0].get("email") if srow else None
+        if not email:
+            return None
+        ws, _role, _cid = _workspace.get() or (None, None, None)
+        m = (raw_db().table("workspace_members").select("user_id")
+             .eq("workspace_id", ws).eq("email", email).execute()).data
+        return m[0]["user_id"] if m else None
+    except Exception:
+        return None
+
+
+def notify(user_id, type, title, body=None, link=None):
+    """Write one notification for one recipient. No-op on a missing user_id."""
+    if not user_id:
+        return
+    try:
+        db().table("notifications").insert({
+            "user_id": user_id, "type": type,
+            "title": title, "body": body, "link": link,
+        }).execute()
+    except Exception:
+        pass
+
+
+def notify_leaders(type, title, body=None, link=None, exclude_user_id=None):
+    """Notify everyone in the current workspace who can manage tasks (admins + leads)."""
+    try:
+        ws, _role, _cid = _workspace.get() or (None, None, None)
+        leaders = (raw_db().table("workspace_members").select("user_id, role")
+                   .eq("workspace_id", ws).in_("role", ["admin", "lead"]).execute()).data or []
+        for m in leaders:
+            if m["user_id"] != exclude_user_id:
+                notify(m["user_id"], type, title, body, link)
     except Exception:
         pass
 
@@ -838,6 +900,11 @@ def _create_assignment(task_id, student_id, actor_email, actor_role, self_assign
         actor_email=actor_email, actor_role=actor_role,
         details={"task_id": task_id, "student_id": student_id, "self_assigned": self_assigned},
     )
+    # Tell the assignee a leader put them on this task (self-assign needs no notice — they did it).
+    if not self_assigned:
+        notify(_user_id_for_student(student_id), "task_assigned",
+               title=f"You were assigned to '{task_desc}'",
+               body=f"Assigned by {actor_email}.", link=f"/tasks/{task_id}")
     return {"success": True, "assignment": result}
 
 
@@ -864,7 +931,34 @@ def self_assign(body: SelfAssignBody, authorization: str = Header(None)):
     if not srows:
         raise HTTPException(status_code=400,
                             detail="No student record is linked to your account. Ask your leader to add you on the Students page.")
-    return _create_assignment(task_id, srows[0]["id"], actor_email=user.email, actor_role=role, self_assigned=True)
+    student_id = srows[0]["id"]
+
+    # Approval gate: a plain member taking a Critical task needs a leader's yes first.
+    # Leaders/admins (assign.others) bypass this — they can already assign anyone.
+    if role == "member":
+        tprio = db().table("tasks").select("priority, description").eq("id", task_id).execute().data
+        if tprio and (tprio[0].get("priority") or "").lower() == "critical":
+            existing = (db().table("approvals")
+                        .select("id").eq("kind", "self_assign_critical")
+                        .eq("target_id", str(task_id)).eq("requested_by", user.id)
+                        .eq("status", "pending").execute()).data
+            if existing:
+                raise HTTPException(status_code=409,
+                                    detail="You already have a pending request to take this task.")
+            db().table("approvals").insert({
+                "requested_by": user.id, "kind": "self_assign_critical",
+                "target_id": str(task_id),
+                "payload": {"task_id": task_id, "student_id": student_id},
+                "note": f"Wants to take the critical task '{tprio[0].get('description', task_id)}'",
+            }).execute()
+            notify_leaders("approval_requested",
+                           title="A member wants a critical task",
+                           body=f"{srows[0]['name']} requested '{tprio[0].get('description', task_id)}'.",
+                           link="/approvals", exclude_user_id=user.id)
+            return {"success": True, "pending_approval": True,
+                    "message": "This is a critical task — your leader has been asked to approve it."}
+
+    return _create_assignment(task_id, student_id, actor_email=user.email, actor_role=role, self_assigned=True)
 
 
 @app.post("/start")
@@ -1060,6 +1154,14 @@ def complete(body: CompleteBody, authorization: str = Header(None)):
                  "committed_hours": committed, "score": score,
                  "task_completed": bool(all_done), "late": late, "due_date": due_date},
     )
+
+    # When the whole task is done, let the leaders know (they may want to review / close it).
+    if all_done:
+        notify_leaders("task_completed",
+                       title=f"Task completed: '{task_desc}'",
+                       body=(f"Finished by {student_name}" + (" (late)" if late else "") + "."),
+                       link=f"/tasks/{task_id}",
+                       exclude_user_id=_user_id_for_student(assignment["student_id"]))
 
     return {"success": True, "score": score, "elapsed_hours": round(elapsed_hours, 2),
             "committed_hours": committed, "late": late, "task_completed": bool(all_done)}
@@ -1687,3 +1789,108 @@ def ai_suggest_task(body: SuggestTaskBody, authorization: str = Header(None)):
     except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
         logger.warning("ai: request failed: %s", type(e).__name__)
         raise HTTPException(status_code=502, detail="The AI service didn't respond. Try again.")
+
+
+# ─── Notifications (Phase 3c) ───
+
+@app.get("/notifications")
+def list_notifications(authorization: str = Header(None)):
+    """The caller's own notifications, newest first, with an unread count."""
+    user = require_user(authorization)
+    rows = (db().table("notifications")
+            .select("id, type, title, body, link, read_at, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", desc=True)
+            .limit(50).execute()).data or []
+    unread = sum(1 for r in rows if not r.get("read_at"))
+    return {"notifications": rows, "unread": unread}
+
+
+@app.post("/notifications/read")
+def mark_notifications_read(body: MarkReadBody, authorization: str = Header(None)):
+    """Mark one notification read, or all of them when no id is given."""
+    user = require_user(authorization)
+    q = db().table("notifications").update({"read_at": now_iso()}).eq("user_id", user.id)
+    if body.notification_id:
+        q = q.eq("id", body.notification_id)
+    else:
+        q = q.is_("read_at", "null")
+    q.execute()
+    return {"success": True}
+
+
+# ─── Approvals (Phase 3c) ───
+
+@app.get("/approvals")
+def list_approvals(status: str = "pending", authorization: str = Header(None)):
+    """Pending approval requests for leaders to decide; a requester also sees their own.
+    RLS enforces the same rule, so this read is safe for any signed-in member."""
+    require_user(authorization)
+    rows = (db().table("approvals")
+            .select("id, requested_by, kind, target_id, payload, status, note, "
+                    "decided_by, decided_at, created_at")
+            .eq("status", status)
+            .order("created_at", desc=True)
+            .limit(100).execute()).data or []
+    return {"approvals": rows}
+
+
+@app.post("/approvals/request")
+def request_approval(body: RequestApprovalBody, authorization: str = Header(None)):
+    """A member asks a leader to approve an action. The request is recorded pending and
+    the workspace's leaders are notified. The actual action runs only on approval."""
+    user = require_user(authorization)
+    row = (db().table("approvals").insert({
+        "requested_by": user.id, "kind": body.kind,
+        "target_id": body.target_id, "payload": body.payload,
+        "note": body.note, "status": "pending",
+    }).execute()).data
+    notify_leaders("approval_requested",
+                   title="A request needs your approval",
+                   body=(body.note or body.kind.replace("_", " ")),
+                   link="/approvals", exclude_user_id=user.id)
+    return {"success": True, "approval": row[0] if row else None}
+
+
+@app.post("/approvals/decide")
+def decide_approval(body: DecideApprovalBody, authorization: str = Header(None)):
+    """A leader approves or rejects a pending request. On approval the stored action runs;
+    either way the requester is notified. Leader-only (assign.others), checked like /assign."""
+    require_permission(authorization, "assign.others")
+    actor_email, actor_role = actor_from_token(authorization)
+
+    rows = (db().table("approvals").select(
+        "id, requested_by, kind, target_id, payload, status").eq("id", body.approval_id).execute()).data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    appr = rows[0]
+    if appr["status"] != "pending":
+        raise HTTPException(status_code=409, detail="This request was already decided.")
+
+    db().table("approvals").update({
+        "status": body.decision, "decided_by": actor_email,
+        "decided_at": now_iso(), "note": body.note or appr.get("note"),
+    }).eq("id", body.approval_id).execute()
+
+    # On approval, run the action the request was holding.
+    ran = None
+    if body.decision == "approved" and appr["kind"] == "self_assign_critical":
+        p = appr.get("payload") or {}
+        if p.get("task_id") and p.get("student_id"):
+            ran = _create_assignment(p["task_id"], p["student_id"],
+                                     actor_email=actor_email, actor_role=actor_role,
+                                     self_assigned=True)
+
+    notify(appr["requested_by"],
+           "approval_approved" if body.decision == "approved" else "approval_rejected",
+           title=f"Your request was {body.decision}",
+           body=(body.note or None),
+           link=(f"/tasks/{appr.get('target_id')}" if appr.get("target_id") else "/my-tasks"))
+
+    log_activity(
+        action=f"approval.{body.decision}", entity_type="approval", entity_id=body.approval_id,
+        summary=f"{actor_email} {body.decision} a {appr['kind']} request",
+        actor_email=actor_email, actor_role=actor_role,
+        details={"kind": appr["kind"], "target_id": appr.get("target_id"), "ran": bool(ran)},
+    )
+    return {"success": True, "status": body.decision, "action_ran": bool(ran)}
