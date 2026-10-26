@@ -82,8 +82,49 @@ Per ROADMAP Level 3, the remaining big items are: **integrations** (GitHub Issue
 - Verified live: calibration returned real numbers on the demo workspace (53 scored tasks); auto-tune on the same 53 proposed `{skills:40, experience:16, availability:16, record:28}` (record correlated best at 0.37, experience/availability near zero). Backend **172 tests pass** (`test_calibration.py` + new `test_autotune.py` + extended L3 auth-contract tests). tsc clean, lint 0 errors.
 - **For Claude:** `docs/PHASE-LEVEL3.md` now documents all of this. Remaining Level 3 ideas: other importers (Linear, Trello), scheduled re-sync of imported issues, and continuous auto-tune once there's enough data. Update the ROADMAP rows when you extend.
 
-## Challenges, limitations & friction this session (the honest list)
-Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.
+## Deferred — for Claude to pick up (I couldn't do these this session)
+These are the remaining open items from `docs/ROADMAP.md`. I suggested them but **could not do them this
+session because the host RAM was critically low** (~1.7–2.6 GB free for most of this stretch), which makes
+dev-server restarts, production builds and a full test run unreliable. None is blocked by code — they're
+ready to build on a machine with headroom. Smallest first:
+
+1. **Avatars storage-bucket policies (security gap).** The `avatars` Supabase Storage bucket has no RLS
+   policies yet — table RLS is done, but storage objects aren't locked down, so upload/read rules are
+   effectively open. Fix: add storage policies (authenticated users can upload/replace their own avatar;
+   read scoped as intended). Needs a new `supabase/storage_avatars.sql` (storage.objects policies) + a short
+   note in a doc. Light once RAM allows; it's the one real security item left.
+
+2. **Replace the "Complete" `prompt()` box with a themed dialog.** Marking a task complete still uses the
+   browser's native `prompt()` to ask for hours (see the task detail / My Tasks complete flow). Replace it
+   with the app's themed modal (there's already a confirm-dialog pattern in `app/components/ui.tsx` /
+   `app/lib/ui.ts`) so it matches the design system and validates the hours input. Frontend-only.
+
+3. **Move the Logs and Signup pages onto the design system.** Per the ROADMAP "UI refresh" table these two
+   are still `☐ todo` — they use legacy classes instead of the `globals.css` tokens + `ui.tsx` kit, so they
+   don't theme correctly in light/dark. Rebuild them with the kit like the other pages. Medium UI work.
+
+4. **Dashboard legacy-class cleanup.** The dashboard is `◐ partly` migrated — some panels still use legacy
+   classes. Finish moving them to tokens so dark/light are fully consistent. Medium UI work.
+
+5. **Per-person / per-role capacity (Level 2 leftover).** Right now capacity is a flat WIP limit plus a
+   global `CAPACITY_HOURS`; real teams differ per person. Add a per-person (and/or per-role) capacity that
+   the matcher's availability factor reads, instead of the single global constant in `matching.py`. Backend
+   + a small settings UI + tests.
+
+6. **Split `taskmatch-api/main.py` into modules.** It's one large file now (auth, matching, notifications,
+   approvals, imports, matcher-tune all in it). Refactor into modules (e.g. `routes_*`, keep `matching.py`
+   pure) as it grows. Pure refactor — do it when there's RAM to run the full suite before/after, since it
+   touches everything.
+
+7. **Frontend `any`/React-Compiler lint debt.** Tracked in the ROADMAP "Known debt": legacy `any` types and
+   strict React-Compiler rules are set to **warning** so CI blocks only real errors. Clean them up gradually
+   (type the `any`s, address the compiler hints) — not urgent, but it's why the lint count shows ~200+
+   warnings.
+
+**Why the RAM limit matters for these:** this machine competes with the dev servers + browser for memory, and
+Kiro Crew auto-pauses sub-agents and heavy steps under pressure. Claude (running server-side) doesn't hit
+this wall, so these are better done there. Anything UI-facing (2–4) wants a dev server running to verify;
+5–6 want the full backend test suite before/after.
 
 - **Host RAM is the big one.** This machine runs tight — free memory swung between ~1.5 GB and ~5 GB during the session, and the dashboard kept flagging "tight/critical". Consequences:
   - I could **not** safely fan out work to parallel sub-agents. The spawn gate sat at 1/32 under "severe pressure" for long stretches, so the lint cleanup (184 issues) and the Phase 3c build were done **sequentially by hand** instead of split across agents. Slower, but reliable. On a bigger box this would have been a parallel wave and much faster.
