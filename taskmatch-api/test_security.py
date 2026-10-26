@@ -255,3 +255,16 @@ def test_notify_write_rejects_anonymous(client, path):
 # Regression: the Phase 3c tables must be registered as workspace-scoped, or db() raises.
 def test_phase3c_tables_are_workspace_scoped():
     assert {'notifications', 'approvals'} <= main.WORKSPACE_TABLES
+
+
+# Level 3: GitHub import + matcher calibration require a login / permission.
+L3_READS = ['/matcher/calibration']
+L3_WRITES = ['/import/github/preview', '/import/github/commit']
+
+@pytest.mark.parametrize('path', L3_READS)
+def test_l3_read_rejects_anonymous(client, path):
+    assert client.get(path).status_code == 401
+
+@pytest.mark.parametrize('path', L3_WRITES)
+def test_l3_write_rejects_anonymous(client, path):
+    assert client.post(path, json={}).status_code in (401, 422)
