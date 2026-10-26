@@ -9,6 +9,7 @@ import { effectiveRole, realRole, setRoleOverride, getRoleOverride, can, roleLab
 import { ThemeToggle } from '../lib/theme'
 import { Icon, Logo, type IconName } from './ui'
 import NotificationBell from './NotificationBell'
+import CommandPalette from './CommandPalette'
 import { cachedWorkspaces, fetchWorkspaces, switchWorkspace, type WorkspaceState } from '../lib/workspace'
 
 export default function Sidebar() {
@@ -59,6 +60,7 @@ export default function Sidebar() {
     { label: 'Projects', href: '/projects', icon: 'folder' as const },
     { label: 'Tasks', href: '/tasks', icon: 'check' as const },
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
+    { label: 'Settings', href: '/settings', icon: 'edit' as const },
   ]
   const adminNav = [
     ...(can(role, 'assign.others') ? [{ label: 'Approvals', href: '/approvals', icon: 'inbox' as const }] : []),
@@ -133,6 +135,15 @@ export default function Sidebar() {
         )}
       </div>
 
+      {/* Global search launcher — the palette also opens on Ctrl/⌘+K from anywhere. */}
+      <button onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+        className="w-full flex items-center gap-2.5 px-2.5 py-2 mb-2 rounded-lg border border-line transition-colors hover:bg-surface-2 text-left"
+        aria-label="Open search (Ctrl or Command + K)">
+        <span className="text-faint shrink-0"><Icon name="search" size={15} /></span>
+        <span className="flex-1 text-[13px] text-faint">Search…</span>
+        <kbd className="text-[10px] text-faint px-1.5 py-0.5 rounded border border-line shrink-0">⌘K</kbd>
+      </button>
+
       {nav.map(navLink)}
       {adminNav.length > 0 && <p className="px-2 pt-4 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Admin</p>}
       {adminNav.map(navLink)}
@@ -173,6 +184,7 @@ export default function Sidebar() {
 
   return (
     <>
+      <CommandPalette />
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 h-14"
         style={{ background: 'var(--tm-bg-sidebar)', borderBottom: '1px solid var(--tm-border)' }}>
