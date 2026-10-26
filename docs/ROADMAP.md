@@ -60,7 +60,7 @@ ships as its own pull request with before/after screenshots.
 | 3b | Workspaces and projects (multi-org, like Jira): one workspace per team or company, projects inside it, a role per person per workspace | ✅ done ([PHASE3B-WORKSPACES.md](PHASE3B-WORKSPACES.md)) |
 | 3d | People page and smarter matching: explainable fit score, proven skills, team insights (gaps, single points of failure, mentors, hours), Find a match, "Who could take this?" in New task, smarter free suggestions | ◐ in review ([PEOPLE-MATCHING.md](PEOPLE-MATCHING.md)) |
 | 3c | Notification centre, approvals | ✅ done ([PHASE3C-NOTIFICATIONS.md](PHASE3C-NOTIFICATIONS.md)) |
-| 4 | Search, Ctrl+K, exports, settings, onboarding | ☐ todo |
+| 4 | Search, Ctrl+K, exports, settings, onboarding | ✅ done (Ctrl+K palette, /settings, CSV exports, Getting Started checklist) |
 
 ---
 
