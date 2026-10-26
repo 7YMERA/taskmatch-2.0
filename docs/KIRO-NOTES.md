@@ -126,6 +126,28 @@ Kiro Crew auto-pauses sub-agents and heavy steps under pressure. Claude (running
 this wall, so these are better done there. Anything UI-facing (2–4) wants a dev server running to verify;
 5–6 want the full backend test suite before/after.
 
+### Also deferred — from earlier this session (browser/media, not RAM)
+These were asked for earlier and I couldn't finish them — the blocker was browser/screenshot tooling on this
+machine, not code. The user prefers to hand media capture to Claude on the other device.
+
+8. **"New feature" screenshots of the notification bell + the approvals inbox (Phase 3c).** Asked for as a
+   showcase. **There is NO real "before"** — the bell and approvals are new in 3c, so frame them as
+   new-feature shots, not a before/after pair. I **seeded demo data** to make the shots look live: 3
+   notifications + 1 pending approval on the demo account's workspace (rows in `notifications` /
+   `approvals`). Capture `/dashboard` (bell lit, dropdown open) and `/approvals` (a pending card), in dark
+   and light. Blocked locally by Windows PowerShell script-execution policy on the `playwright-cli.ps1`
+   shim + tight RAM (Chromium ~400 MB on top of two dev servers). Delete the seeded rows when done.
+
+9. **Visual changelog comparing v1 → now (the user explicitly asked to compare against v1).** `docs/CHANGELOG-VISUAL.md`
+   currently has only landing/login/dashboard before/after pairs. The user wants a changelog covering **all**
+   the big features versus **v1** (the old `taskmatch-git` repo): FYP→generic rebrand, auth hardening
+   (token identity + RLS), the design-system/token UI, the marketing landing page, login redesign, dashboard
+   overhaul, workspaces/projects, roles + audit, AI assist, Phase 3c notifications/approvals, Phase 4
+   (Ctrl+K, settings, exports, onboarding), and Level 3 (GitHub/Jira import, matcher calibration + auto-tune).
+   The writing part needs no browser; the before/after **images** need the screenshot tooling above, so it
+   pairs naturally with item 8.
+
+
 - **Host RAM is the big one.** This machine runs tight — free memory swung between ~1.5 GB and ~5 GB during the session, and the dashboard kept flagging "tight/critical". Consequences:
   - I could **not** safely fan out work to parallel sub-agents. The spawn gate sat at 1/32 under "severe pressure" for long stretches, so the lint cleanup (184 issues) and the Phase 3c build were done **sequentially by hand** instead of split across agents. Slower, but reliable. On a bigger box this would have been a parallel wave and much faster.
   - Browser automation (Chromium via Playwright) is ~400 MB on top of two dev servers — risky when memory is low, and it's why screenshot attempts were deferred/aborted.
