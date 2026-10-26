@@ -32,9 +32,9 @@ The user (a product manager) develops TaskMatch 2.0 across **two assistants**: K
 **Schema**: `supabase/notifications.sql` — run once in the Supabase SQL Editor after `rls.sql`, `roles.sql`, `workspaces.sql`. **Already run** by the user on 2026-10-26. Tables confirmed live.
 
 ## Environment / deploy state
-- Supabase publishable key was rotated to `sb_publishable_zOsqCqnjuKMr9bzoRrsq6A_Zq0fbsXE`; secret + URL unchanged. Local `.env` files, Render, and Vercel all updated — live site boots clean.
+- Supabase publishable key was rotated (the value lives in the `.env` files and the Vercel/Render settings, not here); secret + URL unchanged. Local `.env` files, Render, and Vercel all updated — live site boots clean.
 - Local dev: API on `127.0.0.1:8000` (venv uvicorn, reads `taskmatch-api/.env`), frontend on `:3000`.
-- Demo login: `demo@taskmatch.app` / `taskmatch123` (role **admin/leader**).
+- Demo login: the demo admin account (credentials kept out of this public repo; ask the owner).
 
 ## Test data I seeded (clean up when done)
 For the demo account's workspace I inserted **3 notifications** + **1 pending approval** so screenshots show live content. These are real rows in Supabase — delete them from `notifications` / `approvals` when no longer needed (e.g. `delete from notifications where user_id = '<demo uid>'`).
@@ -70,8 +70,85 @@ First Phase 4 slice. Frontend-only, no schema, no new backend endpoint.
 ### What's next (Level 3 — "reframe as a product")
 Per ROADMAP Level 3, the remaining big items are: **integrations** (GitHub Issues / Jira import), and an **outcome feedback loop** that retrains the matcher from real completion scores. Both are large and partly backend/data-model work — good candidates for a fresh, well-scoped session (and for splitting across agents once the RAM situation allows).
 
-## Challenges, limitations & friction this session (the honest list)
-Written at the user's request — these are real constraints that capped what I could do, so the next agent knows why some things went the way they did.
+### Level 3 — STARTED (branch `level-3-integrations`, NOT merged)
+**1. GitHub Issues import.** `/integrations` page (leaders only; sidebar + palette). Backend in `main.py`: `POST /import/github/preview` (fetch issues from a public or token-authed repo via GitHub's REST API; filters out PRs; skips already-imported) and `POST /import/github/commit` (creates tasks; labels → best-effort severity via `_SEVERITY_FROM_LABEL`; stamps `external_source`/`external_ref`). Schema add: `supabase/integrations.sql` adds `external_source` + `external_ref` to `tasks` + a per-workspace unique index — **user must run it** for dedupe to persist; the API degrades gracefully without it (import still works, just no dedupe column).
+**1b. Jira import — DONE (same `/integrations` page, same shape).** Backend: `POST /import/jira/preview` + `POST /import/jira/commit`. Auth is a Jira account **email + API token** (Atlassian Cloud Basic auth); `site` is the host (`yourco.atlassian.net`), optional `project` key, optional raw `jql` (overrides project/state). Fetches via `GET /rest/api/3/search`; `_jira_text()` flattens Atlassian Document Format description JSON to plain text; Jira **priority** → severity via `_JIRA_PRIORITY_TO_SEVERITY` (Highest/Blocker→Critical, High/Major→High, Low/Minor/Lowest/Trivial→Low). Reuses the SAME `external_source='jira'` / `external_ref=<issue browse URL>` dedupe columns from `integrations.sql` — **no new SQL needed for Jira.** UI: a second card on `/integrations` (site, project, email, token → Preview → pick → Import).
+**2. Outcome feedback loop = matcher calibration.** `matching.calibration(assignments, skill_names)` (pure, unit-tested in `test_calibration.py`) pairs each completed task's required skill level with the score it earned, computes a Pearson correlation per skill + overall, and returns a plain verdict. Exposed at `GET /matcher/calibration` (insights.view), shown on `/integrations`.
+**2b. Matcher auto-tune — DONE (off by default, never silent).** Goes one step past calibration: proposes **re-balanced weights** from how well each of the four fit factors (skills/experience/availability/record) actually predicted real completion scores.
+- Pure logic in `matching.py`: `suggest_weights(factor_pairs, base)` (needs ≥ `MIN_TUNE_SAMPLES=8` completed+scored tasks; blends current weights 50/50 with each factor's evidence-trust, keeps the total at 100, floors every factor at `WEIGHT_FLOOR=5` so none is ever zeroed) and `validate_weights(new)` (checks keys/total and returns a clean copy; it never changes the shared default `WEIGHTS`, since those are used by every workspace on the server). `fit()` now takes an optional `weights=` arg; `rank_people()` loads the workspace's applied weights via `load_active_weights()` and passes them down.
+- Per-workspace storage: `supabase/matcher_weights.sql` — one `matcher_weights` row per workspace (JSONB), registered in `WORKSPACE_TABLES`. **No row = default weights** (`skills45/experience20/availability20/record15`). **User must run this SQL** to persist applied weights; without it the API still serves defaults + suggestions, it just can't save an applied set (POST returns a clear 409 telling them to run the SQL).
+- Endpoints: `GET /matcher/weights` (active + default + suggestion, `insights.view`) and `POST /matcher/weights` (apply; `tasks.manage`; validated, audit-logged `matcher.weights_applied`). UI: a third card on `/integrations` shows active weights, the proposed diff per factor, **Apply** / **Reset to default** buttons. **Nothing re-ranks until a leader clicks Apply.**
+- **Why off-by-default and human-applied:** auto-applying would silently re-rank everyone; a class/team's data is small, so a human reviewing the suggestion is the safe design. True continuous auto-retraining is the future extension (needs far more completed-task volume).
+- Verified live: calibration returned real numbers on the demo workspace (53 scored tasks); auto-tune on the same 53 proposed `{skills:40, experience:16, availability:16, record:28}` (record correlated best at 0.37, experience/availability near zero). Backend **172 tests pass** (`test_calibration.py` + new `test_autotune.py` + extended L3 auth-contract tests). tsc clean, lint 0 errors.
+- **For Claude:** `docs/PHASE-LEVEL3.md` now documents all of this. Remaining Level 3 ideas: other importers (Linear, Trello), scheduled re-sync of imported issues, and continuous auto-tune once there's enough data. Update the ROADMAP rows when you extend.
+
+## Deferred — for Claude to pick up (I couldn't do these this session)
+These are the remaining open items from `docs/ROADMAP.md`. I suggested them but **could not do them this
+session because the host RAM was critically low** (~1.7–2.6 GB free for most of this stretch), which makes
+dev-server restarts, production builds and a full test run unreliable. None is blocked by code — they're
+ready to build on a machine with headroom. Smallest first:
+
+1. **Avatars storage-bucket policies — DONE (SQL written; live-verify pending).** Was the one real
+   security gap: the `avatars` Supabase Storage bucket had no RLS policies. Fixed in
+   `supabase/storage_avatars.sql` — **public read** (the app shows avatars via `getPublicUrl`), and
+   **authenticated-only insert/update/delete** scoped to the `avatars` bucket. Writes aren't tied to
+   `auth.uid()` because the file name is `<studentId>-<timestamp>` and a student id ≠ the auth uid (a
+   leader can upload for others). **User must run the SQL once** in the SQL Editor. Only live verification
+   (upload an avatar after running it) is left — it needs a running dev session, deferred under low RAM.
+
+2. **Replace the "Complete" `prompt()` box with a themed dialog.** Marking a task complete still uses the
+   browser's native `prompt()` to ask for hours (see the task detail / My Tasks complete flow). Replace it
+   with the app's themed modal (there's already a confirm-dialog pattern in `app/components/ui.tsx` /
+   `app/lib/ui.ts`) so it matches the design system and validates the hours input. Frontend-only.
+
+3. **Move the Logs and Signup pages onto the design system.** Per the ROADMAP "UI refresh" table these two
+   are still `☐ todo` — they use legacy classes instead of the `globals.css` tokens + `ui.tsx` kit, so they
+   don't theme correctly in light/dark. Rebuild them with the kit like the other pages. Medium UI work.
+
+4. **Dashboard legacy-class cleanup.** The dashboard is `◐ partly` migrated — some panels still use legacy
+   classes. Finish moving them to tokens so dark/light are fully consistent. Medium UI work.
+
+5. **Per-person / per-role capacity (Level 2 leftover).** Right now capacity is a flat WIP limit plus a
+   global `CAPACITY_HOURS`; real teams differ per person. Add a per-person (and/or per-role) capacity that
+   the matcher's availability factor reads, instead of the single global constant in `matching.py`. Backend
+   + a small settings UI + tests.
+
+6. **Split `taskmatch-api/main.py` into modules.** It's one large file now (auth, matching, notifications,
+   approvals, imports, matcher-tune all in it). Refactor into modules (e.g. `routes_*`, keep `matching.py`
+   pure) as it grows. Pure refactor — do it when there's RAM to run the full suite before/after, since it
+   touches everything.
+
+7. **Frontend `any`/React-Compiler lint debt.** Tracked in the ROADMAP "Known debt": legacy `any` types and
+   strict React-Compiler rules are set to **warning** so CI blocks only real errors. Clean them up gradually
+   (type the `any`s, address the compiler hints) — not urgent, but it's why the lint count shows ~200+
+   warnings.
+
+**Why the RAM limit matters for these:** this machine competes with the dev servers + browser for memory, and
+Kiro Crew auto-pauses sub-agents and heavy steps under pressure. Claude (running server-side) doesn't hit
+this wall, so these are better done there. Anything UI-facing (2–4) wants a dev server running to verify;
+5–6 want the full backend test suite before/after.
+
+### Also deferred — from earlier this session (browser/media, not RAM)
+These were asked for earlier and I couldn't finish them — the blocker was browser/screenshot tooling on this
+machine, not code. The user prefers to hand media capture to Claude on the other device.
+
+8. **"New feature" screenshots of the notification bell + the approvals inbox (Phase 3c).** Asked for as a
+   showcase. **There is NO real "before"** — the bell and approvals are new in 3c, so frame them as
+   new-feature shots, not a before/after pair. I **seeded demo data** to make the shots look live: 3
+   notifications + 1 pending approval on the demo account's workspace (rows in `notifications` /
+   `approvals`). Capture `/dashboard` (bell lit, dropdown open) and `/approvals` (a pending card), in dark
+   and light. Blocked locally by Windows PowerShell script-execution policy on the `playwright-cli.ps1`
+   shim + tight RAM (Chromium ~400 MB on top of two dev servers). Delete the seeded rows when done.
+
+9. **Visual changelog comparing v1 → now (the user explicitly asked to compare against v1).** `docs/CHANGELOG-VISUAL.md`
+   currently has only landing/login/dashboard before/after pairs. The user wants a changelog covering **all**
+   the big features versus **v1** (the old `taskmatch-git` repo): FYP→generic rebrand, auth hardening
+   (token identity + RLS), the design-system/token UI, the marketing landing page, login redesign, dashboard
+   overhaul, workspaces/projects, roles + audit, AI assist, Phase 3c notifications/approvals, Phase 4
+   (Ctrl+K, settings, exports, onboarding), and Level 3 (GitHub/Jira import, matcher calibration + auto-tune).
+   The writing part needs no browser; the before/after **images** need the screenshot tooling above, so it
+   pairs naturally with item 8.
+
 
 - **Host RAM is the big one.** This machine runs tight — free memory swung between ~1.5 GB and ~5 GB during the session, and the dashboard kept flagging "tight/critical". Consequences:
   - I could **not** safely fan out work to parallel sub-agents. The spawn gate sat at 1/32 under "severe pressure" for long stretches, so the lint cleanup (184 issues) and the Phase 3c build were done **sequentially by hand** instead of split across agents. Slower, but reliable. On a bigger box this would have been a parallel wave and much faster.
