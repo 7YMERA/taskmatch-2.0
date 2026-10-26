@@ -60,6 +60,7 @@ export default function Sidebar() {
     { label: 'Projects', href: '/projects', icon: 'folder' as const },
     { label: 'Tasks', href: '/tasks', icon: 'check' as const },
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },
+    { label: 'Settings', href: '/settings', icon: 'edit' as const },
   ]
   const adminNav = [
     ...(can(role, 'assign.others') ? [{ label: 'Approvals', href: '/approvals', icon: 'inbox' as const }] : []),

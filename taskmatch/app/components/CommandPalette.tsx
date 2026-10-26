@@ -9,14 +9,16 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import { can, type Role } from '../lib/role'
 import { Icon, type IconName } from './ui'
+import { toCsv, downloadCsv, stamp } from '../lib/csv'
 
 type Item = {
   id: string
   label: string
   sub?: string
-  group: 'Actions' | 'Tasks' | 'People' | 'Projects'
+  group: 'Actions' | 'Export' | 'Tasks' | 'People' | 'Projects'
   icon: IconName
-  href: string
+  href?: string
+  run?: () => void | Promise<void>
 }
 
 export default function CommandPalette() {
@@ -71,7 +73,7 @@ export default function CommandPalette() {
     }
   }, [open, loadData])
 
-  // Role-gated quick actions (navigation + launchers).
+  // Role-gated quick actions (navigation + launchers + exports).
   const actions: Item[] = useMemo(() => {
     const a: Item[] = [
       { id: 'a-dash', label: 'Go to Dashboard', group: 'Actions', icon: 'grid', href: '/dashboard' },
@@ -79,11 +81,36 @@ export default function CommandPalette() {
       { id: 'a-people', label: 'Go to People', group: 'Actions', icon: 'users', href: '/students' },
       { id: 'a-projects', label: 'Go to Projects', group: 'Actions', icon: 'folder', href: '/projects' },
       { id: 'a-mytasks', label: 'Go to My Tasks', group: 'Actions', icon: 'star', href: '/my-tasks' },
+      { id: 'a-settings', label: 'Go to Settings', group: 'Actions', icon: 'edit', href: '/settings' },
       { id: 'a-newtask', label: 'New task', sub: 'Create a task', group: 'Actions', icon: 'plus', href: '/tasks?new=1' },
     ]
     if (can(role, 'assign.others')) a.push({ id: 'a-approvals', label: 'Go to Approvals', group: 'Actions', icon: 'inbox', href: '/approvals' })
     if (can(role, 'audit.view')) a.push({ id: 'a-audit', label: 'Go to Audit trail', group: 'Actions', icon: 'history', href: '/audit' })
     if (can(role, 'team.manage')) a.push({ id: 'a-team', label: 'Go to Members & roles', group: 'Actions', icon: 'shield', href: '/team' })
+
+    // Exports — anyone who can see the data can download it as CSV.
+    a.push({
+      id: 'x-tasks', label: 'Export tasks as CSV', group: 'Export', icon: 'download',
+      run: async () => {
+        const { data } = await supabase.from('tasks').select('id, description, status, severity, committed_hours, due_date, completed_at').limit(5000)
+        downloadCsv(toCsv(data || [], [
+          { key: 'id', label: 'ID' }, { key: 'description', label: 'Description' }, { key: 'status', label: 'Status' },
+          { key: 'severity', label: 'Severity' }, { key: 'committed_hours', label: 'Committed hours' },
+          { key: 'due_date', label: 'Due date' }, { key: 'completed_at', label: 'Completed at' },
+        ]), `taskmatch-tasks-${stamp()}.csv`)
+      },
+    })
+    a.push({
+      id: 'x-people', label: 'Export people as CSV', group: 'Export', icon: 'download',
+      run: async () => {
+        const { data } = await supabase.from('students').select('id, name, matric, programme, email, group_label, away_until').limit(5000)
+        downloadCsv(toCsv(data || [], [
+          { key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }, { key: 'matric', label: 'Matric' },
+          { key: 'programme', label: 'Programme' }, { key: 'email', label: 'Email' },
+          { key: 'group_label', label: 'Group' }, { key: 'away_until', label: 'Away until' },
+        ]), `taskmatch-people-${stamp()}.csv`)
+      },
+    })
     return a
   }, [role])
 
@@ -100,7 +127,8 @@ export default function CommandPalette() {
 
   const go = useCallback((it: Item) => {
     setOpen(false)
-    router.push(it.href)
+    if (it.run) { void it.run() }
+    else if (it.href) { router.push(it.href) }
   }, [router])
 
   const onKeyDown = (e: React.KeyboardEvent) => {
