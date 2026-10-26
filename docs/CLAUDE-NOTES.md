@@ -30,6 +30,8 @@ covers Claude's work, **PRs #1 to #18**, plus a review of Kiro's work since.
 | #13, #14, #16, #17 | **Demo data**: `supabase/demo-data.sql` (Acme Studio with projects PLAT/MOB/WEB/DATA, a second "Weekend hackathon" workspace) and `supabase/demo-data-more.sql` (46 more tasks with two months of history). Names, emails and skills made unique per workspace. Fixes for the live DB (`activity_logs.entity_id` is a uuid; skill levels are 1 to 3). Tasks page now opens on the Board. |
 | #15 | **Live-site fix**: trims a trailing slash from `NEXT_PUBLIC_API_URL`, which was turning every API call into `//path` (404). |
 | #18 | **People page + smarter matching** (Level 2 start): explainable fit score out of 100 (skills 45, proven experience 20, availability 20, record 15) in `taskmatch-api/matching.py`; skill evidence from finished work that fades with age; `/match/people` and `/people/insights`; Team insights and Find a match tabs; "Who could take this?" in New task. `docs/PEOPLE-MATCHING.md`. |
+| #27 | **Notes + review fixes**: this file, Level 3 merged into `main`, approvals hardened, Jira hosts limited, `validate_weights()`, Vercel preview filter fixed. |
+| #28 | **Bell and Ctrl+K polish**: the bell moved next to the logo and its panel now opens on screen (icons per kind, Today/Earlier, All/Unread, links to approvals and settings). The palette keeps the highlighted row in view, ranks and highlights matches, shows status tags, says Ctrl on Windows, reloads on open, and has a mobile button. README and the visual changelog brought up to date, with before/after screenshots in `docs/screenshots/bell-palette/`. |
 
 **Deployment (not a PR, done with the user on 2026-10-25):** frontend on Vercel
 (`taskmatch-umber.vercel.app`, root dir `taskmatch`, auto-deploys from `main`), API on Render
@@ -93,9 +95,8 @@ Tests for 3–7 are in `taskmatch-api/test_approvals.py` and `test_autotune.py` 
 ## Suggestions / what's next
 In rough order of value:
 1. Run the Level 3 SQL, change the demo password, and delete the seeded test rows (review items 1, 2, 8).
-2. Take the deferred media work from KIRO-NOTES (bell + approvals "new feature" shots, and the full
-   v1 → v2 visual changelog in `docs/CHANGELOG-VISUAL.md`). Claude's mock harness can do this without
-   touching the live database.
+2. ~~Deferred media work from KIRO-NOTES~~ done in #28: bell, approvals and settings shots, and a
+   full release-by-release `docs/CHANGELOG-VISUAL.md`.
 3. Move Logs, Signup and the leftover dashboard panels onto the design system. (KIRO-NOTES deferred
    item 2, replacing the `prompt()` Complete box, is already done: there is no `prompt()` left in
    `taskmatch/app`; #8 added the themed Complete dialog.)
@@ -110,4 +111,5 @@ In rough order of value:
 - Permissions live in three places that must agree: `permissions.json`, API `ROLE_PERMISSIONS`, SQL `tm_can()`.
 - No emoji in the product UI; outline SVG icons from `ui.tsx`. Varied but tasteful colour, both themes.
 - Each phase gets a `docs/PHASE*.md` with light + dark before/after screenshots and a ROADMAP tick.
+- **Every PR updates `README.md` and `docs/CHANGELOG-VISUAL.md`** (the owner's rule, 2026-10-26), and the author's notes file.
 - Never put credentials, client names or work (Axrail) material in this repo.
