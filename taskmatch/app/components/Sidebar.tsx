@@ -58,7 +58,8 @@ export default function Sidebar() {
 
   const nav = [
     { label: 'Dashboard', href: '/dashboard', icon: 'grid' as const },
-    { label: 'People', href: '/students', icon: 'users' as const },
+    { label: 'People', href: '/people', icon: 'users' as const },
+    { label: 'Find a match', href: '/match', icon: 'target' as const },
     { label: 'Projects', href: '/projects', icon: 'folder' as const },
     { label: 'Tasks', href: '/tasks', icon: 'check' as const },
     { label: 'My Tasks', href: '/my-tasks', icon: 'star' as const },

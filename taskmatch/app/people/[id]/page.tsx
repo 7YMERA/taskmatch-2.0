@@ -83,7 +83,7 @@ export default function StudentDetail() {
       <Sidebar />
 
       <main className="flex-1 min-w-0 px-5 sm:px-10 py-8 pt-20 md:pt-10">
-        <Link href="/students" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
+        <Link href="/people" className="inline-flex items-center gap-1.5 text-xs hover:underline" style={FAINT}>
           <Icon name="arrowLeft" size={13} /> Back to students
         </Link>
 
@@ -97,7 +97,7 @@ export default function StudentDetail() {
           </div>
         ) : !student ? (
           <Card className="mt-4">
-            <EmptyState icon={<Icon name="user" size={28} />} title="Student not found" hint="They may have been removed from the roster." />
+            <EmptyState icon={<Icon name="user" size={28} />} title="Person not found" hint="They may have been removed from the roster." />
           </Card>
         ) : (
           <>

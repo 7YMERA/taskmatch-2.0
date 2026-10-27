@@ -2,7 +2,7 @@
 
 /* The fit score (0 to 100) and what it is made of. The API works it out (taskmatch-api/matching.py)
    from skills, proven experience, availability and track record; these just show it the same way
-   wherever people are ranked: People › Find a match, task recommendations, and New task. */
+   wherever people are ranked: Find a match, task recommendations, and New task. */
 
 import { useState } from 'react'
 import { Icon } from './ui'

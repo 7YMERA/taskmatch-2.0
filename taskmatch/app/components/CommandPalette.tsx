@@ -103,7 +103,7 @@ export default function CommandPalette() {
       setData({
         tasks: (tasks.data || []).map(t => ({ id: t.id, label: t.description || 'Untitled task', group: 'Tasks', icon: 'check', color: STATUS_COLOR[t.status],
           badge: t.status ? { text: t.status, color: STATUS_COLOR[t.status] || 'var(--tm-text-faint)' } : undefined, href: `/tasks/${t.id}` })),
-        people: (people.data || []).map(p => ({ id: p.id, label: p.name || 'Unnamed', sub: p.programme || undefined, group: 'People', icon: 'user', color: 'var(--tm-violet)', href: `/students/${p.id}` })),
+        people: (people.data || []).map(p => ({ id: p.id, label: p.name || 'Unnamed', sub: p.programme || undefined, group: 'People', icon: 'user', color: 'var(--tm-violet)', href: `/people/${p.id}` })),
         projects: (projects.data || []).map(p => ({ id: p.id, label: p.name, group: 'Projects', icon: 'folder', color: 'var(--tm-sky)',
           badge: p.key ? { text: p.key, color: 'var(--tm-sky)' } : undefined, href: `/projects` })),
       })
@@ -128,7 +128,8 @@ export default function CommandPalette() {
       go('a-dash', 'Dashboard', 'grid', '/dashboard'),
       go('a-mytasks', 'My Tasks', 'star', '/my-tasks'),
       go('a-tasks', 'Tasks', 'check', '/tasks'),
-      go('a-people', 'People', 'users', '/students'),
+      go('a-people', 'People', 'users', '/people'),
+      go('a-match', 'Find a match', 'target', '/match'),
       go('a-projects', 'Projects', 'folder', '/projects'),
       go('a-settings', 'Settings', 'edit', '/settings'),
     ]
