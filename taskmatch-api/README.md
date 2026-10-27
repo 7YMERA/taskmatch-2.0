@@ -43,16 +43,45 @@ cp .env.example .env
 uvicorn main:app --reload --port 8000
 ```
 
-Behind a reverse proxy (e.g. Render), start it with proxy headers on so the rate
-limiter sees each visitor's real IP instead of the proxy's (otherwise everyone
-shares one limit):
+Health check: `GET http://localhost:8000/health`
+Interactive API docs: `http://localhost:8000/docs`
+
+### Deploy on Vercel (recommended)
+
+The API runs in the **same Vercel project as the frontend**, using Vercel
+[Services](https://vercel.com/docs/services) (beta, free plan included). The repo-root
+`vercel.json` declares two services, `web` (`taskmatch/`, Next.js) and `api`
+(`taskmatch-api/`, FastAPI `main:app`), and sends every `/api/...` request to the API.
+Vercel installs `requirements.txt` by itself; nothing to start.
+
+- Project settings: **Root Directory** empty (the repo root, where `vercel.json` is),
+  **Framework Preset** `Services`.
+- Environment variables: the API ones above (`SUPABASE_URL`, `SUPABASE_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, plus `ANTHROPIC_API_KEY` if used) next to the frontend's,
+  and the frontend's `NEXT_PUBLIC_API_URL` set to `/api`.
+- Same domain, so the browser makes no cross-origin calls and `CORS_ORIGINS` is not needed
+  there (keep it for local dev and Render).
+- Vercel passes the full path through (`/api/health` arrives as `/api/health`), so
+  `StripApiPrefix` in `main.py` drops the `/api` and the routes stay `/health`, `/wip`, ...
+  everywhere. No route may start with `/api`.
+- The rate limiter reads the visitor's IP from Vercel's `x-real-ip` header (only when
+  `VERCEL=1`, which Vercel sets itself), so no proxy flags are needed. Each warm instance
+  keeps its own counts.
+- `.vercelignore` (repo root) leaves the tests out of the deploy, and `vercel.json` only
+  builds `main`, as before.
+
+No sleeping server: unlike Render's free plan, the first request after a quiet spell
+takes a second or two, not about 50.
+
+### Deploy on Render (previous host)
+
+Root Directory `taskmatch-api`, build `pip install -r requirements.txt`. Start it with
+proxy headers on so the rate limiter sees each visitor's real IP instead of the proxy's
+(otherwise everyone shares one limit):
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
 ```
-
-Health check: `GET http://localhost:8000/health`
-Interactive API docs: `http://localhost:8000/docs`
 
 ## Test
 
@@ -72,7 +101,7 @@ controls (login required, rate limiting), and never touch the database. CI runs 
   (`Authorization: Bearer <access_token>`), including the read-only ones.
 - Each client IP is rate-limited (`RATE_LIMIT_PER_MINUTE`, default 120/min); over
   the limit returns `429` with a `Retry-After` header. The limit is in memory, so
-  it is per server process.
+  it is per server process (on Vercel, per warm instance).
 - Request bodies are validated with typed schemas — bad input is rejected with a 422.
 - Lock `CORS_ORIGINS` to your real frontend URL before deploying.
 

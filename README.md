@@ -92,6 +92,7 @@ Each release has a full write-up with before/after screenshots in light and dark
 | Phase 3c, 4: notifications, search, settings | Bell, approvals, Ctrl+K palette, CSV exports, Settings, Getting Started | [#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28) | [3c](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3c-Notifications-and-Approvals), [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#bell-and-ctrlk-polish) |
 | Level 3: integrations | GitHub and Jira import, matcher calibration and auto-tune | [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27) | [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations) |
 | New logo | Overlap mark, two-tone wordmark, favicon, SVG and home-screen icons ([brand files](taskmatch/public/brand/)) | [#29](https://github.com/7YMERA/taskmatch-2.0/pull/29) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#new-logo) |
+| API on Vercel | The API moves from Render into the same Vercel project as the site, under `/api`: no 50-second wake-up, one domain, one place for settings | [#PRNUM](https://github.com/7YMERA/taskmatch-v2/pull/PRNUM) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#api-on-vercel) |
 
 **v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
 
@@ -140,7 +141,7 @@ past its due date is closed and locked automatically.
 | Backend | [FastAPI](https://fastapi.tiangolo.com) (Python 3.11+), Pydantic |
 | Database and auth | [Supabase](https://supabase.com) (Postgres, Auth, Storage) with row-level security |
 | Testing and CI | pytest, TypeScript type-check, ESLint, GitHub Actions |
-| Hosting | Vercel for the frontend, Render for the API ([live demo](https://taskmatch-umber.vercel.app)) |
+| Hosting | Vercel, one project for the site and the API (Vercel Services; API under `/api`) ([live demo](https://taskmatch-umber.vercel.app)). Render still works as a fallback host for the API. |
 
 ## Repository layout
 
@@ -149,6 +150,7 @@ taskmatch/        Next.js frontend (pages in app/, design system in app/componen
 taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
 supabase/         Database scripts, run in order (see "The database" below)
 .github/          CI workflow
+vercel.json       Vercel setup: the site and the API as two services in one project
 ```
 
 Release write-ups, screenshots, the roadmap and the assistants' notes live on the
@@ -221,6 +223,13 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+### Deploying
+
+Both halves deploy as one Vercel project from this repo (Root Directory left empty, Framework
+Preset **Services**): the site at `/` and the API at `/api`, as set in [`vercel.json`](vercel.json).
+Set `NEXT_PUBLIC_API_URL=/api` there, plus the API's variables. Details are in
+[taskmatch-api/README.md](taskmatch-api/README.md#deploy-on-vercel-recommended).
 
 ### Tests
 
