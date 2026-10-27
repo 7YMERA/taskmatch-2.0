@@ -150,7 +150,8 @@ class StripApiPrefix:
             path = scope.get("path", "")
             if path == "/api" or path.startswith("/api/"):
                 raw = scope.get("raw_path") or path.encode()
-                scope = dict(scope, path=path[4:] or "/", raw_path=raw[4:] or b"/")
+                scope = dict(scope, path=path[4:] or "/", raw_path=raw[4:] or b"/",
+                             root_path=scope.get("root_path", "") + "/api")  # so /api/docs finds /api/openapi.json
         await self.app(scope, receive, send)
 
 

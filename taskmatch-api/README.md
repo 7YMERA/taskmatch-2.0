@@ -63,7 +63,7 @@ Vercel installs `requirements.txt` by itself; nothing to start.
   there (keep it for local dev and Render).
 - Vercel passes the full path through (`/api/health` arrives as `/api/health`), so
   `StripApiPrefix` in `main.py` drops the `/api` and the routes stay `/health`, `/wip`, ...
-  everywhere. No route may start with `/api`.
+  everywhere, and the interactive docs work at `/api/docs`. No route may start with `/api`.
 - The rate limiter reads the visitor's IP from Vercel's `x-real-ip` header (only when
   `VERCEL=1`, which Vercel sets itself), so no proxy flags are needed. Each warm instance
   keeps its own counts.

@@ -191,6 +191,13 @@ def test_api_prefix_is_stripped(client, monkeypatch):
     assert client.get("/wip", headers=GOOD).status_code == 200  # Render and local keep working
 
 
+def test_api_docs_work_under_prefix(client):
+    # The docs page must fetch /api/openapi.json, not /openapi.json (that's the site's).
+    r = client.get("/api/docs")
+    assert r.status_code == 200 and "/api/openapi.json" in r.text
+    assert client.get("/api/openapi.json").status_code == 200
+
+
 def test_api_prefix_health_is_never_throttled(client, monkeypatch):
     monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
     for _ in range(3):
