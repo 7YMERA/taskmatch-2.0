@@ -188,8 +188,19 @@ option { background-color: var(--tm-bg-elev); color: var(--tm-text); }
 /* Brand wordmark — solid, confident, no rainbow */
 .tm-wordmark {
   color: var(--tm-text);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+/* "Match" half of the wordmark: indigo → violet gradient (dark theme ends) */
+.tm-wordmark-accent {
+  background: linear-gradient(90deg, #7c79ff, #b45cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Darker ends on light backgrounds so the text keeps 4.5:1 contrast */
+[data-theme="light"] .tm-wordmark-accent {
+  background-image: linear-gradient(90deg, #4f46e5, #9333ea);
 }
 
 /* Brand-coloured emphasis inside headings */
