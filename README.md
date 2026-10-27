@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="taskmatch/public/brand/logo-dark.png">
+    <img src="taskmatch/public/brand/logo-light.png" alt="TaskMatch" width="360">
+  </picture>
+</p>
+
 # TaskMatch 2.0
 
 **Skill-based task matching for teams.** TaskMatch looks at the skills a task needs,
@@ -145,6 +152,14 @@ of real teams and, one day, offering as a product.
 - Calibration shows how well each part of the fit score predicted real results, and auto-tune
   proposes new weights that a lead reviews and applies. Nothing changes on its own.
 - **Details: [PHASE-LEVEL3.md](docs/PHASE-LEVEL3.md)**
+
+### 11. A real logo
+- The old placeholder (a dot and a square on a purple tile) is replaced by **Overlap**: the
+  person (indigo circle) meets the task (green tile), and the glowing amber overlap is the match.
+- The wordmark reads **Task**Match with "Match" in an indigo-to-violet gradient, darker in light
+  mode so it keeps its contrast.
+- New favicon, SVG browser icon and home-screen icon. Source files are in
+  [`taskmatch/public/brand/`](taskmatch/public/brand/).
 
 ### Every release, with before/after screenshots
 
