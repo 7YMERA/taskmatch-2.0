@@ -273,8 +273,11 @@ async def unhandled_error_handler(request: Request, exc: Exception):
 # Supabase creds are loaded from the environment only — never hard-coded.
 # Set SUPABASE_URL and SUPABASE_KEY in taskmatch-api/.env (local) or in your
 # host's env vars (Render/AWS). See .env.example for the template.
+# On Vercel, the Supabase integration adds its own names (SUPABASE_PUBLISHABLE_KEY,
+# SUPABASE_ANON_KEY, SUPABASE_SECRET_KEY), so those count too and nothing has to be copied.
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = (os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+                or os.environ.get("SUPABASE_ANON_KEY"))
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError(
         "SUPABASE_URL and SUPABASE_KEY must be set in the environment "
@@ -286,7 +289,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # (listing accounts, changing roles). It is None until the key is configured, so those
 # endpoints fail loudly with a 503 rather than silently misbehaving. NEVER expose this key
 # to the browser — it bypasses row-level security.
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+# The integration's SUPABASE_SECRET_KEY (sb_secret_...) wins over its legacy JWT
+# SUPABASE_SERVICE_ROLE_KEY, so the API keeps working if legacy keys are switched off.
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) if SUPABASE_SERVICE_ROLE_KEY else None
 
 if admin is None:

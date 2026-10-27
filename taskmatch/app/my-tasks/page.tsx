@@ -114,7 +114,7 @@ export default function MyTasks() {
     const detail = err?.response?.data?.detail
     if (detail) return detail
     if (err?.response) return `${fallback} (server responded ${err.response.status})`
-    return `${fallback} — couldn't reach the server. It may be waking up (free tier); try again in a moment.`
+    return `${fallback} — couldn't reach the server. Check your connection and try again.`
   }
 
   const init = async () => {

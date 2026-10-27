@@ -56,9 +56,11 @@ Vercel installs `requirements.txt` by itself; nothing to start.
 
 - Project settings: **Root Directory** empty (the repo root, where `vercel.json` is),
   **Framework Preset** `Services`.
-- Environment variables: the API ones above (`SUPABASE_URL`, `SUPABASE_KEY`,
-  `SUPABASE_SERVICE_ROLE_KEY`, plus `ANTHROPIC_API_KEY` if used) next to the frontend's,
-  and the frontend's `NEXT_PUBLIC_API_URL` set to `/api`.
+- Environment variables: if the project has Vercel's **Supabase integration**, its
+  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`) and `SUPABASE_SECRET_KEY`
+  (or `SUPABASE_SERVICE_ROLE_KEY`) are read as they are, so there's nothing to copy. Otherwise add
+  the API variables above. Add `ANTHROPIC_API_KEY` if you use Claude suggestions, and set the
+  frontend's `NEXT_PUBLIC_API_URL` to `/api`.
 - Same domain, so the browser makes no cross-origin calls and `CORS_ORIGINS` is not needed
   there (keep it for local dev and Render).
 - Vercel passes the full path through (`/api/health` arrives as `/api/health`), so

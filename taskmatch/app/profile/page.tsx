@@ -120,7 +120,7 @@ export default function Profile() {
       if (student) await loadTasks(student.id)
       toast(`"${desc}" added to your tasks.`, 'success')
     } catch (err: any) {
-      toast(err.response?.data?.detail || 'Could not pick up this task. The server may be waking up — try again.', 'error')
+      toast(err.response?.data?.detail || 'Could not pick up this task. Check your connection and try again.', 'error')
     } finally { setPicking(null) }
   }
 
