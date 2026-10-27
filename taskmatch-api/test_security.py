@@ -164,6 +164,46 @@ def test_anonymous_requests_count_too(client, monkeypatch):
     assert client.get("/wip").status_code == 429
 
 
+def test_forwarded_headers_ignored_off_vercel(client, monkeypatch):
+    # Off Vercel a caller could forge x-forwarded-for, so it must not dodge the limit.
+    monkeypatch.setattr(main, "ON_VERCEL", False)
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    assert client.get("/wip", headers={"x-forwarded-for": "1.1.1.1"}).status_code == 401
+    assert client.get("/wip", headers={"x-forwarded-for": "2.2.2.2"}).status_code == 429
+
+
+def test_vercel_counts_each_visitor_ip(client, monkeypatch):
+    # On Vercel every request arrives from Vercel's edge, so the visitor IP comes
+    # from the headers it sets; two visitors must not share one bucket.
+    monkeypatch.setattr(main, "ON_VERCEL", True)
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    assert client.get("/wip", headers={"x-real-ip": "1.1.1.1"}).status_code == 401
+    assert client.get("/wip", headers={"x-real-ip": "2.2.2.2"}).status_code == 401
+    assert client.get("/wip", headers={"x-forwarded-for": "3.3.3.3, 10.0.0.1"}).status_code == 401
+    assert client.get("/wip", headers={"x-real-ip": "1.1.1.1"}).status_code == 429
+
+
+def test_api_prefix_is_stripped(client, monkeypatch):
+    # On Vercel the API is served under /api on the frontend's domain.
+    assert client.get("/api/health").status_code == 200
+    assert client.get("/api/wip", headers=GOOD).status_code == 200
+    assert client.get("/api/wip").status_code == 401  # still needs a login
+    assert client.get("/wip", headers=GOOD).status_code == 200  # Render and local keep working
+
+
+def test_api_docs_work_under_prefix(client):
+    # The docs page must fetch /api/openapi.json, not /openapi.json (that's the site's).
+    r = client.get("/api/docs")
+    assert r.status_code == 200 and "/api/openapi.json" in r.text
+    assert client.get("/api/openapi.json").status_code == 200
+
+
+def test_api_prefix_health_is_never_throttled(client, monkeypatch):
+    monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
+    for _ in range(3):
+        assert client.get("/api/health").status_code == 200
+
+
 def test_health_is_never_throttled(client, monkeypatch):
     monkeypatch.setattr(main, "rate_limiter", main.RateLimiter(1))
     for _ in range(5):

@@ -1,0 +1,8 @@
+# Left out of Vercel deploys: the API's tests and dev-only deps, local secrets.
+taskmatch-api/test_*.py
+taskmatch-api/conftest.py
+taskmatch-api/requirements-dev.txt
+**/.env
+**/.venv
+**/__pycache__
+**/.pytest_cache

@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("taskmatch")
 
 try:
-    from dotenv import load_dotenv  # local dev: read taskmatch-api/.env (Render injects env vars directly)
+    from dotenv import load_dotenv  # local dev: read taskmatch-api/.env (Render / Vercel inject env vars directly)
     load_dotenv()
 except Exception:
     pass
@@ -32,7 +32,8 @@ app = FastAPI()
 # When the process started, and a version string — reported by /health so a dashboard
 # or uptime monitor can see which build is live and how long it has been up.
 APP_STARTED_AT = time.time()
-APP_VERSION = os.environ.get("APP_VERSION") or os.environ.get("RENDER_GIT_COMMIT", "dev")[:12]
+APP_VERSION = (os.environ.get("APP_VERSION") or os.environ.get("VERCEL_GIT_COMMIT_SHA")
+               or os.environ.get("RENDER_GIT_COMMIT", "dev"))[:12]
 
 
 # ─── Rate limiting — per-client sliding window, in memory ───
@@ -43,7 +44,12 @@ APP_VERSION = os.environ.get("APP_VERSION") or os.environ.get("RENDER_GIT_COMMIT
 #
 # Behind a proxy (Render), run uvicorn with --proxy-headers --forwarded-allow-ips='*'
 # so request.client.host is the real visitor, not the proxy — otherwise every user
-# shares one bucket.
+# shares one bucket. On Vercel there is no uvicorn to configure: client_ip() reads
+# the visitor's IP from Vercel's own headers instead.
+#
+# On Vercel each warm function instance keeps its own counts, so the limit is per
+# instance, not global. Good enough to stop a runaway script; a strict global limit
+# would need a shared store.
 
 class RateLimiter:
     """Sliding-window log: remember each client's recent request times, refuse once
@@ -77,6 +83,21 @@ class RateLimiter:
             del self._hits[k]
 
 
+ON_VERCEL = os.environ.get("VERCEL") == "1"
+
+
+def client_ip(request):
+    """The visitor's IP, used as the rate-limit key. On Vercel, its edge sets
+    x-real-ip / x-forwarded-for itself (a client can't spoof them), so trust those.
+    Anywhere else those headers could be forged by the caller, so only the socket
+    address counts (uvicorn's --proxy-headers already rewrites it behind Render)."""
+    if ON_VERCEL:
+        ip = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if ip:
+            return ip
+    return request.client.host if request.client else "unknown"
+
+
 RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "120"))  # 0 = off
 rate_limiter = RateLimiter(RATE_LIMIT_PER_MINUTE, 60.0)
 RATE_LIMIT_EXEMPT = {"/health"}  # the frontend's wake-up ping must always get through
@@ -88,8 +109,7 @@ RATE_LIMIT_EXEMPT = {"/health"}  # the frontend's wake-up ping must always get t
 async def rate_limit(request: Request, call_next):
     if request.url.path in RATE_LIMIT_EXEMPT:
         return await call_next(request)
-    client = request.client.host if request.client else "unknown"
-    retry_after = rate_limiter.hit(client)
+    retry_after = rate_limiter.hit(client_ip(request))
     if retry_after is not None:
         return JSONResponse(
             status_code=429,
@@ -114,6 +134,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# On Vercel the API shares the frontend's domain and is reached under /api (see the
+# repo-root vercel.json), but Vercel passes the full path through: /api/health arrives
+# as /api/health. Strip the prefix so the routes below stay /health, /wip, ... and
+# work the same on Render and locally. Added last, so it runs first (outermost):
+# the rate limiter and CORS see the stripped path too. No route starts with /api.
+class StripApiPrefix:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == "/api" or path.startswith("/api/"):
+                raw = scope.get("raw_path") or path.encode()
+                scope = dict(scope, path=path[4:] or "/", raw_path=raw[4:] or b"/",
+                             root_path=scope.get("root_path", "") + "/api")  # so /api/docs finds /api/openapi.json
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(StripApiPrefix)
 
 
 # ─── Request schemas — typed bodies so bad input is rejected at the door ───
