@@ -151,6 +151,7 @@ taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
 supabase/         Database scripts, run in order (see "The database" below)
 .github/          CI workflow
 vercel.json       Vercel setup: the site and the API as two services in one project
+AGENTS.md         Working rules for the two AI assistants (branches, Wiki, commit identity, no secrets)
 ```
 
 Release write-ups, screenshots, the roadmap and the assistants' notes live on the
@@ -230,6 +231,10 @@ Both halves deploy as one Vercel project from this repo (Root Directory left emp
 Preset **Services**): the site at `/` and the API at `/api`, as set in [`vercel.json`](vercel.json).
 Set `NEXT_PUBLIC_API_URL=/api` there, plus the API's variables. Details are in
 [taskmatch-api/README.md](taskmatch-api/README.md#deploy-on-vercel-recommended).
+
+Only `main` deploys. Vercel reads `vercel.json` from the branch being pushed, so a branch that
+lacks it (an old branch, or one holding Wiki pages) builds a preview that fails on the Hobby plan
+and emails the owner. Start every branch from the latest `main`; the rules are in [AGENTS.md](AGENTS.md).
 
 ### Tests
 
