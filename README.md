@@ -4,11 +4,11 @@
 finds the people who have them, checks who has room to take more work, and helps a
 lead assign it with the reason for every pick shown up front.
 
-![TaskMatch 2.0 dashboard](docs/screenshots/phase1/after-dashboard-dark.png)
+![TaskMatch 2.0 dashboard](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/dashboard-dark.png)
 
 | Light | Dark |
 |---|---|
-| ![Landing, light](docs/screenshots/redesign/after-landing-light.png) | ![Landing, dark](docs/screenshots/redesign/after-landing-dark.png) |
+| ![Landing, light](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/landing-light.png) | ![Landing, dark](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/landing-dark.png) |
 
 ---
 
@@ -64,94 +64,41 @@ of real teams and, one day, offering as a product.
 | **Staying informed** | Nothing | Notification bell, approvals for critical tasks, Ctrl+K search, CSV exports |
 | **Integrations** | None | Import issues from GitHub or Jira |
 | **Dialogs** | Browser `prompt()` boxes | Themed in-app dialogs |
-| **Documentation** | Default framework README | Setup guides, API reference, roadmap and visual changelogs |
+| **Documentation** | Default framework README | Setup guides, API reference, and a [Wiki](https://github.com/7YMERA/taskmatch-v2/wiki/) with the roadmap and visual changelog |
 
 ---
 
 ## What's been enhanced so far
 
-### 1. Security hardening ([#1](https://github.com/7YMERA/taskmatch-2.0/pull/1))
-- Login required on every read endpoint, not just the write ones.
-- Per-IP rate limiting (`RATE_LIMIT_PER_MINUTE`, default 120) that returns `429` with `Retry-After`.
-- One shared Supabase client in the frontend instead of a copy in every file.
+Each release has a full write-up with before/after screenshots in light and dark on the
+**[Wiki](https://github.com/7YMERA/taskmatch-v2/wiki/)**. The **[Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog)** lists every release, newest first.
 
-### 2. Row-level security ([#3](https://github.com/7YMERA/taskmatch-2.0/pull/3))
-- RLS switched on for all nine tables, so the public key alone can no longer read or write data.
-- The API uses the server-only service-role key for its queries.
+| Release | What it brought | PRs | Write-up |
+|---|---|---|---|
+| Security hardening | Login on every endpoint, rate limiting, row-level security on every table | [#1](https://github.com/7YMERA/taskmatch-2.0/pull/1), [#3](https://github.com/7YMERA/taskmatch-2.0/pull/3) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog) |
+| Modern redesign | One design system, neutral colours with one accent, light mode that works everywhere | [#2](https://github.com/7YMERA/taskmatch-2.0/pull/2), [#4](https://github.com/7YMERA/taskmatch-2.0/pull/4) | [Modern redesign](https://github.com/7YMERA/taskmatch-v2/wiki/Modern-Redesign) |
+| Phase 1: dashboard | KPI trends, needs attention, workload heatmap, skills coverage, auto-assign modes | [#5](https://github.com/7YMERA/taskmatch-2.0/pull/5) | [Phase 1](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-1-Dashboard) |
+| Phase 1b, 1c: Tasks, People, My Tasks | List / board / calendar, saved views, bulk actions, skills matrix, quick views | [#7](https://github.com/7YMERA/taskmatch-2.0/pull/7), [#8](https://github.com/7YMERA/taskmatch-2.0/pull/8) | [1b](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-1b-Tasks-and-People), [1c](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-1c-My-Tasks-and-Quick-Views) |
+| Phase 2: roles and audit | Admin / lead / member / viewer enforced by API and database, audit trail, away status | [#9](https://github.com/7YMERA/taskmatch-2.0/pull/9) | [Phase 2](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-2-Roles-and-Audit) |
+| Phase 3, 3b: suggestions, workspaces | Suggested skills, hours and severity; multi-team workspaces and projects | [#10](https://github.com/7YMERA/taskmatch-2.0/pull/10) – [#12](https://github.com/7YMERA/taskmatch-2.0/pull/12) | [3](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3-Task-Suggestions), [3b](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3b-Workspaces-and-Projects) |
+| People and smarter matching | Explainable fit score out of 100, proven skills, Team insights, Find a match | [#18](https://github.com/7YMERA/taskmatch-2.0/pull/18) | [People matching](https://github.com/7YMERA/taskmatch-v2/wiki/People-Matching) |
+| Phase 3c, 4: notifications, search, settings | Bell, approvals, Ctrl+K palette, CSV exports, Settings, Getting Started | [#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28) | [3c](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3c-Notifications-and-Approvals), [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#bell-and-ctrlk-polish) |
+| Level 3: integrations | GitHub and Jira import, matcher calibration and auto-tune | [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27) | [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations) |
 
-### 3. Modern redesign ([#4](https://github.com/7YMERA/taskmatch-2.0/pull/4), plus [#2](https://github.com/7YMERA/taskmatch-2.0/pull/2))
-- A new design system in `taskmatch/app/globals.css` and `taskmatch/app/components/ui.tsx`.
-- Every page rebuilt or restyled: landing, sign in, sign up, app shell, dashboard,
-  tasks, students, detail pages, My Tasks, profile and the activity log.
-- Light mode fixed everywhere; every colour is defined per theme so text stays readable.
-- **Full before/after gallery, light and dark: [docs/REDESIGN.md](docs/REDESIGN.md)**
+**v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
 
-| Before | After |
+| v1 (FYP) | Today |
 |---|---|
-| ![Dashboard before](docs/screenshots/redesign/before-dashboard-light.png) | ![Dashboard after](docs/screenshots/redesign/after-dashboard-light.png) |
-| ![Sign up before](docs/screenshots/redesign/before-signup-light.png) | ![Sign up after](docs/screenshots/redesign/after-signup-light.png) |
-
-### 4. Phase 1: dashboards and auto-assign ([#5](https://github.com/7YMERA/taskmatch-2.0/pull/5))
-- **Overview:** KPI tiles with change against the previous period, "needs attention"
-  (overdue, due soon, unassigned, people at their limit), matching health against the
-  project's original success targets, and tasks finished per week.
-- **Workload heatmap** of active tasks per person over the last 8 weeks.
-- **Skills coverage:** which skills are covered, thin or a gap for the open work.
-- **Assignment modes** through a new `POST /auto-assign` endpoint, with a dry-run
-  preview so the lead always sees who and why before confirming. Every automatic
-  pick is written to the activity log.
-- **Details and screenshots: [docs/PHASE1-DASHBOARD.md](docs/PHASE1-DASHBOARD.md)**
-
-| Workload heatmap | Skills coverage |
-|---|---|
-| ![Workload](docs/screenshots/phase1/after-workload-dark.png) | ![Skills](docs/screenshots/phase1/after-skills-dark.png) |
-
-### 5. Phase 1b and 1c: Tasks, People and My Tasks ([#7](https://github.com/7YMERA/taskmatch-2.0/pull/7), [#8](https://github.com/7YMERA/taskmatch-2.0/pull/8))
-- Tasks as a list, a board or a calendar, with search, quick and saved views and bulk actions.
-- People with skill and availability filters and a skills matrix.
-- My Tasks as a personal focus page with live timers, plus side-panel quick views.
-- **Details: [PHASE1B-TASKS-PEOPLE.md](docs/PHASE1B-TASKS-PEOPLE.md), [PHASE1C-WORKSPACE.md](docs/PHASE1C-WORKSPACE.md)**
-
-### 6. Phase 2: roles and audit trail ([#9](https://github.com/7YMERA/taskmatch-2.0/pull/9))
-- Four roles (admin, team lead, member, viewer) that only the server can change, checked by the API
-  and by the database. Before, any student could make themselves a leader.
-- A Members & roles page, an audit trail that can't be forged, and an "away" status.
-- **Details: [PHASE2-ROLES-AUDIT.md](docs/PHASE2-ROLES-AUDIT.md)**
-
-### 7. Phase 3 and 3b: suggestions, workspaces and projects ([#10](https://github.com/7YMERA/taskmatch-2.0/pull/10) – [#12](https://github.com/7YMERA/taskmatch-2.0/pull/12))
-- New task suggests skills, hours and severity, each with a confidence level, and nothing is
-  applied until a person clicks Use. Free by default; Claude is used only if an API key is set.
-- Multiple teams like Jira: workspaces, a switcher, invite links, a role per workspace, projects.
-- **Details: [PHASE3-AI-ASSIST.md](docs/PHASE3-AI-ASSIST.md), [PHASE3B-WORKSPACES.md](docs/PHASE3B-WORKSPACES.md)**
-
-### 8. People page and smarter matching ([#18](https://github.com/7YMERA/taskmatch-2.0/pull/18))
-- A fit score out of 100 that always shows its four parts, skills proven by finished work that
-  fade with age, Team insights (gaps, single points of failure, mentors) and Find a match.
-- **Details: [PEOPLE-MATCHING.md](docs/PEOPLE-MATCHING.md)**
-
-### 9. Phase 3c and 4: notifications, approvals, search, settings ([#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28))
-- A notification bell, and an approvals inbox where a lead signs off on a member taking a critical task.
-- A Ctrl+K palette to search tasks, people and projects or jump to any page, CSV exports, a
-  Settings page, and a Getting Started checklist for new workspaces.
-- Level 1 finished: a detailed `/health` check and lint that blocks CI.
-- **Details: [PHASE3C-NOTIFICATIONS.md](docs/PHASE3C-NOTIFICATIONS.md), [CHANGELOG-VISUAL.md](docs/CHANGELOG-VISUAL.md#bell-and-ctrlk-polish)**
+| ![Dashboard, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/dashboard-dark.png) | ![Dashboard, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/dashboard-light.png) |
+| ![Tasks, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/tasks-dark.png) | ![Tasks, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/tasks-dark.png) |
+| ![People, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/people-dark.png) | ![People, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/people-light.png) |
 
 | Notifications | Ctrl+K search |
 |---|---|
-| ![Notifications](docs/screenshots/bell-palette/after-bell-dark.png) | ![Command palette](docs/screenshots/bell-palette/after-palette-search-light.png) |
+| ![Notifications](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/bell-palette/after-bell-dark.png) | ![Command palette](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/bell-palette/after-palette-search-light.png) |
 
-### 10. Level 3: integrations and a matcher that learns ([#25](https://github.com/7YMERA/taskmatch-2.0/pull/25), [#26](https://github.com/7YMERA/taskmatch-2.0/pull/26), shipped in [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27))
-- Import issues from GitHub or Jira as tasks, without duplicates.
-- Calibration shows how well each part of the fit score predicted real results, and auto-tune
-  proposes new weights that a lead reviews and applies. Nothing changes on its own.
-- **Details: [PHASE-LEVEL3.md](docs/PHASE-LEVEL3.md)**
-
-### Every release, with before/after screenshots
-
-**[docs/CHANGELOG-VISUAL.md](docs/CHANGELOG-VISUAL.md)** lists every release, newest first.
-How the two AI assistants split the work is in [CLAUDE-NOTES.md](docs/CLAUDE-NOTES.md) and
-[KIRO-NOTES.md](docs/KIRO-NOTES.md).
-
+How the two AI assistants (Claude and Kiro) split the work is in their notes on the Wiki:
+[Claude notes](https://github.com/7YMERA/taskmatch-v2/wiki/Claude-Notes) and [Kiro notes](https://github.com/7YMERA/taskmatch-v2/wiki/Kiro-Notes).
 
 ---
 
@@ -193,9 +140,11 @@ past its due date is closed and locked automatically.
 taskmatch/        Next.js frontend (pages in app/, design system in app/components/ui.tsx)
 taskmatch-api/    FastAPI matching and task engine (main.py) with its tests
 supabase/         Database scripts, run in order (see "The database" below)
-docs/             Roadmap, a write-up per phase, visual changelog, assistant notes, screenshots
 .github/          CI workflow
 ```
+
+Release write-ups, screenshots, the roadmap and the assistants' notes live on the
+[Wiki](https://github.com/7YMERA/taskmatch-v2/wiki/), not in the code.
 
 ---
 
@@ -282,7 +231,7 @@ CI runs the backend tests, the frontend type-check and lint on every push and pu
 
 ## Roadmap
 
-The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
+The full plan is in [Roadmap](https://github.com/7YMERA/taskmatch-v2/wiki/Roadmap) on the Wiki. In short:
 
 **Level 1: production-grade** ✅ done. Security, validation, tests, CI with blocking lint, a
 detailed `/health` check, storage policies and docs are all in.
@@ -301,10 +250,10 @@ detailed `/health` check, storage policies and docs are all in.
 
 **Level 2: smarter matching.** Skill evidence from completed tasks, skill decay over
 time, hours as well as a task limit, and an explainable, tunable score are in (see
-[docs/PEOPLE-MATCHING.md](docs/PEOPLE-MATCHING.md)). Per-person capacity is next.
+[People matching](https://github.com/7YMERA/taskmatch-v2/wiki/People-Matching)). Per-person capacity is next.
 
 **Level 3: a product.** Multiple teams, GitHub and Jira import, and a matcher that proposes new
-weights from real outcomes are in (see [docs/PHASE-LEVEL3.md](docs/PHASE-LEVEL3.md)). Next: more
+weights from real outcomes are in (see [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations)). Next: more
 importers, scheduled re-sync, and design-system cleanup of the last few pages.
 
 ---
