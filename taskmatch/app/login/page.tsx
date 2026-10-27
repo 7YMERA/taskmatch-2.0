@@ -48,8 +48,6 @@ export default function Login() {
     }
   }
 
-  const fillDemo = () => { setEmail('demo@taskmatch.app'); setPassword('taskmatch123') }
-
   /* ── Post-login buffer ── */
   if (signingIn) {
     return <AuthBuffer title={`Welcome back${welcomeName ? `, ${welcomeName.split(' ')[0]}` : ''}`}
@@ -59,14 +57,14 @@ export default function Login() {
   return (
     <AuthShell title="Welcome back" sub="Sign in to your TaskMatch workspace."
       footer={<>Don&apos;t have an account? <Link href="/signup" onClick={go("/signup")} className="font-medium text-primary-text hover:underline">Sign up</Link></>}>
-      <button onClick={fillDemo} type="button"
+      <button onClick={() => router.push('/demo')} type="button"
         className="w-full flex items-center gap-3 rounded-lg px-3.5 py-3 mb-6 text-left transition-colors border border-dashed border-line-strong bg-subtle hover:bg-surface-2">
         <span className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>
           <Icon name="sparkle" size={16} />
         </span>
         <span className="min-w-0">
           <span className="block text-sm font-medium text-fg">Try the demo account</span>
-          <span className="block text-xs truncate text-muted">Fills in demo@taskmatch.app for you</span>
+          <span className="block text-xs truncate text-muted">Open a demo team, no sign-up needed</span>
         </span>
       </button>
 

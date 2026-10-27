@@ -93,6 +93,7 @@ Each release has a full write-up with before/after screenshots in light and dark
 | Level 3: integrations | GitHub and Jira import, matcher calibration and auto-tune | [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27) | [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations) |
 | New logo | Overlap mark, two-tone wordmark, favicon, SVG and home-screen icons ([brand files](taskmatch/public/brand/)) | [#29](https://github.com/7YMERA/taskmatch-2.0/pull/29) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#new-logo) |
 | API on Vercel | The API moves from Render into the same Vercel project as the site, under `/api`: no 50-second wake-up, one domain, one place for settings | [#31](https://github.com/7YMERA/taskmatch-v2/pull/31) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#api-on-vercel) |
+| Try the demo, no login | One click on the landing or login page (or a `/demo` link) opens the demo team as a team lead. The sign-in happens on the server, so no demo password is in the page | [#35](https://github.com/7YMERA/taskmatch-v2/pull/35) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#try-the-demo-no-login) |
 
 **v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
 
@@ -204,6 +205,10 @@ in. It names the workspace, adds projects and files your tasks into them, gives 
 best-matching people, and adds a second workspace so the switcher has somewhere to go. Then run
 [`supabase/demo-data-more.sql`](supabase/demo-data-more.sql) for a fuller task list: about 50 more
 tasks, two months of finished work for the dashboard trends, and comments.
+
+**Try the demo** (`/demo`) opens the workspace run by `demo@taskmatch.app` as a shared visitor
+account with the team lead role, created on first use. Visitors' changes are shared, so re-run the
+demo scripts to reset it. Settings are in [taskmatch-api/README.md](taskmatch-api/README.md).
 
 ### 3. The frontend
 
