@@ -60,7 +60,7 @@ export default function MatchFinder({ skills, canAssign, onOpenPerson, initialNe
       }, { headers: await authHeaders() })
       setRecs(res.data.recommendations)
     } catch (e: any) {
-      toast(e?.response?.data?.detail || 'Could not reach the server. It may be waking up; try again in a moment.', 'error')
+      toast(e?.response?.data?.detail || 'Could not reach the server. Check your connection and try again.', 'error')
     } finally { setLoading(false) }
   }
 

@@ -103,12 +103,12 @@ export default function TaskDetail() {
   }
 
   // Turn an axios error into a message that names the real reason instead of a bare "Failed"
-  // (e.g. a closed task, or the free-tier backend still waking up).
+  // (e.g. a closed task, or the server being unreachable).
   const errMsg = (err: any, fallback: string) => {
     const detail = err?.response?.data?.detail
     if (detail) return detail
     if (err?.response) return `${fallback} (server responded ${err.response.status})`
-    return `${fallback} — couldn't reach the server. It may be waking up (free tier); try again in a moment.`
+    return `${fallback} — couldn't reach the server. Check your connection and try again.`
   }
 
   const assignStudent = async (student_id: string, name: string) => {
