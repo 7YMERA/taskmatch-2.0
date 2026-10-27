@@ -83,17 +83,29 @@ const ACCENT: Record<Accent, string> = {
 export const accentColor = (a: Accent) => ACCENT[a]
 export const soft = (c: string, pct = 12) => `color-mix(in srgb, ${c} ${pct}%, transparent)`
 
-/* ─── Brand mark ─── one shared logo instead of four copies of the SVG */
+/* ─── Brand mark ─── one shared logo instead of four copies of the SVG.
+   "Overlap": the person (indigo circle) meets the task (green tile), and the amber
+   overlap is the match. Fixed colours, so it reads the same on light and dark. */
 export function Logo({ size = 28, withText = true, className = '' }: { size?: number; withText?: boolean; className?: string }) {
+  const uid = React.useId().replace(/:/g, '')
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="TaskMatch logo">
-        <rect width="32" height="32" rx="8" fill="var(--tm-primary)" />
-        <path d="M11 11l10 10" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" opacity="0.85" />
-        <circle cx="10.5" cy="10.5" r="3.4" fill="#fff" />
-        <rect x="18" y="18" width="7" height="7" rx="2" fill="#fff" />
+      <svg width={size} height={size} viewBox="4 5.5 56 56" fill="none" role="img" aria-label="TaskMatch logo">
+        <defs>
+          <clipPath id={`tm-logo-clip-${uid}`}><rect x="25" y="13" width="34" height="34" rx="10" /></clipPath>
+          <linearGradient id={`tm-logo-glow-${uid}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#fde68a" /><stop offset="1" stopColor="#f59e0b" />
+          </linearGradient>
+        </defs>
+        <circle cx="23" cy="36" r="18" fill="#6d6af8" />
+        <rect x="25" y="13" width="34" height="34" rx="10" fill="#10b981" />
+        <circle cx="23" cy="36" r="18" fill={`url(#tm-logo-glow-${uid})`} clipPath={`url(#tm-logo-clip-${uid})`} />
       </svg>
-      {withText && <span className="tm-wordmark" style={{ fontSize: size * 0.6 }}>TaskMatch</span>}
+      {withText && (
+        <span className="tm-wordmark" style={{ fontSize: size * 0.6 }}>
+          Task<span className="tm-wordmark-accent">Match</span>
+        </span>
+      )}
     </span>
   )
 }

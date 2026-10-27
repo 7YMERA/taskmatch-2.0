@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="taskmatch/public/brand/logo-dark.png">
+    <img src="taskmatch/public/brand/logo-light.png" alt="TaskMatch" width="360">
+  </picture>
+</p>
+
 # TaskMatch 2.0
 
 **Skill-based task matching for teams.** TaskMatch looks at the skills a task needs,
@@ -84,6 +91,7 @@ Each release has a full write-up with before/after screenshots in light and dark
 | People and smarter matching | Explainable fit score out of 100, proven skills, Team insights, Find a match | [#18](https://github.com/7YMERA/taskmatch-2.0/pull/18) | [People matching](https://github.com/7YMERA/taskmatch-v2/wiki/People-Matching) |
 | Phase 3c, 4: notifications, search, settings | Bell, approvals, Ctrl+K palette, CSV exports, Settings, Getting Started | [#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28) | [3c](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3c-Notifications-and-Approvals), [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#bell-and-ctrlk-polish) |
 | Level 3: integrations | GitHub and Jira import, matcher calibration and auto-tune | [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27) | [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations) |
+| New logo | Overlap mark, two-tone wordmark, favicon, SVG and home-screen icons ([brand files](taskmatch/public/brand/)) | [#29](https://github.com/7YMERA/taskmatch-2.0/pull/29) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#new-logo) |
 
 **v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
 
