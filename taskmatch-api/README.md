@@ -36,6 +36,10 @@ cp .env.example .env
 | `AI_RATE_LIMIT_PER_MINUTE` | Suggestion requests per user per minute (default `10`). | no |
 | `CAPACITY_HOURS` | Hours of active work one person can carry, for the fit score's availability part and Team insights (default `20`). | no |
 | `EVIDENCE_HALF_LIFE_DAYS` | How fast proven experience fades: finished work counts half as much after this many days (default `180`). | no |
+| `DEMO_OWNER_EMAIL` | The account whose workspace "Try the demo" opens (default `demo@taskmatch.app`; the first workspace it is admin of). | no |
+| `DEMO_WORKSPACE_ID` | Open this workspace for the demo instead. | no |
+| `DEMO_ROLE` | The demo visitor's role there: `lead` (default), `member` or `viewer`. Never admin. | no |
+| `DEMO_RATE_LIMIT_PER_MINUTE` | Demo starts per IP per minute (default `10`). | no |
 
 ## Run
 
@@ -112,6 +116,7 @@ controls (login required, rate limiting), and never touch the database. CI runs 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/health` | — | liveness |
+| POST | `/demo/start` | — | "Try the demo": signs in the shared demo visitor (a team lead in the demo workspace) on the server and returns its session. Needs the service-role key. |
 | GET | `/recommend/{task_id}` | user | everyone ranked for a task by fit score (0–100, with its four parts; see `matching.py`) |
 | GET | `/recommend-tasks/{student_id}` | user | open tasks for a person, by fit score |
 | POST | `/match/people` | user | everyone ranked for any skills and levels (+ optional description), same fit score |

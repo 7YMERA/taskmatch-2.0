@@ -176,7 +176,7 @@ export default function Sidebar() {
             </div>
           </Link>
           <ThemeToggle />
-          <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut(); router.push('/login') }}
+          <button onClick={async () => { setRoleOverride(null); await supabase.auth.signOut({ scope: 'local' }); router.push('/login') }}
             aria-label="Sign out" title="Sign out" className="tm-btn tm-btn-quiet tm-btn-icon">
             <Icon name="logout" size={16} />
           </button>

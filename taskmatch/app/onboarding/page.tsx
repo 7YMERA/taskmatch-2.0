@@ -53,7 +53,7 @@ export default function Onboarding() {
         : 'Each workspace has its own people, projects, tasks and roles.'}
       footer={ws && ws.workspaces.length > 0
         ? <Link href="/dashboard" className="font-medium text-primary-text hover:underline">Back to {ws.workspaces.find(w => w.id === ws.current)?.name || 'the app'}</Link>
-        : <button type="button" onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} className="hover:underline">Sign out</button>}>
+        : <button type="button" onClick={async () => { await supabase.auth.signOut({ scope: 'local' }); router.push('/login') }} className="hover:underline">Sign out</button>}>
 
       <div className="tm-seg w-full mb-6" role="group" aria-label="Create or join">
         {([['create', 'Start a new one', 'plus'], ['join', 'I have an invite', 'link']] as const).map(([k, label, icon]) => (

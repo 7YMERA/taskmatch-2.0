@@ -216,9 +216,9 @@ export default function Landing() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/signup"><Button className="!px-5 !py-3">Get started free <Icon name="arrowRight" size={16} /></Button></Link>
-              <Link href="/login"><Button variant="ghost" className="!px-5 !py-3">Try the demo</Button></Link>
+              <Link href="/demo"><Button variant="ghost" className="!px-5 !py-3">Try the demo</Button></Link>
             </div>
-            <p className="text-xs mt-4 text-faint">No credit card needed. Demo account included.</p>
+            <p className="text-xs mt-4 text-faint">No credit card needed. Try the demo without signing up.</p>
           </div>
         </Section>
         <div className="relative px-5 sm:px-8 pb-8 tm-fade-up" style={{ animationDelay: '.1s' }}>
