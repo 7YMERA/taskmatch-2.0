@@ -1,6 +1,6 @@
 'use client'
 
-/* People › Find a match. Describe a need (skills at a level, and optionally what the work is) or
+/* Find a match (/match). Describe a need (skills at a level, and optionally what the work is) or
    start from an open task, and get everyone ranked by fit score with the reasons. From an open
    task, a lead can assign straight from the list. */
 
@@ -20,11 +20,12 @@ type Rec = {
 }
 
 
-export default function MatchFinder({ skills, canAssign, onOpenPerson, initialNeed = [] }: {
+export default function MatchFinder({ skills, canAssign, onOpenPerson, initialNeed = [], initialTaskId = '' }: {
   skills: { id: string; skill_name: string }[]
   canAssign: boolean
   onOpenPerson: (id: string) => void
   initialNeed?: { skill_id: string; min_proficiency: number }[]
+  initialTaskId?: string
 }) {
   const [need, setNeed] = useState(initialNeed)
   const [description, setDescription] = useState('')
@@ -40,6 +41,8 @@ export default function MatchFinder({ skills, canAssign, onOpenPerson, initialNe
       .in('status', ['New', 'In Progress']).order('description')
       .then(({ data }) => setOpenTasks((data || []).filter((t: any) => (t.task_skills || []).length)))
   }, [])
+  // Arriving with ?task=<id>: start from that task once the open tasks have loaded.
+  useEffect(() => { if (initialTaskId && !taskId && openTasks.some(t => t.id === initialTaskId)) pickTask(initialTaskId) }, [openTasks])
 
   const pickTask = (id: string) => {
     setTaskId(id)

@@ -178,6 +178,6 @@ export function needsAttention(tasks: Task[], asg: Assignment[], students: Stude
   const load = new Map<string, number>()
   active.forEach(a => load.set(a.student_id, (load.get(a.student_id) || 0) + 1))
   students.filter(s => (load.get(s.id) || 0) >= wipLimit)
-    .forEach(s => items.push({ kind: 'at-limit', label: s.name, href: `/students/${s.id}`, detail: `${load.get(s.id)}/${wipLimit} active tasks` }))
+    .forEach(s => items.push({ kind: 'at-limit', label: s.name, href: `/people/${s.id}`, detail: `${load.get(s.id)}/${wipLimit} active tasks` }))
   return items
 }

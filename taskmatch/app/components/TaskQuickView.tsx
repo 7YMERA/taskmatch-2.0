@@ -137,7 +137,7 @@ export default function TaskQuickView({ task, assignees, groups, projects = [], 
           {assignees.map(a => (
             <div key={a.student_id} className="flex items-center gap-2.5">
               <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold" style={{ background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-text)' }}>{initials(a.students?.name || '?')}</span>
-              <Link href={`/students/${a.student_id}`} className="text-sm text-fg hover:underline flex-1 min-w-0 truncate">{a.students?.name}</Link>
+              <Link href={`/people/${a.student_id}`} className="text-sm text-fg hover:underline flex-1 min-w-0 truncate">{a.students?.name}</Link>
               <span className="text-[11px] text-faint">{a.status === 'In Progress' ? 'Working on it' : a.status === 'Assigned' ? 'Not started' : a.status}</span>
             </div>
           ))}

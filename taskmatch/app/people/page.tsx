@@ -9,7 +9,6 @@ import { logActivity } from '../lib/log'
 import Sidebar from '../components/Sidebar'
 import SkillPicker from '../components/SkillPicker'
 import PersonQuickView from '../components/PersonQuickView'
-import MatchFinder from '../components/MatchFinder'
 import PeopleInsights, { type Insights } from '../components/PeopleInsights'
 import { effectiveRole, can, roleLabel } from '../lib/role'
 import { isAway, fmtDay, setAway as saveAway, markAway as askAway } from '../lib/away'
@@ -28,11 +27,11 @@ const AVATAR = { background: 'var(--tm-primary-soft)', color: 'var(--tm-primary-
 const LEVELS = ['', 'Beginner', 'Intermediate', 'Advanced']
 // Skills-matrix cell shades: one hue, light → dark by level.
 const LEVEL_FILL = ['', 'color-mix(in srgb, var(--tm-chart-1) 40%, var(--tm-surface-1))', 'color-mix(in srgb, var(--tm-chart-1) 62%, var(--tm-surface-1))', 'var(--tm-chart-1)']
-type PeopleView = 'roster' | 'cards' | 'matrix' | 'insights' | 'find'
+type PeopleView = 'roster' | 'cards' | 'matrix' | 'insights'
 type Avail = 'all' | 'free' | 'room' | 'limit' | 'away'
 type PeopleSort = 'group' | 'name' | 'available' | 'score'
 
-export default function Students() {
+export default function People() {
   const router = useRouter()
   const [students, setStudents] = useState<any[]>([])
   const [skills, setSkills] = useState<any[]>([])
@@ -63,17 +62,18 @@ export default function Students() {
   const [avail, setAvail] = useState<Avail>('all')
   const [sort, setSort] = useState<PeopleSort>('group')
   const [insights, setInsights] = useState<Insights | null>(null)
-  const [findSkill, setFindSkill] = useState('')   // "Find people →" from Team insights preselects a skill
   const urlReady = useRef(false)
 
   // Search, filters and layout live in the URL so a slice like "React, Intermediate+, free" can be shared.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
+    // "Find a match" used to be a tab here (?view=find). It has its own page now.
+    if (q.get('view') === 'find') { router.replace('/match'); return }
     if (q.get('q')) setQuery(q.get('q')!)
     if (q.get('skill')) setSkillFilter(q.get('skill')!)
     if (['1', '2', '3'].includes(q.get('level') || '')) setMinLevel(Number(q.get('level')))
     if (['free', 'room', 'limit', 'away'].includes(q.get('avail') || '')) setAvail(q.get('avail') as Avail)
-    if (['matrix', 'cards', 'insights', 'find'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
+    if (['matrix', 'cards', 'insights'].includes(q.get('view') || '')) setView(q.get('view') as PeopleView)
     if (q.get('open')) setQuickId(q.get('open'))
     if (['name', 'available', 'score'].includes(q.get('sort') || '')) setSort(q.get('sort') as PeopleSort)
     if (q.get('group')) setGroupFilter(q.get('group')!)
@@ -174,7 +174,7 @@ export default function Students() {
   }
 
   const disbandGroup = async (name: string) => {
-    if (!(await confirmDialog({ title: `Disband "${name}"?`, message: 'Its members and tasks will be ungrouped — the students and tasks themselves are kept.', danger: true, confirmLabel: 'Disband' }))) return
+    if (!(await confirmDialog({ title: `Disband "${name}"?`, message: 'Its members and tasks will be ungrouped — the people and tasks themselves are kept.', danger: true, confirmLabel: 'Disband' }))) return
     await supabase.from('students').update({ group_label: null }).eq('group_label', name)
     await supabase.from('tasks').update({ group_label: null }).eq('group_label', name)
     await supabase.from('groups').delete().eq('name', name)
@@ -402,16 +402,21 @@ export default function Students() {
               {loading || insights ? 'Your team roster, skills and current workload' : `${students.length} people · ${freeCount} free right now · ${limitCount} at their limit${awayCount ? ` · ${awayCount} away` : ''}`}
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/match" className="tm-btn tm-btn-ghost">
+              <Icon name="target" size={16} /> Find a match
+            </Link>
           {can(userRole, 'people.manage') && (
-            <div className="flex gap-2">
+            <>
               <Button variant="ghost" onClick={() => { setShowGroupForm(!showGroupForm); setShowForm(false) }}>
                 <Icon name="users" size={16} /> Create group
               </Button>
               <Button onClick={() => { setShowForm(!showForm); setShowGroupForm(false) }}>
-                <Icon name="plus" size={16} /> Add student
+                <Icon name="plus" size={16} /> Add person
               </Button>
-            </div>
+            </>
           )}
+          </div>
         </div>
 
         {/* Team at a glance */}
@@ -440,8 +445,8 @@ export default function Students() {
                 const isExisting = groups.some(g => g.name === groupForm.name.trim())
                 return (
                   <div>
-                    <p className="text-sm font-medium" style={TEXT}>{isExisting ? `Add students to “${groupForm.name.trim()}”` : 'Create a group'}</p>
-                    <p className="text-xs" style={FAINT}>{isExisting ? 'Pick students below — anyone in another group will be moved here' : 'Name it, pick a colour, and add students (typing an existing name adds to that group)'}</p>
+                    <p className="text-sm font-medium" style={TEXT}>{isExisting ? `Add people to “${groupForm.name.trim()}”` : 'Create a group'}</p>
+                    <p className="text-xs" style={FAINT}>{isExisting ? 'Pick people below — anyone in another group will be moved here' : 'Name it, pick a colour, and add people (typing an existing name adds to that group)'}</p>
                   </div>
                 )
               })()}
@@ -467,7 +472,7 @@ export default function Students() {
               ))}
             </div>
 
-            <p className="text-xs mb-1" style={MUTED}>Select students ({groupForm.members.length} selected)</p>
+            <p className="text-xs mb-1" style={MUTED}>Select people ({groupForm.members.length} selected)</p>
             <p className="text-xs mb-2" style={FAINT}>Anyone already in another group will be moved here.</p>
             <div className="flex flex-col gap-1 mb-4 max-h-56 overflow-y-auto">
               {(() => {
@@ -476,7 +481,7 @@ export default function Students() {
                 const list = students.filter(s => !(target && s.group_label === target))
                 return list.length === 0 ? (
                   <p className="text-xs" style={FAINT}>
-                    {students.length === 0 ? 'No students yet — add students first.' : 'Everyone is already in this group.'}
+                    {students.length === 0 ? 'Nobody here yet. Add people first.' : 'Everyone is already in this group.'}
                   </p>
                 ) : list.map(s => {
                   const checked = groupForm.members.includes(s.id)
@@ -513,7 +518,7 @@ export default function Students() {
         {/* Add student form — leader only */}
         {showForm && can(userRole, 'people.manage') && (
           <Card className="p-5 mb-6 tm-fade-up">
-            <p className="text-sm font-medium mb-4" style={TEXT}>New student</p>
+            <p className="text-sm font-medium mb-4" style={TEXT}>New person</p>
 
             {/* Source: attach a roster row to someone who already signed up, or type in someone new. */}
             <div className="flex gap-2 mb-4">
@@ -596,7 +601,7 @@ export default function Students() {
                 </select>
               </Field>
             </div>
-            <p className="text-[11px] mb-4 -mt-1" style={FAINT}>Tip: add the student first, then put them in a group from the group filter → “Add students”.</p>
+            <p className="text-[11px] mb-4 -mt-1" style={FAINT}>Tip: add the person first, then put them in a group with “Create group”.</p>
 
             <p className="text-xs mb-2" style={MUTED}>Assign skills <span style={FAINT}>— click a skill, then set B / I / A</span></p>
             <div className="mb-4">
@@ -604,7 +609,7 @@ export default function Students() {
             </div>
 
             <div className="flex gap-3">
-              <Button onClick={addStudent}>Save student</Button>
+              <Button onClick={addStudent}>Save person</Button>
               <Button variant="ghost" onClick={() => { setShowForm(false); setSelectedSkills([]) }}>Cancel</Button>
               <Button variant="ghost" className="ml-auto"
                 onClick={() => { setForm({ name: '', matric: '', programme: '', year: '', email: '', group_label: '' }); setSelectedSkills([]) }}>
@@ -614,29 +619,27 @@ export default function Students() {
           </Card>
         )}
 
-        {/* Toolbar: search, layout */}
+        {/* Toolbar: layout, then search. The tabs scroll sideways on a narrow screen instead of running off it. */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className={`relative flex-1 min-w-[14rem] max-w-md ${view === 'insights' || view === 'find' ? 'hidden' : ''}`}>
+          <div className="max-w-full overflow-x-auto">
+          <div className="tm-seg" aria-label="Layout">
+            {([['roster', 'Roster', 'list'], ['cards', 'Cards', 'users'], ['matrix', 'Skills matrix', 'grid'], ['insights', 'Team insights', 'chart']] as const).map(([k, label, icon]) => (
+              <button key={k} onClick={() => setView(k)} aria-pressed={view === k} className="whitespace-nowrap"><Icon name={icon} size={14} /> {label}</button>
+            ))}
+          </div>
+          </div>
+          <div className={`relative flex-1 min-w-[14rem] max-w-md ${view === 'insights' ? 'hidden' : ''}`}>
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={FAINT}><Icon name="search" size={15} /></span>
             <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, matric, email or skill…" className="!pl-9" aria-label="Search people" />
-          </div>
-          <div className="tm-seg" aria-label="Layout">
-            {([['roster', 'Roster', 'list'], ['cards', 'Cards', 'users'], ['matrix', 'Skills matrix', 'grid'], ['insights', 'Team insights', 'chart'], ['find', 'Find a match', 'target']] as const).map(([k, label, icon]) => (
-              <button key={k} onClick={() => setView(k)} aria-pressed={view === k}><Icon name={icon} size={14} /> {label}</button>
-            ))}
           </div>
         </div>
 
         {view === 'insights' && (
           <PeopleInsights data={insights} onOpenPerson={setQuickId}
-            onFindFor={id => { setFindSkill(id); setView('find') }} />
-        )}
-        {view === 'find' && (
-          <MatchFinder key={findSkill} skills={skills} canAssign={can(userRole, 'assign.others')} onOpenPerson={setQuickId}
-            initialNeed={findSkill ? [{ skill_id: findSkill, min_proficiency: 1 }] : []} />
+            onFindFor={id => router.push(`/match?skill=${id}`)} />
         )}
 
-        <div className={view === 'insights' || view === 'find' ? 'hidden' : ''}>
+        <div className={view === 'insights' ? 'hidden' : ''}>
         {/* "Who knows X and is free?" — skill + level + availability */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="flex items-center gap-2">
@@ -729,7 +732,7 @@ export default function Students() {
                       {shownStudents.map(s => (
                         <tr key={s.id}>
                           <td className="sticky left-0 z-10 pr-3 whitespace-nowrap" style={{ background: 'var(--tm-surface-1)' }}>
-                            <Link href={`/students/${s.id}`} className="hover:underline flex items-center gap-2" style={TEXT}>
+                            <Link href={`/people/${s.id}`} className="hover:underline flex items-center gap-2" style={TEXT}>
                               {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
                               {s.name}
                             </Link>
@@ -765,7 +768,7 @@ export default function Students() {
               <div className="flex gap-2">
                 <Button variant="ghost" className="tm-btn-sm"
                   onClick={() => { setGroupForm({ name: groupFilter, color: groupColor(groupFilter), members: [] }); setShowGroupForm(true); setShowForm(false) }}>
-                  <Icon name="plus" size={14} /> Add students
+                  <Icon name="plus" size={14} /> Add people
                 </Button>
                 <Button variant="ghost" className="tm-btn-sm" style={{ color: 'var(--tm-rose)', borderColor: 'color-mix(in srgb, var(--tm-rose) 40%, transparent)' }}
                   onClick={() => disbandGroup(groupFilter)}>
@@ -780,8 +783,8 @@ export default function Students() {
             </div>
           ) : shownStudents.length === 0 ? (
             <EmptyState icon={<Icon name="users" size={28} />}
-              title={students.length === 0 ? 'No students yet' : peopleFiltersOn ? 'Nobody matches these filters' : 'No students in this group'}
-              hint={students.length === 0 && can(userRole, 'people.manage') ? 'Add your first student to start matching them to tasks.' : undefined} />
+              title={students.length === 0 ? 'Nobody here yet' : peopleFiltersOn ? 'Nobody matches these filters' : 'Nobody in this group'}
+              hint={students.length === 0 && can(userRole, 'people.manage') ? 'Add your first person to start matching them to tasks.' : undefined} />
           ) : view === 'cards' ? (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {shownStudents.map(s => {
@@ -795,7 +798,7 @@ export default function Students() {
                         ? <img src={s.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
                         : <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-medium shrink-0" style={AVATAR}>{initials(s.name)}</div>}
                       <div className="flex-1 min-w-0">
-                        <Link href={`/students/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate block" style={TEXT}>{s.name}</Link>
+                        <Link href={`/people/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate block" style={TEXT}>{s.name}</Link>
                         <p className="text-[11px] truncate flex items-center gap-1.5" style={FAINT}>
                           {s.group_label && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} />}
                           {s.group_label ? `${s.group_label} · ` : ''}{s.programme}
@@ -841,7 +844,7 @@ export default function Students() {
                     <div className="flex-1 md:flex-none md:w-52 shrink-0 min-w-0">
                       <div className="flex items-center gap-2">
                         {s.group_label && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: groupColor(s.group_label) }} title={s.group_label} />}
-                        <Link href={`/students/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full profile)">{s.name}</Link>
+                        <Link href={`/people/${s.id}`} onClick={e => openQuick(e, s.id)} className="text-sm font-medium hover:underline truncate" style={TEXT} title="Quick view (Ctrl-click to open the full profile)">{s.name}</Link>
                         {can(userRole, 'people.manage') && (() => {
                           const acct = accountFor(s)
                           if (!acct) return <span className="text-[11px] shrink-0" style={FAINT} title="No login account linked to this roster row">no login</span>
@@ -893,14 +896,14 @@ export default function Students() {
                     {can(userRole, 'people.manage') && (
                       <div className="relative shrink-0">
                         <button onClick={() => setMenuOpen(menuOpen === s.id ? null : s.id)}
-                          aria-label="Student actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
+                          aria-label="Person actions" className="tm-btn tm-btn-ghost tm-btn-icon !border-transparent">
                           <Icon name="more" size={18} />
                         </button>
                         {menuOpen === s.id && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
                             <div className="tm-menu absolute right-0 top-full mt-1 z-20 w-48">
-                              <Link href={`/students/${s.id}`} className="tm-menu-item"><Icon name="user" size={13} /> See profile</Link>
+                              <Link href={`/people/${s.id}`} className="tm-menu-item"><Icon name="user" size={13} /> See profile</Link>
                               <button onClick={() => { setMenuOpen(null); startEditing(s) }} className="tm-menu-item"><Icon name="star" size={13} /> Edit skills &amp; photo</button>
                               {isAway(s)
                                 ? <button onClick={() => { setMenuOpen(null); saveAway(s, null).then(ok => { if (ok) fetchStudents() }) }} className="tm-menu-item"><Icon name="check" size={13} /> Mark as back</button>

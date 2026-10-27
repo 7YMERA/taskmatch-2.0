@@ -25,7 +25,7 @@ export default function GettingStarted({ peopleCount, taskCount, role }:
   if (!isLeader || dismissed) return null
 
   const steps: Step[] = [
-    { id: 'people', label: 'Add your people', done: peopleCount > 0, href: '/students', cta: 'Add people', icon: 'users' },
+    { id: 'people', label: 'Add your people', done: peopleCount > 0, href: '/people', cta: 'Add people', icon: 'users' },
     { id: 'task', label: 'Create your first task', done: taskCount > 0, href: '/tasks?new=1', cta: 'New task', icon: 'plus' },
     { id: 'invite', label: 'Invite your teammates', done: false, href: '/team', cta: 'Invite', icon: 'link' },
   ]

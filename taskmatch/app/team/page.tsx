@@ -296,7 +296,7 @@ export default function Team() {
                           <td className="text-[13px]">
                             {a.on_roster ? <span className="text-muted inline-flex items-center gap-1"><Icon name="check" size={13} /> Yes</span>
                               : a.role === 'viewer' ? <span className="text-faint">Not needed</span>
-                              : <Link href="/students" className="text-primary-text hover:underline">Add to roster</Link>}
+                              : <Link href="/people" className="text-primary-text hover:underline">Add to roster</Link>}
                           </td>
                           <td className="text-[13px] text-muted whitespace-nowrap">{ago(a.last_sign_in_at)}</td>
                           <td className="text-[13px] text-faint whitespace-nowrap">{a.created_at ? new Date(a.created_at).toLocaleDateString() : '—'}</td>

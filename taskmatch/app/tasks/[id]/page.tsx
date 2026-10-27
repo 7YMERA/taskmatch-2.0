@@ -299,7 +299,7 @@ export default function TaskDetail() {
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0" style={AVATAR}>{initials(a.students?.name)}</div>
                         <div className="flex-1 min-w-0">
                           <span className="flex items-center gap-2 flex-wrap">
-                            <Link href={`/students/${a.student_id}`} className="text-sm hover:underline" style={TEXT}>{a.students?.name}</Link>
+                            <Link href={`/people/${a.student_id}`} className="text-sm hover:underline" style={TEXT}>{a.students?.name}</Link>
                             {recs.length > 0 && wipChip(recs.find(r => r.student_id === a.student_id)?.wip ?? 0)}
                           </span>
                           <p className="text-xs mt-0.5" style={FAINT}>
