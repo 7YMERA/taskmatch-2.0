@@ -4,11 +4,11 @@
 finds the people who have them, checks who has room to take more work, and helps a
 lead assign it with the reason for every pick shown up front.
 
-![TaskMatch 2.0 dashboard](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/phase1/after-dashboard-dark.png)
+![TaskMatch 2.0 dashboard](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/dashboard-dark.png)
 
 | Light | Dark |
 |---|---|
-| ![Landing, light](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/redesign/after-landing-light.png) | ![Landing, dark](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/redesign/after-landing-dark.png) |
+| ![Landing, light](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/landing-light.png) | ![Landing, dark](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/landing-dark.png) |
 
 ---
 
@@ -85,9 +85,13 @@ Each release has a full write-up with before/after screenshots in light and dark
 | Phase 3c, 4: notifications, search, settings | Bell, approvals, Ctrl+K palette, CSV exports, Settings, Getting Started | [#19](https://github.com/7YMERA/taskmatch-2.0/pull/19) – [#24](https://github.com/7YMERA/taskmatch-2.0/pull/24), [#28](https://github.com/7YMERA/taskmatch-2.0/pull/28) | [3c](https://github.com/7YMERA/taskmatch-v2/wiki/Phase-3c-Notifications-and-Approvals), [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#bell-and-ctrlk-polish) |
 | Level 3: integrations | GitHub and Jira import, matcher calibration and auto-tune | [#27](https://github.com/7YMERA/taskmatch-2.0/pull/27) | [Level 3](https://github.com/7YMERA/taskmatch-v2/wiki/Level-3-Integrations) |
 
-| Before (FYP) | After (2.0) |
+**v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
+
+| v1 (FYP) | Today |
 |---|---|
-| ![Dashboard before](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/redesign/before-dashboard-light.png) | ![Dashboard after](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/redesign/after-dashboard-light.png) |
+| ![Dashboard, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/dashboard-dark.png) | ![Dashboard, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/dashboard-light.png) |
+| ![Tasks, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/tasks-dark.png) | ![Tasks, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/tasks-dark.png) |
+| ![People, v1](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/v1/people-dark.png) | ![People, today](https://raw.githubusercontent.com/wiki/7YMERA/taskmatch-v2/images/now/people-light.png) |
 
 | Notifications | Ctrl+K search |
 |---|---|
