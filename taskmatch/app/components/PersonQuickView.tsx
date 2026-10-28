@@ -59,7 +59,7 @@ export default function PersonQuickView({ person, wip, wipLimit, stat, insight, 
         </span>
       </span>}
       footer={<>
-        <Link href={`/students/${person.id}`} className="tm-btn tm-btn-primary tm-btn-sm">Open full profile <Icon name="arrowRight" size={13} /></Link>
+        <Link href={`/people/${person.id}`} className="tm-btn tm-btn-primary tm-btn-sm">Open full profile <Icon name="arrowRight" size={13} /></Link>
         {person.email && <a href={`mailto:${person.email}`} className="tm-btn tm-btn-ghost tm-btn-sm"><Icon name="mail" size={13} /> Email</a>}
         <button onClick={onClose} className="tm-btn tm-btn-ghost tm-btn-sm ml-auto">Close</button>
       </>}>

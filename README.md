@@ -65,6 +65,7 @@ of real teams and, one day, offering as a product.
 | **Look and feel** | Six-colour palette; white-on-white text in light mode | Neutral base with one indigo accent, per-theme tokens, Geist type, theme follows your OS |
 | **Dashboard** | Totals at one point in time | Date ranges, KPI trends with sparklines, "needs attention", matching health, workload heatmap, skills coverage |
 | **Assigning work** | Pick a person from a ranked list | Also auto-assign by best match, round robin or least loaded, previewed with the reason before confirming |
+| **Finding the right person** | Only from inside one task | A **Find a match** page in the sidebar: describe the work or pick a task, see everyone ranked with reasons |
 | **Assigning work, part 2** | Ranked by skill only | An explainable fit score out of 100 (skills, proven experience, availability, record), tunable per workspace from real outcomes |
 | **Teams** | One shared list for everyone | Workspaces with their own people, tasks and roles; projects inside them; invite links |
 | **Roles** | Leader or student, editable by the user | Admin, team lead, member, viewer, enforced by the API and the database, with an audit trail |
@@ -95,6 +96,8 @@ Each release has a full write-up with before/after screenshots in light and dark
 | API on Vercel | The API moves from Render into the same Vercel project as the site, under `/api`: no 50-second wake-up, one domain, one place for settings | [#31](https://github.com/7YMERA/taskmatch-v2/pull/31) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#api-on-vercel) |
 | Try the demo, no login | One click on the landing or login page (or a `/demo` link) opens the demo team as a team lead. The sign-in happens on the server, so no demo password is in the page | [#35](https://github.com/7YMERA/taskmatch-v2/pull/35) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#try-the-demo-no-login) |
 
+| People and Find a match | Students becomes People at `/people` (old links redirect); Find a match gets its own page and sidebar entry | [#33](https://github.com/7YMERA/taskmatch-v2/pull/33) | [Changelog](https://github.com/7YMERA/taskmatch-v2/wiki/Changelog#people-page-and-find-a-match) |
+
 **v1 (the FYP) vs today**, on the same demo team. Every page, in both themes: **[v1 vs Now](https://github.com/7YMERA/taskmatch-v2/wiki/v1-vs-Now)**.
 
 | v1 (FYP) | Today |
@@ -121,7 +124,8 @@ How the two AI assistants (Claude and Kiro) split the work is in their notes on 
    (20), availability (20) and track record (15). The app always shows the four parts, and a
    workspace can retune the weights from real outcomes. A strong member can be paired with a
    learner so skills spread.
-5. The lead assigns from the list, or lets TaskMatch pick by mode:
+5. The lead assigns from the list, or lets TaskMatch pick by mode. To ask "who could do this?"
+   before a task exists, open **Find a match** in the sidebar.
 
 | Mode | Who it picks |
 |---|---|

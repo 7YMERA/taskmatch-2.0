@@ -287,7 +287,7 @@ export default function Dashboard() {
             spark={spans.map(w => onTimeRate(tasks, w))} />
           <TrendTile label="Avg efficiency score" value={loading ? '…' : (kScore == null ? '—' : kScore.toFixed(2))}
             change={prev ? delta(kScore, avgScoreIn(assignments, prev)) : null}
-            sub="1.00 = no time used · 0.50 = on budget" href="/students"
+            sub="1.00 = no time used · 0.50 = on budget" href="/people"
             spark={spans.map(w => avgScoreIn(assignments, w))} />
           <TrendTile label="Avg days to complete" value={loading ? '…' : (kCycle == null ? '—' : `${kCycle.toFixed(1)}d`)}
             change={prev ? delta(kCycle, avgCycleDays(assignments, prev)) : null} goodWhen="down"
@@ -411,7 +411,7 @@ export default function Dashboard() {
           {loading ? <Skeleton style={{ height: 200 }} />
             : grid.rows.length === 0 ? <p className="text-faint text-sm">No students yet.</p>
             : <Heatmap rows={grid.rows.map(r => ({ id: r.student.id, label: r.student.name, cells: r.cells }))}
-                cols={grid.cols.map(w => fmtDay(w.from))} max={gridMax} limit={wipLimit} rowHref={id => `/students/${id}`} />}
+                cols={grid.cols.map(w => fmtDay(w.from))} max={gridMax} limit={wipLimit} rowHref={id => `/people/${id}`} />}
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -429,7 +429,7 @@ export default function Dashboard() {
             : (
               <div className="flex flex-col gap-2.5">
                 {wipLoaded.map((s: any) => (
-                  <Link key={s.student_id} href={`/students/${s.student_id}`}
+                  <Link key={s.student_id} href={`/people/${s.student_id}`}
                     className="flex items-center gap-3 hover:bg-surface-2 -mx-2 px-2 py-1 rounded transition"
                     title={s.active_tasks?.map((t: any) => t.description).filter(Boolean).join(' · ')}>
                     <span className="text-xs text-muted w-32 truncate shrink-0">{s.name}</span>
@@ -578,7 +578,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
                 {[...statsList].sort((a, b) => (b.avg_score ?? -1) - (a.avg_score ?? -1)).map(s => (
-                  <Link key={s.student_id} href={`/students/${s.student_id}`}
+                  <Link key={s.student_id} href={`/people/${s.student_id}`}
                     className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-surface-2 transition-colors">
                     <div className="w-8 h-8 rounded-full bg-primary-soft text-primary-text flex items-center justify-center text-xs font-semibold shrink-0">
                       {initials(s.name)}
