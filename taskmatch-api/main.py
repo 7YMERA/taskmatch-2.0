@@ -3,6 +3,8 @@ import re
 import time
 import logging
 import secrets
+import hmac
+import hashlib
 from contextvars import ContextVar
 from datetime import timedelta
 from fastapi import FastAPI, HTTPException, Header, Request
@@ -1826,6 +1828,78 @@ def join_workspace(body: JoinBody, authorization: str = Header(None)):
                      actor_email=user.email, actor_role=role, details={"role": role})
     w = (raw_db().table("workspaces").select("name").eq("id", ws).execute()).data
     return {"id": ws, "name": w[0]["name"] if w else "Workspace", "role": role, "already_member": bool(existing)}
+
+
+# ─── Try the demo without an account ───
+# "Try the demo" signs the visitor in as a shared demo account, on the server, so no password ever
+# reaches the browser. That account is a team lead (DEMO_ROLE) in the demo workspace, never an
+# admin, so visitors can plan and assign work but can't change roles or team settings. Its
+# password is derived from the service-role key and reset on every start, so a visitor changing
+# it can't lock the next one out.
+
+DEMO_OWNER_EMAIL = os.environ.get("DEMO_OWNER_EMAIL", "demo@taskmatch.app")
+DEMO_VISITOR_EMAIL = os.environ.get("DEMO_VISITOR_EMAIL", "visitor@demo.taskmatch.app")
+DEMO_ROLE = os.environ.get("DEMO_ROLE", "lead")
+if DEMO_ROLE not in ("lead", "member", "viewer"):  # a visitor is never an admin
+    DEMO_ROLE = "lead"
+demo_limiter = RateLimiter(int(os.environ.get("DEMO_RATE_LIMIT_PER_MINUTE", "10")), 60.0)  # per IP
+
+
+def _demo_password():
+    return hmac.new(SUPABASE_SERVICE_ROLE_KEY.encode(), b"taskmatch-demo-visitor", hashlib.sha256).hexdigest()
+
+
+def _demo_workspace():
+    """DEMO_WORKSPACE_ID if set, otherwise the first workspace the demo owner runs."""
+    ws = os.environ.get("DEMO_WORKSPACE_ID")
+    if ws:
+        return ws
+    rows = (raw_db().table("workspace_members").select("workspace_id, role, joined_at")
+            .eq("email", DEMO_OWNER_EMAIL).order("joined_at").execute()).data or []
+    pick = next((m for m in rows if m["role"] == "admin"), None)
+    return pick["workspace_id"] if pick else None
+
+
+def _demo_sign_in(email, password):
+    """A throwaway client, so the visitor's session never sticks to the shared `supabase` one."""
+    return create_client(SUPABASE_URL, SUPABASE_KEY).auth.sign_in_with_password(
+        {"email": email, "password": password})
+
+
+@app.post("/demo/start")
+def demo_start(request: Request):
+    """Sign in as the demo visitor and return the session for the browser to use."""
+    wait = demo_limiter.hit(client_ip(request))
+    if wait is not None:
+        raise HTTPException(status_code=429, detail="Too many demo starts. Try again in a minute.",
+                            headers={"Retry-After": str(int(wait) + 1)})
+    admin_client = require_admin_client()
+    ws = _demo_workspace()
+    if not ws:
+        raise HTTPException(status_code=503, detail="The demo isn't set up on this server.")
+    password = _demo_password()
+    visitor = next((u for u in _list_all_users(admin_client)
+                    if (u.email or "").lower() == DEMO_VISITOR_EMAIL), None)
+    if visitor:
+        admin_client.auth.admin.update_user_by_id(visitor.id, {"password": password})
+    else:
+        visitor = admin_client.auth.admin.create_user({
+            "email": DEMO_VISITOR_EMAIL, "password": password, "email_confirm": True,
+            "user_metadata": {"full_name": "Demo visitor"}}).user
+    member = (raw_db().table("workspace_members").select("role").eq("workspace_id", ws)
+              .eq("user_id", visitor.id).execute()).data
+    if not member:
+        raw_db().table("workspace_members").insert({"workspace_id": ws, "user_id": visitor.id,
+                                                    "email": DEMO_VISITOR_EMAIL, "role": DEMO_ROLE}).execute()
+    elif member[0]["role"] != DEMO_ROLE:
+        raw_db().table("workspace_members").update({"role": DEMO_ROLE}).eq("workspace_id", ws) \
+            .eq("user_id", visitor.id).execute()
+    _remember_workspace(admin_client, visitor.id, ws, DEMO_ROLE)
+    res = _demo_sign_in(DEMO_VISITOR_EMAIL, password)
+    session = getattr(res, "session", None)
+    if not session:
+        raise HTTPException(status_code=502, detail="Couldn't start the demo. Try again.")
+    return {"access_token": session.access_token, "refresh_token": session.refresh_token, "role": DEMO_ROLE}
 
 
 # ─── AI assist ───
