@@ -157,6 +157,7 @@ supabase/         Database scripts, run in order (see "The database" below)
 .github/          CI workflow
 vercel.json       Vercel setup: the site and the API as two services in one project
 AGENTS.md         Working rules for the two AI assistants (branches, Wiki, commit identity, no secrets)
+.mcp.json         Design and docs MCP servers for AI coding sessions (see "MCP servers for AI sessions")
 ```
 
 Release write-ups, screenshots, the roadmap and the assistants' notes live on the
@@ -244,6 +245,23 @@ Set `NEXT_PUBLIC_API_URL=/api` there, plus the API's variables. Details are in
 Only `main` deploys. Vercel reads `vercel.json` from the branch being pushed, so a branch that
 lacks it (an old branch, or one holding Wiki pages) builds a preview that fails on the Hobby plan
 and emails the owner. Start every branch from the latest `main`; the rules are in [AGENTS.md](AGENTS.md).
+
+### MCP servers for AI sessions
+
+[`.mcp.json`](.mcp.json) at the repo root lists four [MCP](https://modelcontextprotocol.io) servers.
+They load automatically when a Claude Code session starts in this repo (the first time, Claude
+Code asks you to approve them once). Each one runs through `npx`, so Node.js is all you need; no
+API keys are stored in the file. They are only tools for the assistant and change nothing in the app.
+
+| Server | Command | What it's for |
+|---|---|---|
+| `shadcn` | `npx -y shadcn@latest mcp` | Browse and add [shadcn/ui](https://ui.shadcn.com) components and blocks when designing new UI. |
+| `magicui` | `npx -y @magicuidesign/mcp@latest` | Look up [Magic UI](https://magicui.design) animated components (backgrounds, text effects, marquees) for landing and marketing pages. |
+| `playwright` | `npx -y @playwright/mcp@latest --headless --isolated` | Drive a headless browser to open the app, click through pages and take light and dark screenshots for the Wiki. `--isolated` starts each session with a fresh profile, so no logins are kept. |
+| `context7` | `npx -y @upstash/context7-mcp@latest` | Pull current, version-specific library docs (Next.js 16, React 19, Tailwind v4, FastAPI, Supabase) so code follows today's APIs, not older ones. |
+
+Anything taken from shadcn or Magic UI still has to follow the house rules: the colours and
+outline icons in `taskmatch/app/components/ui.tsx`, and no emoji in the product UI.
 
 ### Tests
 
